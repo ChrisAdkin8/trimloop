@@ -295,6 +295,9 @@ the transform version, the sent request can be reproduced exactly.
 | **Team** | Solo on each machine + self-hosted collector (container / Helm chart) | ClickHouse (events, findings), Postgres (policies, recommendations) | Org running it on its own infra |
 | **Hosted** (later) | Same collector, run by us | Same | Teams that accept the hashes-only data model |
 
+How each mode is packaged and released (one binary, one container image,
+one Helm chart, one Python package) is in [packaging.md](packaging.md).
+
 ## 10. Technology choices
 
 | Area | Choice | Why | ADR |

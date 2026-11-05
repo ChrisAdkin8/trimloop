@@ -195,7 +195,7 @@ adapters.
 Hosts written in Go import `pkg/engine` directly and call `Ingest` and
 `Decide` in-process:
 
-- **Local proxy** (M1+): tees each request/response into `Ingest`.
+- **Local proxy** (M4): tees each request/response into `Ingest`.
 - **Envoy external processor**: a small gRPC service implementing Envoy's
   external-processing API, calling `Decide` on request headers/body and
   `Ingest` on the response.
@@ -530,7 +530,9 @@ testdata/sessions/          redacted fixture sessions + expected findings
 ```
 
 `pkg/` is public so Envoy/Kong hosts and third parties can embed the engine;
-adapters stay outside it so the core has no I/O dependencies.
+adapters stay outside it so the core has no I/O dependencies. Packaging adds
+`cmd/trimloop-kong/`, `internal/collector/`, `web/`, `deploy/` and
+`.goreleaser.yaml` ([packaging.md §12](packaging.md#12-repository-layout-additions)).
 
 ## 13. Performance targets
 

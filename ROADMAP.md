@@ -1,7 +1,9 @@
 # Roadmap
 
 Each milestone is usable on its own. Ship order is chosen so developers get
-value before they have to trust a proxy in their request path.
+value before they have to trust anything in their request path: first
+transcripts on disk (M0), then a gateway the team already runs (M1); a proxy on
+developer machines comes last (M4).
 
 ## M0 — Transcript analyser (MVP)
 
@@ -14,39 +16,65 @@ findings report with estimated savings. No proxy, no server.
 - Detectors P01–P07.
 - CLI report (terminal + static HTML).
 - Fixture corpus of real (redacted) sessions; detector unit tests.
+- Release pipeline: signed binary on GitHub Releases and a Homebrew tap
+  ([packaging.md](docs/packaging.md)).
 
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.
 
-## M1 — Local proxy, observe-only
+## M1 — Gateway sidecar and LiteLLM plugin, observe-only
 
-- Forward proxy with per-harness CA scoping; reverse-proxy fallback.
-- Live capture, including cache-usage fields per turn.
+**Goal:** a team running LiteLLM installs one plugin and one sidecar and gets
+the same findings as `trimloop analyse`, live, for every developer — with no
+software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-local-proxy.md)).
+
+- `trimloop serve`: ingest API (`/v1/events`), sessioniser, streaming detector
+  driver, memory and DuckDB stores ([analyzer.md](docs/analyzer.md) §5.2, §6).
+- `trimloop-litellm` plugin, observe-only: success/failure callbacks, batched
+  asynchronous forwarding, fail-open ([ADR 0005](docs/adr/0005-thin-python-plugin-for-litellm.md),
+  [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)).
+- Batch-versus-streaming parity tests; plugin tested against each supported
+  LiteLLM version.
+- Packaging: container image, Helm chart sidecar mode, Docker Compose
+  example, plugin on PyPI, schemas on the Buf registry
+  ([packaging.md](docs/packaging.md)).
+- Codex CLI transcript importer.
 - Local web UI: sessions, turns, prefix-divergence view.
-- Codex CLI importer and proxy support.
-- Fail-open and latency budget tests.
+
+**Done when:** on the same sessions, the sidecar's findings match
+`trimloop analyse`; the plugin adds no latency to model calls; killing the
+sidecar causes zero failed model calls.
 
 ## M2 — Team collector and recommendations
 
-- Hashes-only upload from agents.
-- ClickHouse/Postgres collector, container and Helm chart.
+- Hashes-only upload from sidecars and developer machines.
+- ClickHouse/Postgres collector: container image and Helm chart collector
+  mode ([packaging.md](docs/packaging.md)).
 - Root-cause grouping and ranked recommendations.
 - L1 actuators: config-patch diffs, optionally opened as PRs.
 - Before/after savings measurement.
-- Gateway connector: LiteLLM first.
+- Gateway log connectors for gateways without a plugin (hosted gateways'
+  log exports and usage APIs).
 
 ## M3 — Safe in-path transforms
 
 - Outcome signals (git, tests, interrupts).
+- Decide path through the LiteLLM plugin first (`/v1/decide`, 25 ms budget,
+  fail-open).
 - Shadow → canary → on rollout, kill switch, signed policies.
 - L2 transforms: deterministic tool ordering, volatile-segment reordering,
   cache-breakpoint placement, TTL selection.
 - Detectors P08–P12.
 
-## M4 — Broader coverage and routing
+## M4 — Local proxy and broader coverage
 
+- Local proxy for teams without a gateway: forward proxy with per-harness CA
+  scoping, reverse-proxy fallback, live capture including cache-usage fields,
+  fail-open and latency-budget tests; L2 transforms through the proxy.
 - More harnesses (Gemini CLI, others) and gateways (Portkey, Helicone,
   OpenRouter).
+- Envoy integration (`trimloop serve --extproc`) and the `trimloop-kong`
+  binary.
 - Turn-complexity classifier from outcome data.
 - L3 transforms behind opt-in: output truncation with pointers, model routing,
   thinking-budget caps.

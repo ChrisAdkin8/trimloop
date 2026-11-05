@@ -1,6 +1,6 @@
 # ADR 0001: Capture through four taps — proxy, OTel, transcripts, gateway connectors
 
-- Status: Proposed
+- Status: Proposed — order amended by [ADR 0009](0009-gateway-sidecar-before-local-proxy.md) (gateway sidecar before local proxy)
 - Date: 2026-11-05
 
 ## Context
@@ -17,7 +17,8 @@ can disable vendor features.
 Support four taps feeding one normaliser:
 
 1. Transcript importer (first to ship: zero setup, works on history).
-2. Local proxy, forward mode by default, reverse mode as a fallback.
+2. Local proxy, forward mode by default, reverse mode as a fallback
+   (now shipped after the gateway sidecar; see ADR 0009).
 3. OTLP receiver.
 4. Gateway connectors at the team collector.
 

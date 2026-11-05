@@ -13,3 +13,5 @@ Trimloop is in the design phase: the repo holds design documents only.
   content must say so explicitly and run locally.
 - Dev environment: `scripts/bootstrap.sh` installs the SDKs; run it with
   `--check` first. Keep its tool list in step with the planned stack.
+- Packaging and releases: `docs/packaging.md` (ADR 0008). Release tooling
+  runs in CI only.
