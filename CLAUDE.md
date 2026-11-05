@@ -11,3 +11,5 @@ Trimloop is in the design phase: the repo holds design documents only.
   (team collector), TypeScript (web UI).
 - Privacy default is hashes-only (ADR 0004). Any feature that needs raw
   content must say so explicitly and run locally.
+- Dev environment: `scripts/bootstrap.sh` installs the SDKs; run it with
+  `--check` first. Keep its tool list in step with the planned stack.

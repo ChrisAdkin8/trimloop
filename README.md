@@ -75,6 +75,23 @@ Decisions: [ADR 0002](docs/adr/0002-go-for-agent-and-proxy.md) (Go),
 plugin), [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)
 (plugin forwards to a sidecar). Engine design: [docs/analyzer.md](docs/analyzer.md).
 
+## Development setup
+
+Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or
+Debian/Ubuntu):
+
+```bash
+scripts/bootstrap.sh --check   # see what is missing; changes nothing
+scripts/bootstrap.sh           # install what is missing (asks first)
+```
+
+It installs Go (≥ 1.25) and a C toolchain for the DuckDB driver; `buf`,
+`protoc-gen-go`, `protoc-gen-go-grpc`, `golangci-lint` and `govulncheck`;
+`uv` with Python 3.12 for the LiteLLM plugin; Node.js (≥ 22) for the web UI;
+and the DuckDB CLI. `--with-collector` also checks Docker for the team
+collector stack; `--skip-node` and `--skip-python` skip those parts. Re-running
+is safe: anything already at the minimum version is left alone.
+
 ## Documents
 
 | Doc | What's in it |
