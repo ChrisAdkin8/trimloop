@@ -198,7 +198,9 @@ Finding {
 Detectors are versioned and written as SQL over DuckDB views where possible
 (cheap to read, easy to unit-test against fixtures), falling back to Go for
 sequence logic such as loop detection. The full catalogue is in
-[patterns.md](patterns.md). The highest-value ones for the MVP:
+[patterns.md](patterns.md); their expected value is ranked in
+[value.md](value.md#2-the-levers-ranked-by-expected-value). The highest-value
+ones for the MVP:
 
 - **Cache-prefix churn**: which segment broke the cached prefix, and how often.
 - **Cache TTL expiry**: idle gaps longer than the cache lifetime, forcing
