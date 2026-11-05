@@ -31,6 +31,12 @@ DuckDB driver needs cgo, which rules out simple cross-compilation.
   SBOMs and provenance, notarise macOS binaries.
 - Embedded data is overridable from a config directory; network fetching of
   the price catalogue is opt-in and signed.
+- DuckDB and the extensions the detectors need are compiled in. Extension
+  auto-install and auto-load are disabled and the connection configuration
+  is locked, so DuckDB never downloads anything.
+- The local DuckDB store carries a schema version; forward-only migrations
+  run on open after a backup copy, and an older binary refuses to touch a
+  newer file.
 
 Detail: [packaging.md](../packaging.md).
 

@@ -159,6 +159,9 @@ It never receives prompt text, file contents, tool output, or auth headers.
 | Developer machine | DuckDB file `~/.trimloop/trimloop.duckdb`, encrypted at rest | 30 days of events; findings kept 1 year |
 | Team collector | ClickHouse (events, findings), Postgres (recommendations, policies) | 13 months |
 
+Schema versions, migrations and backups for the local DuckDB file are
+described in [packaging.md](packaging.md#bundled-components).
+
 ## Price catalogue
 
 A versioned YAML file of per-model prices by token class (input, output, cache

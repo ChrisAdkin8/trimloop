@@ -13,8 +13,9 @@
    `trimloop` binary. Modes are subcommands and configuration, not separate
    products.
 2. **Works offline, never calls home.** Everything needed to run — detectors,
-   profiles, price catalogue, templates, web UI — is embedded. Anything that
-   fetches data from the network is opt-in.
+   profiles, price catalogue, templates, web UI, and the DuckDB extensions it
+   uses — is embedded. Anything that fetches data from the network is opt-in
+   ([bundled components](#bundled-components)).
 3. **Same artefact everywhere.** The binary on a laptop, in the sidecar image
    and in the collector image is the same build.
 4. **Verifiable.** Every artefact is signed and ships with a software bill of
@@ -90,6 +91,54 @@ Prices change more often than code. `trimloop update-catalogue` (off by
 default, never automatic) downloads a catalogue signed by the project's
 release key, verifies it, and writes it to the override directory. Teams that
 never run it keep the catalogue that shipped with their release.
+
+### Bundled components
+
+Third-party code compiled into the binary. None is shipped or installed
+separately; users never install DuckDB to use Trimloop.
+
+| Component | How it is included | Used by | Notes |
+|---|---|---|---|
+| **DuckDB** | Static library via DuckDB's official Go driver (cgo) | `analyse`, `serve` with the DuckDB store, `proxy` | MIT licence. Version pinned in `go.mod`, listed in the SBOM, printed by `trimloop version`. The reason builds are native per platform (§4) |
+| **DuckDB extensions** | Only those the detectors need (expected: JSON), statically linked | As DuckDB | Never downloaded at run time — see below |
+| **ClickHouse client, Postgres driver** | Pure Go | Collector mode | No cgo |
+| **Web UI** | Built from `web/`, embedded | `serve`, local UI | |
+
+The DuckDB command-line tool installed by `scripts/bootstrap.sh` is a developer
+convenience for writing detector SQL. It is not part of any artefact.
+
+**No extension downloads.** By default DuckDB installs and loads some
+extensions from the internet the first time a query needs them. That would
+break the "never calls home" principle. Every connection Trimloop opens
+therefore:
+
+- sets `autoinstall_known_extensions = false` and
+  `autoload_known_extensions = false`;
+- refuses community extensions;
+- locks the configuration (`lock_configuration = true`) so a query cannot
+  change these settings.
+
+CI checks that every extension the detectors use is reported as built in, that
+nothing is written to DuckDB's extension directory, and that `trimloop
+analyse` makes no network connections.
+
+**Local store upgrades.** The DuckDB file (`~/.trimloop/trimloop.duckdb`) is
+created at first run and changes over time in two ways:
+
+| Change | Handling |
+|---|---|
+| **Trimloop's own schema** (tables, columns) | Schema version kept in a `meta` table. On open, forward-only migrations run in a transaction, after copying the file to `trimloop.duckdb.bak-<old-version>` |
+| **DuckDB's storage format** | A newer DuckDB can write files an older one cannot read. Release notes flag every DuckDB version bump. An older `trimloop` that meets a newer file stops with a clear message pointing to the backup, and never modifies the file |
+
+The local store is derived data: anything that came from transcripts can be
+rebuilt with `trimloop analyse --rebuild`. Events received live by a sidecar
+using the DuckDB store cannot be rebuilt, which is one reason the team
+collector holds the durable copy. CI opens store files written by each of the
+last few releases to prove upgrades work.
+
+Collector-mode schemas in ClickHouse and Postgres use versioned SQL
+migrations, run by `trimloop serve --migrate` and, in the Helm chart, by a
+pre-upgrade job.
 
 ## 4. Platforms and builds
 
@@ -199,7 +248,7 @@ Run by CI on a version tag:
 | Measure | Applies to |
 |---|---|
 | Keyless signatures (cosign) | Binaries, checksums file, container images, Helm chart |
-| Software bill of materials (SPDX or CycloneDX) | Every binary and image |
+| Software bill of materials (SPDX or CycloneDX) | Every binary and image, including the bundled DuckDB library and extensions |
 | Build provenance attestation (SLSA) | Binaries and images |
 | Apple notarisation | macOS binaries |
 | PyPI trusted publishing + attestations | `trimloop-litellm` |
