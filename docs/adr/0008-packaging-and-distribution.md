@@ -19,8 +19,8 @@ DuckDB driver needs cgo, which rules out simple cross-compilation.
   with detectors, profiles, prices, templates and web UI embedded. The
   collector and Envoy modes are configuration of this binary.
 - Ship **one container image** of that same binary (distroless glibc base,
-  multi-arch, non-root), and **one Helm chart** with `sidecar` and
-  `collector` modes, plus a Docker Compose example.
+  multi-arch, non-root), and **one Helm chart** with `sidecar`, `collector`,
+  `connector` and `litellm-bundle` modes, plus a Docker Compose example.
 - Ship the LiteLLM plugin as the **`trimloop-litellm`** pure-Python package
   on PyPI, versioned independently against the sidecar API version. It,
   the container image and the Helm sidecar mode ship in M1 (ADR 0009).

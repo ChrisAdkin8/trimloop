@@ -88,7 +88,7 @@ flowchart LR
 | `pkg/sessionize` | Group turns into sessions when the source does not (gateway case, §6) | stateful, in-memory |
 | `pkg/detect` | Detector interface, registry, incremental driver | yes (state passed in) |
 | `pkg/detectors` | One file per pattern: `p01_cache_churn.go`, … | yes |
-| `pkg/aggregate` | Cross-session SQL detectors (repo / developer / org scope) | runs on a Store |
+| `pkg/aggregate` | Cross-session aggregates (repo / developer / org scope): SQL, plus P16's Go sequence miner | runs on a Store |
 | `pkg/decide` | Turns policy + session context into a declarative transform spec (L2/L3) | yes |
 | `pkg/store` | Store interface; `duckdb` and `memory` implementations | adapter |
 | `pkg/engine` | Wires the above; the public embedding API | — |
@@ -117,6 +117,12 @@ type Log struct {
     Offset int64 // where the previous run stopped
 }
 
+// Reader contract:
+// - Read stops before a final line with no newline (still being written);
+//   that line is read on the next run.
+// - Message ids already counted are stored per log, so usage repeated across
+//   lines (or across runs) is counted once.
+
 // A Detector is an incremental state machine over one session.
 // Batch mode replays a session's turns in order; streaming mode calls
 // OnTurn as turns arrive. Both must yield identical findings.
@@ -125,16 +131,19 @@ type Detector interface {
     Version() string     // bump on any logic change
     Requires() Capabilities // needed and optional capabilities (§10.4)
     NewState() State     // per-session state; serialisable (§7)
-    OnTurn(st any, s *event.Session, t *event.Turn) []event.Finding
-    OnSessionEnd(st any, s *event.Session) []event.Finding
+    OnTurn(st State, s *event.Session, t *event.Turn) []event.Finding
+    OnSessionEnd(st State, s *event.Session) []event.Finding
 }
 
-// An Aggregate runs across sessions in a Store (e.g. P06 unused tools
-// per repo, P15–P18 cross-session repeats). Written as SQL.
+// An Aggregate runs across sessions in a Store (P06, P07, P15–P18).
+// Most are SQL (SQLAggregate wraps a query); P16's sequence miner is Go.
+// Like a Detector, it declares capabilities and reports coverage per group.
 type Aggregate interface {
     ID() string
     Version() string
-    Query() string
+    Requires() Capabilities
+    GroupBy() Scope // repo, developer, org — or gateway key when repo is unknown (§10.4)
+    Run(ctx context.Context, st store.Reader) ([]event.Finding, []event.DetectorCoverage, error)
 }
 
 type Sink interface {
@@ -272,7 +281,7 @@ the session-scope detectors ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)
 | Scope | Mechanism | Batch | Streaming |
 |---|---|---|---|
 | Turn, session | Incremental `Detector` | Replay turns in order | `OnTurn` per arrival; `OnSessionEnd` on idle close |
-| Repo, developer, org | SQL `Aggregate` over the store | After import | Every N minutes (default 15) and on demand |
+| Repo, developer, org | `Aggregate` over the store (SQL, or Go for P16) | After import | Every N minutes (default 15) and on demand |
 
 **Parity invariant.** CI replays every fixture session through both drivers —
 once as a batch, once as a shuffled-arrival stream across interleaved sessions
@@ -397,7 +406,9 @@ the two.
 
 Each capability has one **owner**: the provider profile (usage fields, cache
 markers), the harness profile (logs, config, skills, repo context) or the shape
-(what the capture path can see, e.g. `request.full_body` at a gateway). A
+(what the capture path can see). `request.full_body` is owned by the shape at
+a gateway or proxy, and by the harness profile for transcripts — per harness
+version, confirmed per transcript by the reader. A
 session's **effective capabilities** are those its owners supply, minus any the
 shape cannot see. For example, gateway traffic from Claude Code has `request.full_body`
 but not `context.repo`; a Claude Code transcript has `context.repo` but may
@@ -475,12 +486,15 @@ detect:
   user_agent: "^claude-cli/"         # verified per version by the conformance kit
 transcripts:
   paths: ["~/.claude/projects/**/*.jsonl"]
-  parser: adapters/source/claudecode
+  parser: internal/adapters/source/claudecode
 memory_files: ["CLAUDE.md", "CLAUDE.local.md"]
 config_files: [".mcp.json", ".claude/settings.json"]
 skills: { kind: skill_md, paths: [".claude/skills/", "~/.claude/skills/"] }
 capabilities: [session.explicit_id, context.repo, harness.config, harness.skills,
-               content.local, outcome.git, request.full_body]  # full_body: from api-request records
+               content.local, outcome.git]
+capabilities_by_version:
+  ">=2.1.288": [request.full_body]   # api-request records seen from this version
+detect_capabilities: true            # the reader also checks each transcript and reports what it found
 sidechains: { folder: subagents, flag: isSidechain }
 fix_templates: templates/claude-code/
 ```
@@ -505,11 +519,15 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P03 Repeated file reads | `response.tool_calls` | `request.full_body` |
 | P04 Oversized tool output | `response.tool_calls` | — |
 | P05 Tool-call loops | `response.tool_calls` | `outcome.git` |
-| P06 Unused tool definitions | `request.full_body` **or** `harness.config` | — |
+| P06 Unused tool definitions | `response.tool_calls`, and `request.full_body` **or** `harness.config` | `context.repo` |
 | P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `content.local` |
 | P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |
 | P17 Repeated instructions | — | `content.local`, `harness.skills` |
 | P18 Hot documentation | `response.tool_calls` | `content.local`, `harness.skills` |
+
+Aggregates group by repo where `context.repo` is available. Gateway traffic
+has no repo, so P06 and P07 there group by gateway key and harness instead and
+report `reduced` coverage.
 
 For each session the engine resolves a status per detector:
 
@@ -544,7 +562,7 @@ can ship marked `experimental`.
 |---|---|---|
 | A new model on a known provider | Price catalogue entry; `model_families` match | Code |
 | A new provider / API surface | Provider profile; parser in `pkg/normalize`; price entries; recorded fixtures (including streamed responses) | Detectors |
-| A new harness | Harness profile; a `Reader` package under `adapters/source/` (if it writes logs) and one line adding it to the reader registry in `cmd/trimloop`; fix templates; recorded fixtures | Detectors, parsers for providers it uses, other readers |
+| A new harness | Harness profile; a `Reader` package under `internal/adapters/source/` (if it writes logs) and one line adding it to the reader registry in `cmd/trimloop`; fix templates; recorded fixtures | Detectors, parsers for providers it uses, other readers |
 
 Readers are listed explicitly in `cmd/trimloop` rather than registering
 themselves on import, so tests can build exactly the set they need. Every
@@ -561,7 +579,7 @@ capture:
 fingerprint:
   key: keychain            # keychain | file:PATH | env:TRIMLOOP_FINGERPRINT_KEY (ADR 0011)
 privacy:
-  plain_names: []          # opt in per field: repo, branch, mcp
+  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp
 sources:
   claude_code: { enabled: true }
   codex:       { enabled: true }
@@ -603,9 +621,10 @@ pkg/detect/                 interfaces, registry, drivers
 pkg/detectors/              p01_cache_churn.go … one per pattern
 pkg/aggregate/              *.sql + runner
 pkg/decide/                 ops, policy evaluation
-pkg/store/{duckdb,memory,clickhouse}/
-adapters/source/{claudecode,codex,otlp,ingest}/
-adapters/sink/{report,otel,upload,webhook}/
+pkg/store/                  store interface; memory implementation
+internal/store/{duckdb,clickhouse}/
+internal/adapters/source/{claudecode,codex,otlp,ingest}/
+internal/adapters/sink/{report,otel,upload,webhook}/
 proto/trimloop/v1/          events.proto, decide.proto
 profiles/providers/         one YAML per API surface (anthropic-messages, openai-responses, …)
 profiles/harnesses/         one YAML per harness (claude-code, codex, …)
@@ -614,8 +633,9 @@ plugins/litellm/            Python package trimloop-litellm
 testdata/sessions/          redacted fixture sessions + expected findings
 ```
 
-`pkg/` is public so Envoy/Kong hosts and third parties can embed the engine;
-adapters stay outside it so the core has no I/O dependencies. Packaging adds
+`pkg/` is public so Envoy/Kong hosts and third parties can embed the engine.
+Adapters and database-backed stores live under `internal/`, which Go
+enforces as private, so the public core has no I/O dependencies. Packaging adds
 `cmd/trimloop-kong/`, `internal/collector/`, `web/`, `deploy/` and
 `.goreleaser.yaml` ([packaging.md §12](packaging.md#12-repository-layout-additions)).
 
@@ -658,9 +678,10 @@ body.
 Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 
 1. **M0 — `trimloop analyse`:** `pkg/event`, `normalize/anthropic`,
-   `redact`, `fingerprint`, `price`, Claude Code `Reader`, DuckDB and memory
-   stores, incremental re-runs, detectors P01–P05 (Go) and P06–P07 (SQL
-   aggregates), text and HTML reports.
+   `redact`, `fingerprint` (keyed) and `trimloop key init`, `price`, Claude
+   Code `Reader`, DuckDB and memory stores, incremental re-runs, detectors
+   P01–P05 (Go) and P06–P07 (aggregates), text and HTML reports, release
+   pipeline dry-run.
 2. **M1 — sidecar:** ingest API, `sessionize`, `trimloop serve`, LiteLLM
    plugin (observe only), Codex `Reader`, JSON report, conformance kit.
 3. **M2 — team collector:** ClickHouse and Postgres stores, upload sink, OTel

@@ -48,4 +48,5 @@ retrieval, so RAG is not a safe default.
   time, which take longer to measure than cache savings; the value case
   ranks them after the token levers.
 - An export format for the hot-doc list is needed; it carries URLs or paths
-  in plain text only for repos that opt in to plain paths.
+  in plain text only if the organisation opts in to plain `path` and `url`
+  names (`privacy.plain_names`, ADR 0011).

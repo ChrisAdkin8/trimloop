@@ -121,8 +121,12 @@ Rules for the proxy:
   tee the stream to the normaliser. Added latency budget: p99 < 5 ms.
 - Never log `Authorization`, `x-api-key` or cookie headers. Auth is passed
   through untouched and never stored.
-- Fail open. If Trimloop crashes or the analysis queue is full, traffic still
-  flows; capture is dropped and a gap event is recorded.
+- Fail open where possible. If the analysis queue is full or analysis fails,
+  traffic still flows; capture is dropped and a gap event is recorded. If the
+  proxy *process* dies, requests routed through it fail, so `trimloop proxy`
+  runs under a supervisor (launchd, systemd) and the harness launcher checks
+  the proxy is listening before routing traffic to it, falling back to a
+  direct connection if not.
 - Scope the CA to the harness process (env var for the CA bundle), never install
   it system-wide by default.
 
@@ -153,8 +157,10 @@ agents, background agents):
   ADRs [0005](adr/0005-thin-python-plugin-for-litellm.md) and
   [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md)).
 - **Log connectors (M2).** For gateways without a plugin (Portkey/Helicone log
-  export, OpenRouter activity API): pulled or received at the team collector.
-  Usually lower fidelity — usage and metadata rather than full bodies.
+  export, OpenRouter activity API): pulled or received by `trimloop serve` in
+  connector mode, which holds the fingerprint key and forwards keyed records
+  to the team collector ([ADR 0011](adr/0011-keyed-fingerprints.md)). Usually
+  lower fidelity — usage and metadata rather than full bodies.
 
 ### Coverage matrix (target)
 
@@ -233,10 +239,17 @@ Aggregates findings across sessions, developers and repos, then:
    developers all trace to the same line in one repo's CLAUDE.md that embeds a
    timestamp.
 2. **Ranks** by estimated weekly saving × confidence ÷ effort to fix.
-3. **Renders** a recommendation from a template per harness, with the exact
-   change: a diff to a file, a settings key, an MCP server to disable for a
-   repo.
-4. **Tracks** whether it was applied and the measured saving afterwards
+3. **Describes** the fix as a template id plus keyed parameters (which
+   segment, which line hash, which MCP server). The collector holds no
+   content, so it cannot write the change itself.
+4. **Renders locally.** On a developer machine, `trimloop recommendations`
+   fetches the open recommendations, resolves the keyed parameters against the
+   local repo and harness logs, and renders the exact change — a diff to a
+   file, a settings key, an MCP server to disable — for a person to apply or
+   open as a PR. Gateway-only teams (no Trimloop on developer machines) see the
+   recommendation's title, saving and template text in the dashboard; any
+   developer who runs `trimloop recommendations` in the repo gets the diff.
+5. **Tracks** whether it was applied and the measured saving afterwards
    (before/after on the same repo and developer cohort).
 
 This closed loop — recommend, apply, measure — is the core product. It is what
@@ -296,9 +309,9 @@ the transform version, the sent request can be reproduced exactly.
 
 | Threat | Mitigation |
 |---|---|
-| Source code / secrets leaving the machine | Default `capture.content = hashes`; team collector receives only fingerprints, counts, cost and findings; content upload requires an explicit per-repo opt-in |
+| Source code / secrets leaving the machine | Default `capture.content = hashes`; the team collector receives only keyed fingerprints, counts, cost and findings. Content is never uploaded; full capture is a per-repo opt-in that stays on the developer machine and never applies to a sidecar |
 | Guessing attacks on fingerprints (hash a likely path, URL or secret and look for a match) | Fingerprints are HMAC-SHA-256 with a customer-held key the collector never receives; names (paths, URLs, repo, branch, MCP servers) are keyed by default ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
-| Secrets stored locally | Redaction before storage; the DuckDB store is encrypted (AES via DuckDB's encryption, which needs the bundled `httpfs` extension for writing). Key from the OS keychain on developer machines; from an environment variable or Kubernetes secret on servers and in containers |
+| Secrets stored locally | Redaction before storage; by default the store holds only keyed hashes and is protected by file permissions. Encryption at rest becomes required when full-content capture is enabled ([ADR 0015](adr/0015-defer-local-store-encryption.md)) |
 | API keys captured by the proxy | Auth headers are never parsed, logged or stored |
 | Malicious use of the local CA | CA private key generated per machine, stored in the OS keychain, scoped to harness processes via env var, 90-day rotation |
 | Tampered policies pushing harmful transforms | Policies signed by the collector; actuators verify signatures; level 3 needs local opt-in as well as policy |
@@ -320,9 +333,9 @@ one Helm chart, one Python package) is in [packaging.md](packaging.md).
 
 | Area | Choice | Why | ADR |
 |---|---|---|---|
-| Proxy, agent, CLI | Go | Single static binary; strong HTTP/2, TLS, SSE; easy cross-compile | [0002](adr/0002-go-for-agent-and-proxy.md) |
+| Proxy, agent, CLI | Go | Single binary (built per OS because DuckDB needs cgo); strong HTTP/2, TLS, SSE | [0002](adr/0002-go-for-agent-and-proxy.md), [0014](adr/0014-release-builds-per-os.md) |
 | LiteLLM gateway plugin | Python, thin: capture and forward to a `trimloop serve` sidecar | LiteLLM plugins must be Python; parsing, fingerprinting and detection stay in the Go core | [0005](adr/0005-thin-python-plugin-for-litellm.md), [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md) |
-| Local analytics | DuckDB | Embedded, fast SQL over columnar data; detectors as SQL | [0003](adr/0003-duckdb-local-clickhouse-team.md) |
+| Local analytics | DuckDB | Embedded, fast SQL over columnar data; cross-session aggregates in SQL | [0003](adr/0003-duckdb-local-clickhouse-team.md), [0010](adr/0010-go-detectors-sql-aggregates.md) |
 | Team analytics | ClickHouse | High-volume event analytics; self-hostable | [0003](adr/0003-duckdb-local-clickhouse-team.md) |
 | Wire format | OTLP + protobuf event schema | Reuse OTel ecosystem; versioned schema | [0001](adr/0001-capture-proxy-otel-transcripts.md) |
 | UI | TypeScript web app, served by the binary | No separate install for solo mode | — |

@@ -64,7 +64,7 @@ cost and findings. Detail in
 
 | Part | Language | Why |
 |---|---|---|
-| Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One static binary to install; strong HTTP, TLS and streaming support; one codebase for every tap to feed |
+| Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One binary to install (glibc-linked, built per OS); strong HTTP, TLS and streaming support; one codebase for every tap to feed |
 | Detectors | Go per-turn state machines; SQL only for cross-session aggregates | One implementation serves batch analysis and live traffic ([ADR 0010](docs/adr/0010-go-detectors-sql-aggregates.md)) |
 | LiteLLM gateway plugin | Python, kept thin | LiteLLM plugins must be Python. The plugin only captures events and forwards them to a `trimloop serve` sidecar on loopback, which does all parsing, redaction and fingerprinting; it applies transforms the core has decided on but contains no detection logic |
 | Envoy and Kong gateways (later) | Go | Envoy's external processing and Kong's Go plugin server let the core plug in directly — no third language |

@@ -20,8 +20,8 @@ findings report with estimated savings. No proxy, no server.
 - Fixtures: synthetic sessions in the repository; real (redacted) sessions
   only in a private, access-controlled store, never committed. Detector unit
   tests.
-- Encrypted local store (DuckDB encryption with `httpfs` linked in for its
-  crypto; no extension downloads).
+- Local store protected by file permissions; encryption deferred until
+  full-content capture ([ADR 0015](docs/adr/0015-defer-local-store-encryption.md)).
 - Aggregate runner for the cross-session detectors (P06, P07).
 - Release pipeline: signed binary on GitHub Releases, `.deb` / `.rpm`
   packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved by a
@@ -71,9 +71,10 @@ the sidecar causes zero failed model calls.
 - Root-cause grouping and ranked recommendations.
 - L1 actuators: config-patch diffs, optionally opened as PRs.
 - Before/after savings measurement.
-- OTLP receiver for harnesses that export OpenTelemetry.
-- Gateway log connectors for gateways without a plugin (hosted gateways'
-  log exports and usage APIs).
+- `trimloop serve` connector mode (holds the fingerprint key, forwards keyed
+  records): OTLP receiver for harnesses that export OpenTelemetry, and log
+  connectors for gateways without a plugin (hosted gateways' log exports and
+  usage APIs).
 
 ## M3 — Safe in-path transforms
 

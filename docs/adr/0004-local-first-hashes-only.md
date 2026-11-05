@@ -15,9 +15,12 @@ recommendations need data from many machines.
 - Raw content stays on the developer's machine. Default capture mode is
   `hashes`: segment hashes, line hashes, sizes, token counts.
 - The team collector receives structure, counts, cost and findings — never
-  content. File paths are hashed unless a repo opts in.
+  content. Names, including file paths, are keyed hashes unless the
+  organisation opts in per field (`privacy.plain_names`, ADR 0011).
 - Secret redaction runs before anything is written, even locally.
-- Full content capture is an explicit, per-repo, local opt-in.
+- Full content capture is an explicit, per-repo opt-in on developer
+  machines only. It never applies to a gateway sidecar, and content is never
+  uploaded.
 
 ## Consequences
 

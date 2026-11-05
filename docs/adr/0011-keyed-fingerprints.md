@@ -21,9 +21,8 @@ made.
 
 1. **Algorithm.** Every fingerprint is
    `HMAC-SHA-256(fingerprint_key, label ‖ 0x00 ‖ data)`, with a context label
-   per purpose (`seg.exact`, `seg.content`, `line`, `path`, `url`, `repo`,
-   `branch`, `tool`, `mcp`, `prefix`). Labels keep codes made for different
-   purposes from ever being equal.
+   per purpose from a fixed registry ([data-model.md](../data-model.md#specification)).
+   Labels keep codes made for different purposes from ever being equal.
 2. **The key belongs to the customer.** A 256-bit random key per organisation
    (or per machine, for a solo user).
    - `trimloop key init` creates it. Solo: stored in the OS keychain where
@@ -39,7 +38,8 @@ made.
    machine or sidecar using the wrong key.
 4. **Names are keyed by default.** File paths, URLs, repo, branch, MCP server
    and MCP tool names are sent as keyed hashes. An organisation may opt in to
-   plain text per field (`privacy.plain_names: [repo, branch, mcp]`) for
+   plain text per field (`privacy.plain_names`: any of `repo`, `branch`, `path`,
+   `url`, `mcp`) for
    readable team dashboards. The harness's built-in tool names stay plain.
 5. **Evidence is typed.** Finding evidence holds ids, codes and counts only —
    no free text.
@@ -68,8 +68,10 @@ nothing can be inferred from usage patterns.
   under plain SHA-256.
 - Key distribution is a new setup step for teams and a new Helm value; losing
   the key breaks comparison with history but exposes nothing.
-- Gateway log connectors that run at the collector need the key to
-  fingerprint what they receive. In hosted mode they must run on the
-  customer's side instead.
+- Anything that fingerprints incoming data needs the key, so gateway log
+  connectors and the OTLP receiver do not run inside the collector. They run
+  as a separate **connector** mode of `trimloop serve`, deployed by the
+  customer with the key, which forwards keyed records to the collector. The
+  collector process never holds the key, self-hosted or hosted.
 - The Python plugin's remote mode (ADR 0006) needs the key too.
 - HMAC costs roughly one extra hash per input; negligible next to parsing.

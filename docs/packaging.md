@@ -29,10 +29,10 @@
 
 | # | Artefact | Contents | Channel | Audience | Milestone |
 |---|---|---|---|---|---|
-| 1 | **`trimloop` binary** | All modes (§3); embedded web UI, aggregate SQL, profiles, price catalogue, fix templates | Homebrew tap, GitHub Releases (archives + checksums), `.deb` / `.rpm` | Developers; servers without containers | M0 |
+| 1 | **`trimloop` binary** | All modes (§3); aggregate SQL, profiles, price catalogue, fix templates; embedded web UI from M1 | Homebrew tap, GitHub Releases (archives + checksums), `.deb` / `.rpm` | Developers; servers without containers | M0 |
 | 2 | **Container image** `ghcr.io/<org>/trimloop` | The same binary, multi-arch | GitHub Container Registry | Gateway sidecar, team collector | M1 |
 | 3 | **Helm chart** `trimloop` | Sidecar mode and collector mode (§6) | Helm repository (OCI, on GHCR) | Platform teams on Kubernetes | M1 (sidecar), M2 (collector) |
-| 4 | **Docker Compose example** | LiteLLM + plugin + sidecar | `deploy/compose/` in the repo | Evaluators; teams not on Kubernetes | M1 |
+| 4 | **Docker Compose example** | LiteLLM + plugin + sidecar; the sidecar shares LiteLLM's network namespace (`network_mode: "service:litellm"`) so loopback works | `deploy/compose/` in the repo | Evaluators; teams not on Kubernetes | M1 |
 | 5 | **`trimloop-litellm`** | Thin Python plugin (§7) | PyPI | Teams running LiteLLM | M1 |
 | 6 | **Go module** | Public `pkg/` packages for embedding the engine | Go module proxy | Envoy/Kong integrations, third parties | Unstable until M3 |
 | 7 | **Wire schemas** | `proto/trimloop/v1` | Buf Schema Registry | Authors of other plugins | M1 |
@@ -49,7 +49,7 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | Command | Purpose |
 |---|---|
 | `trimloop analyse` | Standalone analysis of session transcripts (M0) |
-| `trimloop serve` | Sidecar or team collector, depending on configuration |
+| `trimloop serve` | Sidecar, connector or team collector, depending on configuration |
 | `trimloop serve --extproc` | Envoy external-processing server |
 | `trimloop proxy` | Local forward/reverse proxy |
 | `trimloop report`, `explain` | Render reports; explain a finding |
@@ -101,7 +101,7 @@ separately; users never install DuckDB to use Trimloop.
 | Component | How it is included | Used by | Notes |
 |---|---|---|---|
 | **DuckDB** | Static library via DuckDB's official Go driver (cgo) | `analyse`, `serve` with the DuckDB store, `proxy` | MIT licence. Version pinned in `go.mod`, listed in the SBOM, printed by `trimloop version`. The reason builds are native per platform (§4) |
-| **DuckDB extensions** | JSON, and `httpfs` for its crypto library — statically linked | As DuckDB | Never downloaded at run time — see below |
+| **DuckDB extensions** | Only those the detectors need (expected: JSON), statically linked. `httpfs` only once store encryption ships (ADR 0015) | As DuckDB | Never downloaded at run time — see below |
 | **ClickHouse client, Postgres driver** | Pure Go | Collector mode | No cgo |
 | **Web UI** | Built from `web/`, embedded | `serve`, local UI | |
 
@@ -117,16 +117,18 @@ therefore:
   `autoload_known_extensions = false`;
 - refuses community extensions;
 - disables remote file systems (DuckDB's `disabled_filesystems` setting, to
-  verify for DuckDB 2.0), because `httpfs` is linked in only for its crypto;
+  verify for DuckDB 2.0) — required if `httpfs` is ever linked in for its
+  crypto;
 - locks the configuration (`lock_configuration = true`) so a query cannot
   change these settings.
 
-**Why `httpfs` is bundled.** In DuckDB 2.0, writing an encrypted database
+**Encryption and `httpfs`.** In DuckDB 2.0, writing an encrypted database
 needs the OpenSSL-based crypto that `httpfs` provides; without it DuckDB
 refuses unless an explicitly unsafe mode is forced. Tested 2026-11-05: an
 encrypted `ATTACH` made the stock DuckDB CLI **download** `httpfs` from the
-internet. Trimloop links it in so the local store can be encrypted without any
-download.
+internet. Store encryption is therefore deferred until full-content capture,
+when `httpfs` must be linked in (or DuckDB built with it) so no download
+happens ([ADR 0015](adr/0015-defer-local-store-encryption.md)).
 
 CI checks that every extension the detectors use is reported as built in, that
 nothing is written to DuckDB's extension directory, and that `trimloop
@@ -171,22 +173,23 @@ not planned; the container image uses a glibc base instead.
 - Runs as a non-root user; read-only root filesystem supported.
 - Multi-arch manifest: `linux/amd64`, `linux/arm64`.
 - Entrypoint `trimloop`, default command `serve`.
-- Tags: exact version (`1.4.2`), minor (`1.4`), and digest. No floating
+- Tags: exact version (`0.4.2`), minor (`0.4`), and digest. No floating
   `latest` in documentation.
 - Configuration by mounted `trimloop.yaml` and environment variables.
 
 ## 6. Helm chart
 
-One chart, two modes:
+One chart, four modes:
 
 | Mode | What it deploys |
 |---|---|
 | `sidecar` | A `trimloop serve` container for the LiteLLM pod, listening on loopback, with the plugin pointed at it. A separate Helm release cannot change another release's Deployment, so the container is added **through the LiteLLM chart's own extra-containers values** — this chart renders that values block (`helm template --show-only`) for the user to merge. If the LiteLLM chart version in use has no such option, the `litellm-bundle` mode deploys LiteLLM (as a dependency) and the sidecar together |
 | `litellm-bundle` | LiteLLM plus the sidecar in one release; the fallback for the case above |
+| `connector` | `trimloop serve` in connector mode: OTLP receiver and log connectors, holding the fingerprint key and forwarding keyed records to the collector (M2) |
 | `collector` | `trimloop serve` as the team collector; optional ClickHouse and Postgres sub-charts, or connection settings for existing ones |
 
 ```yaml
-mode: sidecar            # sidecar | collector
+mode: sidecar            # sidecar | collector | connector | litellm-bundle
 image:
   repository: ghcr.io/<org>/trimloop
   tag: ""                # defaults to the chart's appVersion
@@ -196,13 +199,13 @@ serve:
     url: ""              # team collector, hashes only
 fingerprintKey:
   existingSecret: ""     # Kubernetes secret holding the organisation's key (ADR 0011);
-                         # required in sidecar mode, never set in collector mode
+                         # required in sidecar and connector modes, never set in collector mode
 collector:
   clickhouse: { enabled: true }
   postgres:   { enabled: true }
 ```
 
-The chart version and `appVersion` track the binary version (§9).
+The chart's `appVersion` is the binary version; the chart has its own version, bumped on every release (§9).
 
 ## 7. Python plugin: `trimloop-litellm`
 
@@ -219,10 +222,12 @@ The chart version and `appVersion` track the binary version (§9).
 
 ## 8. Go module, schemas and integrations
 
-- **Go module.** `pkg/` is the public embedding API. It is versioned with the
-  binary but marked unstable (`v0`) until M3; after that, breaking changes
-  follow semantic import versioning. Everything in `internal/` and
-  `adapters/` is private.
+- **Go module.** One module; `pkg/` is the public embedding API. Releases
+  are tagged `v0.x.y` until the `pkg/` API is stable (M3), and the binary
+  carries the same version, so `v0` signals "unstable API" for both. From
+  `v1.0.0` breaking changes follow semantic import versioning (a `/v2` module
+  path). Everything under `internal/` — adapters and database-backed stores
+  — is private, which Go enforces.
 - **Schemas.** `proto/trimloop/v1` is published to the Buf Schema Registry so
   others can generate clients in any language. A breaking change creates
   `v2`; `v1` stays served until a documented end date.

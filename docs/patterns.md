@@ -19,7 +19,7 @@ neutral, so P01 and P02 describe each provider cache model.
 
 | ID | Pattern | Milestone | Kind | Max fix level |
 |---|---|---|---|---|
-| P01 | Cache-prefix churn | M0 | Go | 2 |
+| P01 | Cache-prefix churn | M0 | Go | 3 |
 | P02 | Cache TTL expiry | M0 | Go | 2 |
 | P03 | Repeated file reads | M0 | Go | 1 |
 | P04 | Oversized tool output | M0 | Go | 3 |
@@ -57,8 +57,8 @@ moments ago.
 
 **Detection:** For each consecutive pair of turns, walk the ordered segment
 fingerprints and record the first divergence. Group by the segment type and
-source of the divergence (e.g. `system_prompt` line 3, `tool_definitions`
-reordered, memory file changed). Without the full request body the detector
+source of the divergence (e.g. `system` line 3, `tool_definition` order,
+`memory_file` changed). Without the full request body the detector
 still sees *that* churn happened from usage figures, but runs at reduced
 fidelity and cannot name the cause.
 
@@ -111,8 +111,8 @@ may conflict with provider terms.
 **What happens:** The agent reads the same unchanged file several times in one
 session, adding it to context each time.
 
-**Signals:** The same file-content fingerprint appears in N > 2 `file_read` or
-tool-result segments within a session.
+**Signals:** The same file-content fingerprint appears in N > 2 `tool_result`
+segments with `source_kind = file` within a session.
 
 **Detection:** Count fingerprint occurrences per session, excluding reads after
 the file changed (the fingerprint differs).
@@ -333,7 +333,7 @@ task labels), `harness.skills` (otherwise the memory-file fallback).
 **Signals:** The same user-message line hash appearing in N or more
 sessions for a developer or repo.
 
-**Detection:** Frequency of line hashes in `user_message` segments, per
+**Detection:** Frequency of line hashes in `user_text` segments, per
 developer and per repo.
 
 **Saving:** Mostly developer time and consistency; the token saving is small.

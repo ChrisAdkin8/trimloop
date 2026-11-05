@@ -32,7 +32,9 @@ a sidecar (`trimloop serve`) next to the gateway.
   customer already runs for the gateway; it is never written to disk or sent
   further. This keeps the hashes-only promise of ADR 0004 for everything that
   leaves the gateway host.
-- Deployment needs one extra container or process beside the gateway.
+- Deployment needs one extra container or process beside the gateway,
+  sharing its network namespace so loopback reaches it (same Kubernetes pod;
+  in Docker Compose, `network_mode: "service:litellm"`).
   Provided as a Helm chart sidecar and a Docker Compose example.
 - Remote mode keeps the Python parity tests from ADR 0005, but only for teams
   that need it.

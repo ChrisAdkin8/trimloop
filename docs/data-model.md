@@ -45,6 +45,8 @@ One model request and its response.
 | `session_id` | string | |
 | `seq` | int | Order within the session |
 | `provider` | enum | `anthropic`, `openai`, `google`, … |
+| `provider_request_id` | string? | Provider or gateway request id, where available — de-duplicates the same turn seen by two taps |
+| `response_id` | string? | Provider response or message id — usage is counted once per response |
 | `provider_profile` | string | API surface, e.g. `anthropic-messages`, `openai-responses`; selects parser and cache model ([analyzer.md §10.2](analyzer.md#102-provider-profiles)) |
 | `model` | string | As sent |
 | `request_at` / `first_token_at` / `completed_at` | timestamp | Latency analysis |
@@ -72,7 +74,8 @@ A typed slice of a turn's input. The unit of fingerprinting.
 | `segment_id` | string | |
 | `turn_id` | string | |
 | `position` | int | Order in the request |
-| `kind` | enum | `system`, `tool_definitions`, `memory_file`, `history`, `file_read`, `tool_result`, `user_message`, `assistant_message` |
+| `kind` | enum | See the segment table in [fingerprinting](#specification) |
+| `source_kind` | enum? | For `tool_result`: `file`, `url`, `command`, `mcp`, `other` |
 | `source` | string? | Keyed hash of the file path, URL, tool name or MCP server, where known |
 | `exact_hash` | string | Keyed hash of the segment exactly as sent ([fingerprinting](#fingerprinting)) |
 | `content_hash` | string | Keyed hash of the segment's canonical form |
@@ -141,14 +144,16 @@ scope). Lets reports distinguish "no waste found" from "could not check".
 
 ### Recommendation
 
-Built by the team collector from grouped findings.
+Built by the team collector from grouped findings. It holds no content: the
+exact change is rendered on a developer machine (design §6.2).
 
 | Field | Type |
 |---|---|
 | `recommendation_id` | string |
 | `root_cause_key` | string |
-| `title` / `body` | text (rendered from a per-harness template) |
-| `patch` | text? (diff for L1 fixes) |
+| `template_id` | string (per-harness fix template) |
+| `params` | json (keyed hashes and counts the template needs, e.g. segment and line hashes) |
+| `title` / `body` | text (rendered from the template without content) |
 | `est_weekly_saving` | decimal |
 | `status` | `open`, `applied`, `dismissed`, `measured` |
 | `measured_saving` | decimal? (after/before comparison) |
@@ -235,31 +240,61 @@ vectors in `pkg/fingerprint/testdata/vectors.json`. Every turn records the spec
 version (`fp_version`, currently `fp1`) so hashes made under different rules
 are never compared.
 
-**Hash function.** HMAC-SHA-256 with the organisation's **fingerprint key**,
-hex-encoded ([ADR 0011](adr/0011-keyed-fingerprints.md)). Every input is
-prefixed with a context label and a zero byte, so a hash made for one purpose
-can never equal a hash made for another:
+**Hash function.** HMAC-SHA-256 with the organisation's **fingerprint key**
+([ADR 0011](adr/0011-keyed-fingerprints.md)). Every input is prefixed with a
+context label and a zero byte, so a hash made for one purpose can never equal
+a hash made for another:
 
 ```text
 fp(label, data) = HMAC-SHA-256(fingerprint_key, label ‖ 0x00 ‖ data)
-labels: seg.exact, seg.content, line, path, url, repo, branch, tool, mcp
 ```
 
-Every turn records `fp_key_id`, a short identifier derived from the key
-(`fp("key-id", "")`, first 8 hex characters), so codes made with different
-keys are never compared.
+- `label` is the ASCII label from the registry below; `data` is UTF-8 text or
+  raw bytes as the label says.
+- `fp` returns **32 raw bytes**. Everything that combines hashes (prefix
+  chains) works on raw bytes. Hashes are hex-encoded (lower case, 64
+  characters) only when stored or sent.
 
-**Segments.** A request is split into ordered segments, one per:
+Label registry — no other labels may be used:
 
-- system block (each element of `system`, or the whole system string);
-- tool definition (each element of `tools`);
-- message content block (text, image, thinking, tool use, tool result), in
-  message order;
-- injected context: text a harness inserts inside user messages that its
-  profile marks (for example Claude Code's `<system-reminder>` blocks) is split
-  out of the surrounding block as its own segment, kind `injected_context`.
+| Label | Input | Used for |
+|---|---|---|
+| `seg.exact` | Segment bytes as sent, cache markers removed | `exact_hash` |
+| `seg.content` | Segment canonical form | `content_hash` |
+| `prefix.exact` | Previous chain value (32 bytes) ‖ segment `exact_hash` (32 bytes) | Exact prefix chain |
+| `prefix.content` | Previous chain value ‖ segment `content_hash` | Content prefix chain |
+| `line` | One canonical line | `line_hashes` |
+| `args` | Tool-call input, canonical JSON | `args_fingerprint` (P05) |
+| `args.template` | Tool-call input with values replaced by their JSON types | Argument templates (P16) |
+| `path` | Normalised file path | `source`, P03, P15 |
+| `url` | Normalised URL | `source`, P18 |
+| `repo` | Normalised git remote URL | Session `repo` |
+| `branch` | Branch name | Session `branch` |
+| `tool` | MCP tool name | Tool-call `name` |
+| `mcp` | MCP server name | `mcp_server` |
+| `root` | Content hashes of the system segments and first user message, concatenated | Conversation root (canary buckets, ADR 0013) |
+| `key-id` | Empty | `fp_key_id`: first 8 hex characters |
 
-Segments never split a content block in any other way.
+Every turn records `fp_key_id`, so codes made with different keys are never
+compared.
+
+**Segments.** A request is split into ordered segments, each with a `kind`:
+
+| Kind | One segment per |
+|---|---|
+| `system` | System block (each element of `system`, or the whole system string) |
+| `memory_file` | System or injected text the harness profile identifies as a memory file (CLAUDE.md, AGENTS.md) |
+| `tool_definition` | Element of `tools` |
+| `user_text` | Text block in a user message |
+| `injected_context` | Text a harness inserts inside user messages that its profile marks (for example Claude Code's `<system-reminder>` blocks), split out of the surrounding block |
+| `assistant_text` | Text block in an assistant message |
+| `thinking` | Thinking / reasoning block |
+| `tool_use` | Tool call |
+| `tool_result` | Tool result; `source_kind` says `file`, `url`, `command`, `mcp` or `other` |
+| `image` | Image or other binary block (hashed as raw bytes) |
+
+Segments never split a content block in any other way. Earlier turns are not a
+separate kind: history is the same kinds, in order.
 
 **Cache markers.** `cache_control` and equivalent fields are removed before
 hashing and recorded as `cache_breakpoint_after`. They change where a provider
@@ -287,8 +322,9 @@ caches, not what.
   in request *n+1* — which sessionising relies on.
 
 **Prefix hashes.** Two rolling chains over the ordered segments:
-`P₀ = fp("prefix", "")`, `Pᵢ = fp("prefix", Pᵢ₋₁ ‖ hᵢ)`, where `hᵢ` is the segment's
-exact hash (exact chain) or content hash (content chain). A turn stores the
+`P₀ = fp(L, "")`, `Pᵢ = fp(L, Pᵢ₋₁ ‖ hᵢ)` over raw 32-byte values, where
+`L` is `prefix.exact` with `hᵢ` the segment's exact hash, or `prefix.content`
+with `hᵢ` its content hash. A turn stores the
 exact chain at each cache breakpoint and the content chain at each message
 boundary.
 
@@ -314,7 +350,8 @@ In the default `hashes` capture mode, the team collector receives:
   kinds.
 - Names as keyed hashes: file paths, URLs, repo, branch, MCP server and MCP
   tool names. Each can be sent in plain text only if the organisation opts in
-  for that field (`privacy.plain_names`). The harness's own built-in tool names
+  for that field (`privacy.plain_names`: `repo`, `branch`, `path`, `url`,
+  `mcp` — the last covers MCP server and tool names). The harness's own built-in tool names
   (for example `Read`, `Bash`) are sent in plain text; they reveal nothing about
   the customer.
 
@@ -327,7 +364,7 @@ which sessions share an (unnamed) item — is listed in
 
 | Where | Engine | Retention (default) |
 |---|---|---|
-| Developer machine | DuckDB file `~/.trimloop/trimloop.duckdb`, encrypted at rest (key in the OS keychain) | 30 days of events; findings kept 1 year |
+| Developer machine | DuckDB file `~/.trimloop/trimloop.duckdb`, mode 0600; encrypted only with full-content capture (ADR 0015) | 30 days of events; findings kept 1 year |
 | Team collector | ClickHouse (events, findings), Postgres (recommendations, policies) | 13 months |
 
 Schema versions, migrations and backups for the local DuckDB file are

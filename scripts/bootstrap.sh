@@ -8,7 +8,7 @@
 #   golangci-lint, govulncheck  Go linting and vuln checks
 #   uv + Python LiteLLM plugin                              (ADR 0005)
 #   Node.js     web UI (TypeScript)
-#   DuckDB CLI  writing and testing SQL detectors
+#   DuckDB CLI  writing and testing aggregate SQL
 #   Docker      optional: local ClickHouse/Postgres for the team collector
 #
 # Supported: macOS (Homebrew) and Debian/Ubuntu (apt).
@@ -23,6 +23,14 @@ ORIG_PATH="$PATH"
 GO_MIN="1.25"
 PYTHON_VERSION="3.12"   # pinned for the LiteLLM plugin
 NODE_MIN="22"
+# Pinned tool versions. DUCKDB_VERSION must match the DuckDB bundled by the Go
+# driver in go.mod, so aggregate SQL is written against the engine that ships.
+DUCKDB_VERSION="v2.0.0"
+BUF_VERSION="v1.75.0"
+PROTOC_GEN_GO_VERSION="v1.36.12"
+PROTOC_GEN_GO_GRPC_VERSION="v1.6.2"
+GOLANGCI_LINT_VERSION="v2.15.0"
+GOVULNCHECK_VERSION="v1.9.0"
 
 CHECK_ONLY=0
 ASSUME_YES=0
@@ -92,6 +100,10 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 confirm() {
   ((ASSUME_YES)) && return 0
+  if [[ ! -t 0 ]]; then
+    fail "No terminal to ask for confirmation; re-run with --yes (or --check)."
+    exit 2
+  fi
   local reply
   read -r -p "$1 [y/N] " reply
   [[ $reply == [yY]* ]]
@@ -155,7 +167,7 @@ if [[ $PLATFORM == macos ]]; then
     if have "$t"; then ok "$t"; else note_missing "$t"; run brew install "$t"; fi
   done
 else
-  pkgs=(build-essential pkg-config git curl ca-certificates unzip jq python3)
+  pkgs=(build-essential pkg-config git curl ca-certificates xz-utils jq python3)
   missing_pkgs=()
   for p in "${pkgs[@]}"; do
     dpkg -s "$p" >/dev/null 2>&1 || missing_pkgs+=("$p")
@@ -172,7 +184,7 @@ fi
 # ---------- Go ----------
 
 step "Go >= $GO_MIN"
-[[ -x /usr/local/go/bin/go ]] && export PATH="/usr/local/go/bin:$PATH"
+[[ $PLATFORM == linux && -x /usr/local/go/bin/go ]] && export PATH="/usr/local/go/bin:$PATH"
 go_current=""
 have go && go_current="$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
 if [[ -n $go_current ]] && version_ge "$go_current" "$GO_MIN"; then
@@ -204,17 +216,23 @@ print(f["filename"], f["sha256"])' "$GOARCH")" || die "Could not look up the lat
   fi
 fi
 
+if ((!CHECK_ONLY)) && have go; then
+  go_now="$(go env GOVERSION 2>/dev/null | sed 's/^go//')"
+  version_ge "$go_now" "$GO_MIN" \
+    || die "Go $go_now is first on PATH ($(command -v go)) but $GO_MIN or newer is needed. Remove or reorder the older Go and re-run."
+fi
+
 # ---------- Go tools ----------
 
 step "Go tools (buf, protoc plugins, linters)"
 GOBIN_DIR=""
 have go && GOBIN_DIR="$(go env GOPATH)/bin" && export PATH="$GOBIN_DIR:$PATH"
 go_tools=(
-  "buf|github.com/bufbuild/buf/cmd/buf@latest"
-  "protoc-gen-go|google.golang.org/protobuf/cmd/protoc-gen-go@latest"
-  "protoc-gen-go-grpc|google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
-  "golangci-lint|github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest"
-  "govulncheck|golang.org/x/vuln/cmd/govulncheck@latest"
+  "buf|github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
+  "protoc-gen-go|google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}"
+  "protoc-gen-go-grpc|google.golang.org/grpc/cmd/protoc-gen-go-grpc@${PROTOC_GEN_GO_GRPC_VERSION}"
+  "golangci-lint|github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}"
+  "govulncheck|golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
 )
 for entry in "${go_tools[@]}"; do
   bin="${entry%%|*}"; pkg="${entry#*|}"
@@ -318,26 +336,36 @@ fi
 
 step "DuckDB CLI (aggregate SQL development)"
 if have duckdb; then
-  ok "duckdb $(duckdb --version 2>/dev/null | awk '{print $1}')"
+  duck_now="$(duckdb --version 2>/dev/null | awk '{print $1}')"
+  if [[ $duck_now == "$DUCKDB_VERSION" ]]; then
+    ok "duckdb $duck_now"
+  else
+    todo "duckdb $duck_now installed; $DUCKDB_VERSION expected (the version the Go driver bundles)"
+  fi
 else
   note_missing "duckdb CLI"
   if [[ $PLATFORM == macos ]]; then
     run brew install duckdb
   elif ((CHECK_ONLY)); then
-    echo "    would download the latest DuckDB CLI release from GitHub to /usr/local/bin"
+    echo "    would download DuckDB CLI $DUCKDB_VERSION from GitHub, verify its SHA-256 and install to /usr/local/bin"
   else
-    # Only assets for this machine's architecture: amd64 never falls back to ARM.
-    # No checksum file is used; the binary is run once after install to prove it works here.
-    if [[ $GOARCH == amd64 ]]; then duck_assets=(duckdb_cli-linux-amd64.zip)
-    else duck_assets=(duckdb_cli-linux-arm64.zip duckdb_cli-linux-aarch64.zip); fi
+    # Pinned release for this machine's architecture only, verified against the
+    # SHA-256 digest GitHub publishes for the asset, then run once to prove it works.
+    duck_asset="duckdb-cli-linux-${GOARCH}.tar.gz"
+    duck_sha="$(curl -fsSL "https://api.github.com/repos/duckdb/duckdb/releases/tags/${DUCKDB_VERSION}" | python3 -c '
+import json, sys
+name = sys.argv[1]
+a = next((x for x in json.load(sys.stdin)["assets"] if x["name"] == name), None)
+print((a or {}).get("digest", "").removeprefix("sha256:"))' "$duck_asset")" || duck_sha=""
     installed=0
-    for asset in "${duck_assets[@]}"; do
-      if curl -fsSL -o "$TMP/duckdb.zip" "https://github.com/duckdb/duckdb/releases/latest/download/${asset}" \
-         && unzip -o -q "$TMP/duckdb.zip" -d "$TMP" && "$TMP/duckdb" --version >/dev/null 2>&1; then
-        $SUDO install -m 0755 "$TMP/duckdb" /usr/local/bin/duckdb
-        installed=1; break
-      fi
-    done
+    if [[ -n $duck_sha ]] \
+       && curl -fsSL -o "$TMP/$duck_asset" "https://github.com/duckdb/duckdb/releases/download/${DUCKDB_VERSION}/${duck_asset}" \
+       && [[ "$(sha256sum "$TMP/$duck_asset" | awk '{print $1}')" == "$duck_sha" ]] \
+       && mkdir -p "$TMP/duckdb-cli" && tar -C "$TMP/duckdb-cli" -xzf "$TMP/$duck_asset" \
+       && "$TMP/duckdb-cli/duckdb" --version >/dev/null 2>&1; then
+      $SUDO install -m 0755 "$TMP/duckdb-cli/duckdb" /usr/local/bin/duckdb
+      installed=1
+    fi
     if ((installed)); then
       ok "Installed duckdb $(duckdb --version 2>/dev/null | awk '{print $1}')"
     else
