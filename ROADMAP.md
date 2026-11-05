@@ -16,8 +16,9 @@ findings report with estimated savings. No proxy, no server.
 - Detectors P01–P07.
 - CLI report (terminal + static HTML).
 - Fixture corpus of real (redacted) sessions; detector unit tests.
-- Release pipeline: signed binary on GitHub Releases and a Homebrew tap
-  ([packaging.md](docs/packaging.md)).
+- Aggregate runner for the cross-session detectors (P06, P07).
+- Release pipeline: signed binary on GitHub Releases, `.deb` / `.rpm`
+  packages and a Homebrew tap ([packaging.md](docs/packaging.md)).
 
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.
@@ -38,7 +39,8 @@ software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-
 - Packaging: container image, Helm chart sidecar mode, Docker Compose
   example, plugin on PyPI, schemas on the Buf registry
   ([packaging.md](docs/packaging.md)).
-- Codex CLI transcript importer.
+- Codex CLI transcript reader.
+- Conformance kit (`trimloop conformance`) for provider and harness profiles.
 - Local web UI: sessions, turns, prefix-divergence view.
 
 **Done when:** on the same sessions, the sidecar's findings match
@@ -53,6 +55,7 @@ sidecar causes zero failed model calls.
 - Root-cause grouping and ranked recommendations.
 - L1 actuators: config-patch diffs, optionally opened as PRs.
 - Before/after savings measurement.
+- OTLP receiver for harnesses that export OpenTelemetry.
 - Gateway log connectors for gateways without a plugin (hosted gateways'
   log exports and usage APIs).
 

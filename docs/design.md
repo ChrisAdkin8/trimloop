@@ -67,13 +67,18 @@ flowchart LR
     A -->|in-path transforms| P
     A -->|config patches| CFG[(CLAUDE.md, settings,<br/>MCP config)]
   end
+  subgraph GWH["Gateway host (M1)"]
+    LL[LiteLLM + trimloop-litellm plugin] -->|raw events, loopback| SC[trimloop serve<br/>sidecar: normalise + detect]
+    SC -.->|decide, M3| LL
+  end
   subgraph Team["Team collector (optional, self-hosted)"]
     C[Ingest API] --> TS[(ClickHouse /<br/>Postgres)]
     TS --> R[Recommendation engine]
     R --> TUI[Team dashboard]
     R --> POL[Policy service]
   end
-  GW[(LLM gateway logs:<br/>LiteLLM, Portkey, Helicone)] -. connector .-> C
+  GW[(Logs from gateways<br/>without a plugin)] -. connector .-> C
+  SC -->|hashes, counts, cost,<br/>findings| C
   F -->|hashes, sizes, counts,<br/>cost — no content| C
   POL -->|signed policies| A
 ```
@@ -89,8 +94,12 @@ Four layers, each replaceable:
 
 ## 4. Taps (capture)
 
-Different harnesses expose different surfaces, so there are four taps. All emit
-the same raw envelope to the normaliser.
+Different harnesses and gateways expose different surfaces, so there are four
+kinds of tap: local proxy, OTLP receiver, transcript reader and gateway
+(plugin plus sidecar, or log connector). All emit the same raw envelope to the
+normaliser. Ship order: transcripts (M0), gateway sidecar (M1), OTLP and log
+connectors (M2), local proxy (M4) — see
+[ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.md).
 
 ### 4.1 Local proxy
 
@@ -131,12 +140,21 @@ transcripts under `~/.claude/projects/` and Codex session logs. Works on
 history, so a new user gets findings on day one with no proxy. This is the MVP
 tap (see [ROADMAP.md](../ROADMAP.md)).
 
-### 4.4 Gateway connectors
+### 4.4 Gateway taps
 
-Pull or receive logs from LLM gateways (LiteLLM callbacks, Portkey/Helicone
-log export, OpenRouter activity API). Lands at the team collector, not the
-laptop. Gives coverage for traffic that never touches a developer machine
-(CI agents, background agents).
+Two forms, both covering traffic that never touches a developer machine (CI
+agents, background agents):
+
+- **Plugin plus sidecar (M1).** A thin plugin inside the gateway (LiteLLM
+  first) forwards raw events over loopback to a `trimloop serve` sidecar on the
+  same host, which normalises, fingerprints and runs the detectors. Only
+  hashes, counts, cost and findings go on to the team collector
+  ([analyzer.md §5.2](analyzer.md#52-gateway-sidecar-trimloop-serve),
+  ADRs [0005](adr/0005-thin-python-plugin-for-litellm.md) and
+  [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md)).
+- **Log connectors (M2).** For gateways without a plugin (Portkey/Helicone log
+  export, OpenRouter activity API): pulled or received at the team collector.
+  Usually lower fidelity — usage and metadata rather than full bodies.
 
 ### Coverage matrix (target)
 
@@ -163,10 +181,11 @@ Steps, in order:
    definitions, memory files (CLAUDE.md, AGENTS.md), conversation history,
    file reads, tool results, user message.
 3. **Redact.** Run secret detection (entropy + known key formats) over segment
-   text. Matches are replaced before anything is stored.
-4. **Fingerprint.** For each segment, store a SHA-256 of normalised text, a
-   rolling-hash chunk set (for near-duplicate detection), byte and token
-   counts. Raw text is kept only if `capture.content = full` (default:
+   text. Matches are replaced before any text is stored; hashes are taken
+   from the original text (see the fingerprinting specification).
+4. **Fingerprint.** For each segment, store an exact hash, a content hash,
+   line hashes where applicable, and byte and token counts
+   ([specification](data-model.md#fingerprinting)). Raw text is kept only if `capture.content = full` (default:
    `hashes`).
 5. **Price.** Apply the versioned price catalogue (input, output, cache write,
    cache read; per model; per date) to produce `cost_estimate`.
@@ -184,24 +203,14 @@ in a host is specified in [analyzer.md](analyzer.md).
 
 ### 6.1 Detectors
 
-A detector is a pure function over a window of events that emits zero or more
-`Finding`s:
+A detector emits zero or more `Finding`s, each with evidence, wasted tokens by
+class, an estimated saving, a confidence and a reference to the fix that
+applies. The schema is defined once, in [data-model.md](data-model.md#finding).
 
-```text
-Finding {
-  pattern_id      // e.g. P01-cache-prefix-churn
-  scope           // turn | session | repo | developer | org
-  evidence        // event ids, segment fingerprints, counts
-  wasted_tokens   // by token class: input, cache_write, cache_read, output
-  est_saving      // money, from the price catalogue
-  confidence      // 0..1
-  fix_ref         // which actuator / recommendation template applies
-}
-```
-
-Detectors are versioned and written as SQL over DuckDB views where possible
-(cheap to read, easy to unit-test against fixtures), falling back to Go for
-sequence logic such as loop detection. The full catalogue is in
+Turn- and session-scope detectors are versioned Go state machines that run
+unchanged over history and live traffic; cross-session detectors are SQL
+aggregates over the store ([ADR 0010](adr/0010-go-detectors-sql-aggregates.md),
+[analyzer.md §7](analyzer.md#7-detector-execution)). The full catalogue is in
 [patterns.md](patterns.md); their expected value is ranked in
 [value.md](value.md#2-the-levers-ranked-by-expected-value). The highest-value
 ones for the MVP:
@@ -292,7 +301,8 @@ the transform version, the sent request can be reproduced exactly.
 | Mode | Components | Storage | Who |
 |---|---|---|---|
 | **Solo** | Single `trimloop` binary: taps, normaliser, detectors, local UI | DuckDB file in `~/.trimloop/` | One developer |
-| **Team** | Solo on each machine + self-hosted collector (container / Helm chart) | ClickHouse (events, findings), Postgres (policies, recommendations) | Org running it on its own infra |
+| **Gateway sidecar** | `trimloop serve` beside each gateway instance, plus the gateway plugin (container / Helm sidecar mode) | Memory or DuckDB on the gateway host | Team running LiteLLM (M1) |
+| **Team** | Solo and/or gateway sidecars + self-hosted collector (container / Helm collector mode) | ClickHouse (events, findings), Postgres (policies, recommendations) | Org running it on its own infra |
 | **Hosted** (later) | Same collector, run by us | Same | Teams that accept the hashes-only data model |
 
 How each mode is packaged and released (one binary, one container image,

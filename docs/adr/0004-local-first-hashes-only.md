@@ -13,7 +13,7 @@ recommendations need data from many machines.
 ## Decision
 
 - Raw content stays on the developer's machine. Default capture mode is
-  `hashes`: segment fingerprints, chunk hashes, sizes, token counts.
+  `hashes`: segment hashes, line hashes, sizes, token counts.
 - The team collector receives structure, counts, cost and findings — never
   content. File paths are hashed unless a repo opts in.
 - Secret redaction runs before anything is written, even locally.

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="680" height="600" viewBox="0 0 680 600" role="img" aria-labelledby="title desc">
 <title id="title">Trimloop high-level architecture</title>
-<desc id="desc">On the developer machine, coding agents send traffic through Trimloop taps to model providers. Taps feed a normaliser, a local DuckDB store, detectors and actuators, which push fixes back into the proxy. Detectors send hashes-only findings to an optional team collector, which also ingests gateway logs, ranks recommendations and serves a team dashboard.</desc>
+<desc id="desc">On the developer machine, coding agents send traffic through Trimloop taps to model providers. Taps feed a normaliser, a local DuckDB store, detectors and actuators, which push fixes back into the proxy. Detectors send hashes-only findings to an optional team collector, which also receives findings from a gateway sidecar beside LiteLLM, ranks recommendations and serves a team dashboard.</desc>
 <style>
   text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
   .th { font-size: 14px; font-weight: 500; }
@@ -108,8 +108,8 @@
 
 <g class="ext">
   <rect x="60" y="520" width="165" height="56" rx="8" stroke-width="0.5"/>
-  <text class="th" x="142" y="538" text-anchor="middle" dominant-baseline="central">Gateway logs</text>
-  <text class="ts" x="142" y="558" text-anchor="middle" dominant-baseline="central">LiteLLM, Portkey</text>
+  <text class="th" x="142" y="538" text-anchor="middle" dominant-baseline="central">Gateway sidecar</text>
+  <text class="ts" x="142" y="558" text-anchor="middle" dominant-baseline="central">LiteLLM plugin (M1)</text>
 </g>
 <line class="arr" x1="142" y1="520" x2="142" y2="464" marker-end="url(#arrow)"/>
 </svg>

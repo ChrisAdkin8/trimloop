@@ -1,6 +1,6 @@
 # ADR 0002: Go for the agent, proxy and CLI
 
-- Status: Proposed
+- Status: Proposed — build and platform claims amended by [ADR 0008](0008-packaging-and-distribution.md)
 - Date: 2026-11-05
 
 ## Context
@@ -18,7 +18,9 @@ Go.
 
 ## Rationale
 
-- Single static binary, trivial cross-compilation, no runtime to install.
+- Single binary with no runtime to install. (Not static, and not trivially
+  cross-compiled: the DuckDB driver needs cgo, so builds are per platform —
+  see packaging.md §4. Windows comes later.)
 - Mature standard library for HTTP/1.1, HTTP/2, TLS and streaming.
 - Good enough latency for a pass-through proxy; the p99 < 5 ms budget is a
   network-path problem, not a language one.

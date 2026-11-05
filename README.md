@@ -46,12 +46,14 @@ Trimloop is designed to do all four.
 
 ## Architecture
 
-![Trimloop high-level architecture: coding agents send traffic through Trimloop taps to model providers; a normaliser, local store, detectors and actuators run on the developer machine; an optional team collector receives hashes-only findings and gateway logs and ranks recommendations](docs/images/architecture.svg)
+![Trimloop high-level architecture: coding agents send traffic through Trimloop taps to model providers; a normaliser, local store, detectors and actuators run on the developer machine; an optional team collector receives hashes-only findings, including from a gateway sidecar beside LiteLLM, and ranks recommendations](docs/images/architecture.svg)
 
 Everything in the top box runs on the developer's machine; raw prompts and code
 never leave it. The dashed arrow is the fix loop: actuators feed safe
-transforms back into the proxy. The team collector is optional and receives
-only hashes, counts, cost and findings. Detail in
+transforms back into the proxy. The gateway sidecar (M1) runs the same engine
+beside LiteLLM, so teams get findings without installing anything on developer
+machines. The team collector is optional and receives only hashes, counts,
+cost and findings. Detail in
 [docs/design.md §3](docs/design.md#3-architecture).
 
 ## Technology
@@ -61,7 +63,7 @@ only hashes, counts, cost and findings. Detail in
 | Part | Language | Why |
 |---|---|---|
 | Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One static binary to install; strong HTTP, TLS and streaming support; one codebase for every tap to feed |
-| Detectors | SQL over DuckDB (called from Go) | Language-neutral, easy to test against fixtures, runs locally and in the team collector |
+| Detectors | Go per-turn state machines; SQL only for cross-session aggregates | One implementation serves batch analysis and live traffic ([ADR 0010](docs/adr/0010-go-detectors-sql-aggregates.md)) |
 | LiteLLM gateway plugin | Python, kept thin | LiteLLM plugins must be Python. The plugin only captures events and forwards them to a `trimloop serve` sidecar on loopback, which does all parsing, redaction and fingerprinting; it applies transforms the core has decided on but contains no detection logic |
 | Envoy and Kong gateways (later) | Go | Envoy's external processing and Kong's Go plugin server let the core plug in directly — no third language |
 | Web UI | TypeScript | Embedded in the Go binary |
@@ -81,7 +83,7 @@ Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or
 Debian/Ubuntu):
 
 ```bash
-scripts/bootstrap.sh --check   # see what is missing; changes nothing
+scripts/bootstrap.sh --check   # see what is missing; changes nothing; exit 1 if any
 scripts/bootstrap.sh           # install what is missing (asks first)
 ```
 

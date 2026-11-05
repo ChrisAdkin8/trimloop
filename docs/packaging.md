@@ -29,7 +29,7 @@
 
 | # | Artefact | Contents | Channel | Audience | Milestone |
 |---|---|---|---|---|---|
-| 1 | **`trimloop` binary** | All modes (§3); embedded web UI, detector SQL, profiles, price catalogue, fix templates | Homebrew tap, GitHub Releases (archives + checksums), `.deb` / `.rpm` | Developers; servers without containers | M0 |
+| 1 | **`trimloop` binary** | All modes (§3); embedded web UI, aggregate SQL, profiles, price catalogue, fix templates | Homebrew tap, GitHub Releases (archives + checksums), `.deb` / `.rpm` | Developers; servers without containers | M0 |
 | 2 | **Container image** `ghcr.io/<org>/trimloop` | The same binary, multi-arch | GitHub Container Registry | Gateway sidecar, team collector | M1 |
 | 3 | **Helm chart** `trimloop` | Sidecar mode and collector mode (§6) | Helm repository (OCI, on GHCR) | Platform teams on Kubernetes | M1 (sidecar), M2 (collector) |
 | 4 | **Docker Compose example** | LiteLLM + plugin + sidecar | `deploy/compose/` in the repo | Evaluators; teams not on Kubernetes | M1 |
@@ -54,7 +54,7 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | `trimloop proxy` | Local forward/reverse proxy |
 | `trimloop report`, `explain` | Render reports; explain a finding |
 | `trimloop conformance` | Test a provider or harness profile against fixtures |
-| `trimloop update-catalogue` | Opt-in: fetch a signed price catalogue (§3.3) |
+| `trimloop update-catalogue` | Opt-in: fetch a signed price catalogue ([below](#price-catalogue-updates)) |
 | `trimloop version` | Version, build provenance, embedded data versions |
 
 ### Why one binary
@@ -72,7 +72,7 @@ integration is a separate binary (artefact 9).
 
 ### Embedded data and overrides
 
-Embedded with `go:embed`: detector SQL, provider and harness profiles, price
+Embedded with `go:embed`: aggregate SQL, provider and harness profiles, price
 catalogue, fix templates, built web UI.
 
 Lookup order for each data kind, first match wins:
@@ -105,7 +105,7 @@ separately; users never install DuckDB to use Trimloop.
 | **Web UI** | Built from `web/`, embedded | `serve`, local UI | |
 
 The DuckDB command-line tool installed by `scripts/bootstrap.sh` is a developer
-convenience for writing detector SQL. It is not part of any artefact.
+convenience for writing aggregate SQL. It is not part of any artefact.
 
 **No extension downloads.** By default DuckDB installs and loads some
 extensions from the internet the first time a query needs them. That would

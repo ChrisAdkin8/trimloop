@@ -8,34 +8,35 @@ saving is estimated, and the fix (with the actuator safety level from
 prompt cache. Anything that changes inside the prefix invalidates the cache
 from that point on.
 
-Priority: **MVP** = ships with the transcript analyser; **v1** = needs the proxy
-or the team collector; **later** = needs outcome data or routing.
+**Milestone:** when the detector ships ([ROADMAP.md](../ROADMAP.md)).
+**Kind:** **Go** = per-turn state machine; **SQL** = cross-session aggregate;
+**Go + SQL** = both ([ADR 0010](adr/0010-go-detectors-sql-aggregates.md)).
 
 Detectors are provider- and harness-neutral: each declares the capabilities it
 needs ([analyzer.md §10.4](analyzer.md#104-capability-gated-detectors)) and
 reports "not applicable" where they are missing, never zero. Caching is not
 neutral, so P01 and P02 describe each provider cache model.
 
-| ID | Pattern | Priority | Max fix level |
-|---|---|---|---|
-| P01 | Cache-prefix churn | MVP | 2 |
-| P02 | Cache TTL expiry | MVP | 2 |
-| P03 | Repeated file reads | MVP | 1 |
-| P04 | Oversized tool output | MVP | 3 |
-| P05 | Tool-call loops | MVP | 0 |
-| P06 | Unused tool definitions | MVP | 1 |
-| P07 | Bloated standing context | MVP | 1 |
-| P08 | Stale context | v1 | 3 |
-| P09 | Resume bloat | v1 | 2 |
-| P10 | Compaction thrash | v1 | 1 |
-| P11 | Post-failure burn | v1 | 0 |
-| P12 | Retry storms | v1 | 1 |
-| P13 | Model over-provisioning | later | 3 |
-| P14 | Thinking-budget overspend | later | 3 |
-| P15 | Duplicated exploration across a team | later | 1 |
-| P16 | Repeated workflow (skill candidate) | v1 | 1 |
-| P17 | Repeated instructions | v1 | 1 |
-| P18 | Hot documentation | v1 | 1 |
+| ID | Pattern | Milestone | Kind | Max fix level |
+|---|---|---|---|---|
+| P01 | Cache-prefix churn | M0 | Go | 2 |
+| P02 | Cache TTL expiry | M0 | Go | 2 |
+| P03 | Repeated file reads | M0 | Go | 1 |
+| P04 | Oversized tool output | M0 | Go | 3 |
+| P05 | Tool-call loops | M0 | Go | 0 |
+| P06 | Unused tool definitions | M0 | SQL | 1 |
+| P07 | Bloated standing context | M0 | SQL | 1 |
+| P08 | Stale context | M3 | Go | 3 |
+| P09 | Resume bloat | M3 | Go | 2 |
+| P10 | Compaction thrash | M3 | Go | 1 |
+| P11 | Post-failure burn | M3 | Go | 0 |
+| P12 | Retry storms | M3 | Go | 1 |
+| P13 | Model over-provisioning | M4 | Go | 3 |
+| P14 | Thinking-budget overspend | M4 | Go | 3 |
+| P15 | Duplicated exploration across a team | M4 | SQL | 1 |
+| P16 | Repeated workflow (skill candidate) | M4 | Go + SQL | 1 |
+| P17 | Repeated instructions | M4 | SQL | 1 |
+| P18 | Hot documentation | M4 | SQL | 1 |
 
 ---
 
@@ -51,7 +52,7 @@ moments ago.
 | Cache model | Example providers | Signal | Saving |
 |---|---|---|---|
 | Explicit breakpoints | Anthropic; Claude on Bedrock/Vertex | `cache_write` high relative to `cache_read` on consecutive turns; first differing segment sits before the last breakpoint | `(cache_write − expected_write) × (write_price − read_price)` |
-| Automatic prefix | OpenAI | `cache_read ÷ input` low on consecutive turns whose prefixes should match; first differing segment early in the request | `uncached_but_cacheable × (input_price − cached_price)` |
+| Automatic prefix | OpenAI | `cache_read ÷ input_total` low on consecutive turns whose prefixes should match; first differing segment early in the request | `uncached_but_cacheable × (input_price − cached_price)` |
 | Implicit + managed | Gemini | Implicit: as automatic prefix. Managed: the same cached content re-created repeatedly | Implicit: as automatic prefix. Managed: re-creation cost plus overlapping storage |
 
 **Detection:** For each consecutive pair of turns, walk the ordered segment
@@ -133,8 +134,10 @@ especially when the next assistant turn references only a small part of it.
 **Detection:** Size threshold, plus a ratio of tokens in the result to tokens
 in the follow-up action.
 
-**Saving:** Tokens above the threshold × input price, multiplied by the number
-of later turns that carry it in history.
+**Saving:** Tokens above the threshold × input price on the turn it arrives,
+plus, for each later turn that carries it in history, the same tokens at that
+turn's price for them — usually the cache-read rate when the prefix was
+cached.
 
 **Fix:**
 - L1: suggest command flags (`--quiet`, `| tail -n 200`, test reporter
@@ -324,10 +327,10 @@ task labels), `harness.skills` (otherwise the memory-file fallback).
 **What happens:** The developer types the same guidance into many sessions —
 "use our logger", "don't touch the generated files", "run the linter first".
 
-**Signals:** The same user-message chunk fingerprint appearing in N or more
+**Signals:** The same user-message line hash appearing in N or more
 sessions for a developer or repo.
 
-**Detection:** Frequency of chunk hashes in `user_message` segments, per
+**Detection:** Frequency of line hashes in `user_message` segments, per
 developer and per repo.
 
 **Saving:** Mostly developer time and consistency; the token saving is small.

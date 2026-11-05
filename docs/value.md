@@ -94,7 +94,7 @@ enough to be worth building for.
 
 | Form | Who feels it | How it shows up |
 |---|---|---|
-| **Lower spend** | Budget holder | Theoretical 20–60 % of agent spend for poorly tuned teams; 5–15 % for well-tuned ones |
+| **Lower spend** | Budget holder | Avoidable waste of perhaps 20–60 % of agent spend for poorly tuned teams (5–15 % for well-tuned ones). The net saving is smaller: §6's example nets 14 % after fixable and adoption shares |
 | **Speed** | Developer | Cached prefixes reduce time to first token; smaller context and fewer loops finish tasks sooner. Developer time costs more than tokens |
 | **Headroom under limits** | Developers on flat-fee plans; API users near rate limits | Waste hits usage caps and rate limits sooner. Efficiency means more work before being throttled, not a smaller bill |
 | **Answer quality** | Developer | Less stale context and fewer loops may improve results. Plausible, not proven — hence outcome signals ([design.md §6.3](design.md#63-outcome-signals)) |
@@ -144,7 +144,8 @@ before/after measurement in the recommendation engine is what makes
 1. Run `trimloop analyse` (M0) on the founder's own Claude Code sessions.
    Record actual cache-hit rate, token mix by class, and estimated waste per
    pattern.
-2. Repeat on 5–10 design-partner developers across at least two harnesses.
+2. Repeat on 5–10 design-partner developers; add a second harness once the
+   Codex reader ships (M1).
 3. Replace the hypotheses in §2, §3 and §6 with measured values: re-rank the
    levers, publish the measured waste-share range.
 4. For one or two applied L1 fixes (e.g. CLAUDE.md reordering), measure the

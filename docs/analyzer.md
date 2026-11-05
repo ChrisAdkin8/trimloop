@@ -82,7 +82,7 @@ flowchart LR
 | `pkg/event` | Canonical model (Session, Turn, Segment, ToolCall, Outcome, Finding) and the versioned wire schema (`proto/trimloop/v1`) | yes |
 | `pkg/normalize` | Provider parsers (Anthropic Messages, OpenAI Chat Completions and Responses, Gemini) → Turn + ordered Segments | yes |
 | `pkg/redact` | Secret detection and replacement before anything is stored | yes |
-| `pkg/fingerprint` | Normalisation + SHA-256 per segment; rolling prefix hashes; chunk hashes. Spec and test vectors in `pkg/fingerprint/testdata` | yes |
+| `pkg/fingerprint` | Exact and content hashes per segment; prefix chains; line hashes ([spec](data-model.md#fingerprinting)). Spec and test vectors in `pkg/fingerprint/testdata` | yes |
 | `pkg/price` | Versioned price catalogue; cost per token class | yes |
 | `pkg/profile` | Provider and harness profiles, capability sets, registry (§10) | yes |
 | `pkg/sessionize` | Group turns into sessions when the source does not (gateway case, §6) | stateful, in-memory |
@@ -124,7 +124,7 @@ type Detector interface {
     ID() string          // "P01"
     Version() string     // bump on any logic change
     Requires() Capabilities // needed and optional capabilities (§10.4)
-    NewState() any       // per-session state
+    NewState() State     // per-session state; serialisable (§7)
     OnTurn(st any, s *event.Session, t *event.Turn) []event.Finding
     OnSessionEnd(st any, s *event.Session) []event.Finding
 }
@@ -162,6 +162,7 @@ team/key alias, cwd/repo when known).
 ```text
 trimloop analyse [--harness claude-code|codex|all] [--since 30d]
                  [--repo PATH] [--format text|html|json] [--out FILE]
+                 [--rebuild]
 ```
 
 1. Source adapters discover transcripts (Claude Code: `~/.claude/projects/**/*.jsonl`;
@@ -175,16 +176,30 @@ trimloop analyse [--harness claude-code|codex|all] [--since 30d]
 Incremental re-runs: the store records each transcript's path, size and last
 offset, so a second run only reads new lines.
 
-Transcript limits: transcripts record what the harness chose to log. They
-show *that* a cache was re-written (usage fields), but may not include the full
-system prompt or tool definitions as sent, so P01 root-cause detail is lower
-than from a gateway or proxy. Findings carry a `fidelity` field
+Transcript contents vary by harness and version. A survey of local Claude
+Code transcripts (versions 2.1.288–2.1.318, 2026-11-05) found:
+
+- `api-request-shape` lines holding the system prompt and tool definitions,
+  keyed by `shapeHash`, and `api-request` lines that reference a shape plus
+  message blobs (`api-request-blob`). The request as sent can therefore
+  largely be rebuilt, giving `request.full_body` for these versions.
+- Usage blocks with `cache_creation.ephemeral_5m_input_tokens` and
+  `ephemeral_1h_input_tokens`, and `output_tokens_details.thinking_tokens`.
+- An assistant message split across several lines (one per content block),
+  each repeating the **same** usage block. Usage is counted once per message
+  id; summing lines double-counts.
+- Sub-agent transcripts in sub-folders, with `isSidechain` set; the reader
+  includes them and links them to the parent session.
+- Claude Code deletes old transcripts after a retention period
+  (`cleanupPeriodDays`), which bounds `--since` and `--rebuild`.
+
+Older or other harnesses may log less. Findings carry a `fidelity` field
 (`transcript` | `wire`) so the report can say so.
 
 ### 5.2 Gateway sidecar: `trimloop serve`
 
 ```text
-trimloop serve --listen 127.0.0.1:7341 [--decide] [--store duckdb|memory]
+trimloop serve --listen 127.0.0.1:7341 [--decide] [--store duckdb|memory|clickhouse]
                [--upload https://collector.example.com]
 ```
 
@@ -202,7 +217,7 @@ normalises, redacts and fingerprints; only hashes, counts, cost and findings
 are written to disk or uploaded.
 
 The sidecar also serves as the **team collector** when run centrally with
-`--store duckdb` swapped for the ClickHouse store — same binary, different
+`--store clickhouse` (plus Postgres for recommendations and policy) — same binary, different
 adapters.
 
 ### 5.3 Embedded library
@@ -251,6 +266,12 @@ once as a batch, once as a shuffled-arrival stream across interleaved sessions
 — and asserts identical findings. This is what lets the same detectors serve
 the CLI and the gateway.
 
+**Detector state.** State returned by `NewState` is serialisable and saved per
+open session (table `detector_state`, keyed by session and
+`detector_id@version`). An incremental re-run or a sidecar restart resumes from
+saved state; if a detector's version changed, its open sessions are replayed
+from stored turns instead.
+
 **Versioning.** Each finding stores `detector_id@version`,
 `price_catalogue_version` and `fidelity`. Re-running with newer detectors
 produces new findings; old ones are kept for before/after comparisons.
@@ -268,7 +289,8 @@ produces new findings; old ones are kept for before/after comparisons.
     {"op": "move_segment", "kind": "memory_file", "source_hash": "…", "to": "after_breakpoint"},
     {"op": "set_cache_ttl", "value": "1h"}
   ],
-  "mode": "canary"
+  "mode": "canary",
+  "apply": true
 }
 ```
 
@@ -346,8 +368,11 @@ the two.
 | `outcome.git` | Git outcomes linkable to sessions | Local shapes only |
 | `timing.per_turn` | Request and response timestamps | All |
 
-A session's **effective capabilities** = provider profile ∩ harness profile ∩
-shape. For example, gateway traffic from Claude Code has `request.full_body`
+Each capability has one **owner**: the provider profile (usage fields, cache
+markers), the harness profile (logs, config, skills, repo context) or the shape
+(what the capture path can see, e.g. `request.full_body` at a gateway). A
+session's **effective capabilities** are those its owners supply, minus any the
+shape cannot see. For example, gateway traffic from Claude Code has `request.full_body`
 but not `context.repo`; a Claude Code transcript has `context.repo` but may
 lack `request.full_body`.
 
@@ -368,9 +393,13 @@ cache:
   kind: explicit_breakpoints         # explicit_breakpoints | automatic_prefix | implicit_and_managed
   write_billed: true
   ttl_options: [5m, 1h]
-usage_fields:
+usage_fields:                        # normalisation rules: data-model.md#usage-normalisation
+  input_uncached: usage.input_tokens
   cache_read: usage.cache_read_input_tokens
-  cache_write: usage.cache_creation_input_tokens
+  cache_write_5m: usage.cache_creation.ephemeral_5m_input_tokens
+  cache_write_1h: usage.cache_creation.ephemeral_1h_input_tokens
+  output: usage.output_tokens
+  reasoning: usage.output_tokens_details.thinking_tokens
 capabilities: [usage.cache_read, usage.cache_write, usage.reasoning,
                request.cache_markers, response.tool_calls, timing.per_turn]
 ops: [sort_tools, move_segment, set_cache_breakpoint, set_cache_ttl]
@@ -388,8 +417,11 @@ cache:
   kind: automatic_prefix
   write_billed: false
   ttl_options: provider_managed
-usage_fields:
+usage_fields:                        # input_uncached = input_total − cache_read (data-model.md#usage-normalisation)
+  input_total: usage.input_tokens
   cache_read: usage.input_tokens_details.cached_tokens
+  output: usage.output_tokens
+  reasoning: usage.output_tokens_details.reasoning_tokens
 capabilities: [usage.cache_read, usage.reasoning, response.tool_calls, timing.per_turn]
 ops: [sort_tools, move_segment, set_cache_key]
 ```
@@ -421,7 +453,8 @@ memory_files: ["CLAUDE.md", "CLAUDE.local.md"]
 config_files: [".mcp.json", ".claude/settings.json"]
 skills: { kind: skill_md, paths: [".claude/skills/", "~/.claude/skills/"] }
 capabilities: [session.explicit_id, context.repo, harness.config, harness.skills,
-               content.local, outcome.git]
+               content.local, outcome.git, request.full_body]  # full_body: from api-request records
+sidechains: { folder: subagents, flag: isSidechain }
 fix_templates: templates/claude-code/
 ```
 
@@ -525,7 +558,8 @@ already use (Datadog, Grafana, etc.).
 ## 12. Repository layout
 
 ```text
-cmd/trimloop/               CLI: analyse, serve, report, explain, version
+cmd/trimloop/               CLI: analyse, serve, proxy, report, explain, conformance,
+                            update-catalogue, version
 pkg/engine/                 public embedding API
 pkg/event/                  canonical model
 pkg/normalize/{anthropic,openai,gemini}/
@@ -581,27 +615,35 @@ adapters stay outside it so the core has no I/O dependencies. Packaging adds
 
 ## 15. Build order
 
-1. `pkg/event`, `normalize/anthropic`, `fingerprint`, `price`, Claude Code
-   source, memory store, detectors P01–P07, text report → **`trimloop analyse` (M0)**.
-2. DuckDB store, incremental re-runs, HTML/JSON reports, Codex source.
-3. Ingest API, `sessionize`, `trimloop serve`, LiteLLM plugin (observe only).
-4. Aggregates, OTel sink, upload sink → team collector.
-5. `decide`, ops, policy, plugin pre-call hook (shadow first).
+Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
+
+1. **M0 — `trimloop analyse`:** `pkg/event`, `normalize/anthropic`,
+   `redact`, `fingerprint`, `price`, Claude Code `Reader`, DuckDB and memory
+   stores, incremental re-runs, detectors P01–P05 (Go) and P06–P07 (SQL
+   aggregates), text and HTML reports.
+2. **M1 — sidecar:** ingest API, `sessionize`, `trimloop serve`, LiteLLM
+   plugin (observe only), Codex `Reader`, JSON report, conformance kit.
+3. **M2 — team collector:** ClickHouse and Postgres stores, upload sink, OTel
+   sink, OTLP receiver, recommendations.
+4. **M3 — automatic fixes:** `decide`, ops, policy, plugin pre-call hook
+   (shadow first).
+5. **M4:** local proxy, Envoy and Kong integrations, remaining detectors.
 
 ## 16. Open questions
 
-1. Do current Claude Code transcripts include enough of the request (system
-   prompt, tool definitions) for P01 root causes, or only usage figures?
-   Determines how much M0 can say about *why* caches break.
+1. ~~Do Claude Code transcripts include enough of the request for P01 root
+   causes?~~ Largely yes for versions 2.1.288 onward (§5.1). Still to confirm:
+   whether every turn's request can be rebuilt exactly, including cache
+   markers.
 2. Which harnesses send an explicit session identifier through a gateway?
    Affects how often §6 falls back to prefix continuity.
-5. Which capabilities do Claude Code transcripts actually provide? If they
-   lack tool definitions, P06 depends on reading harness config from disk
-   (`harness.config`) in M0.
-6. For providers with no local tokenizer, how large is the token-estimate
-   error, and should findings that depend on estimates carry lower
-   confidence by default?
 3. Is the LiteLLM success callback guaranteed to carry final usage for
    streamed responses in every supported version?
 4. Should `serve` support a Unix socket as well as loopback TCP, to tighten
    the local-only guarantee?
+5. ~~Which capabilities do Claude Code transcripts provide?~~ See §5.1 and the
+   harness profile (§10.3). P06 still needs tool-definition sizes per MCP
+   server, which come from the recorded request shape.
+6. For providers with no local tokenizer, how large is the token-estimate
+   error, and should findings that depend on estimates carry lower
+   confidence by default?

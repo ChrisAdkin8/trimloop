@@ -32,7 +32,8 @@ and it does not outweigh Go's faster iteration on detectors.
 - The LiteLLM plugin is written in Python and kept thin. It:
   - captures requests and responses,
   - redacts secrets and fingerprints segments,
-  - forwards events to the Trimloop core (team collector),
+  - forwards events to the Trimloop core (by default the co-located
+    `trimloop serve` sidecar — ADR 0006),
   - applies transforms the core has decided on (L2/L3), identified by
     transform version.
 - It contains no detectors and no recommendation logic.
