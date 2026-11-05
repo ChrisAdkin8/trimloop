@@ -55,7 +55,7 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | `trimloop report`, `explain` | Render reports; explain a finding |
 | `trimloop conformance` | Test a provider or harness profile against fixtures |
 | `trimloop update-catalogue` | Opt-in: fetch a signed price catalogue ([below](#price-catalogue-updates)) |
-| `trimloop key init`, `key rotate` | Create or rotate the fingerprint key ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
+| `trimloop key init`, `import`, `export`, `rotate`, `status` | Manage the fingerprint key ([ADR 0011](adr/0011-keyed-fingerprints.md), [ADR 0019](adr/0019-fingerprint-key-management.md)) |
 | `trimloop version` | Version, build provenance, embedded data versions |
 
 ### Why one binary
@@ -166,6 +166,12 @@ builds both macOS architectures (`amd64` with Apple's clang `-arch x86_64`),
 and Linux runners build `amd64` and `arm64` natively. A static musl build is
 not planned; the container image uses a glibc base instead.
 
+**glibc baseline: 2.34** (RHEL 9 and derivatives, Ubuntu 22.04, Debian 12 and
+newer). Linux binaries are built inside a container with glibc 2.34 (for
+example an AlmaLinux 9 image) on the Linux runners, so they never require
+newer glibc symbols than that; `.rpm` and `.deb` packages declare the
+dependency. The distroless runtime image (glibc 2.36) is above the baseline.
+
 ## 5. Container image
 
 - Base: a distroless glibc image (e.g. `gcr.io/distroless/cc`): no shell, no
@@ -197,6 +203,15 @@ serve:
   decide: false
   upload:
     url: ""              # team collector, hashes only
+persistence:
+  enabled: true          # DuckDB store on a volume; off = memory store (findings lost on restart)
+  size: 10Gi
+  storageClass: ""
+findings:
+  port: 7342             # read-only findings API and page (ADR 0016)
+  tokenSecret: ""
+webhook:
+  url: ""                # e.g. a Slack incoming webhook for findings
 fingerprintKey:
   existingSecret: ""     # Kubernetes secret holding the organisation's key (ADR 0011);
                          # required in sidecar and connector modes, never set in collector mode

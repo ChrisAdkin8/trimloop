@@ -66,6 +66,8 @@ fidelity and cannot name the cause.
 - Timestamps, git status or random IDs embedded in the system prompt or a
   memory file.
 - MCP servers returning tool lists in a non-deterministic order.
+- Context editing: the provider or harness clearing old tool results or
+  compacting history (`history_edit_at`) — reported as its own cause.
 - Tools added or removed mid-session.
 
 **Fix:**

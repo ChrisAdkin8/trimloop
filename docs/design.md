@@ -286,7 +286,7 @@ allowed; the default is 1.
 |---|---|---|---|
 | 0 | Report | Findings in CLI/UI | none |
 | 1 | Config patch | Edit CLAUDE.md to move volatile lines below stable ones; disable an unused MCP server for a repo; add a tool-output limit to settings | Human approves a diff (local, or as a PR) |
-| 2 | In-path transform, semantics-preserving | Sort tool definitions; add cache breakpoints within the provider's limit; choose the cache TTL; set a cache key | Shadow → canary → on, auto-rollback on regression; rejected requests resent untransformed |
+| 2 | In-path transform, semantics-preserving | Sort tool definitions (where tool order is shown not to matter, ADR 0018); add cache breakpoints within the provider's limit; choose the cache TTL; set a cache key | Shadow → canary → on, auto-rollback on regression; rejected requests resent untransformed |
 | 3 | In-path transform, behaviour-changing | Move volatile segments behind stable ones; truncate tool output with a retrievable pointer; route low-complexity turns to a cheaper model; cap thinking budget on trivial turns | Opt-in per repo, canary only, outcome signals must not regress; not at a gateway until developer-side outcomes are joined (M4) |
 
 ### Rollout for levels 2 and 3
@@ -295,7 +295,8 @@ allowed; the default is 1.
    *would* have changed: predicted cache hit, tokens saved.
 2. **Canary.** Apply to a percentage of sessions (by session, never by turn, so
    a conversation is internally consistent; the bucket comes from the keyed
-   fingerprint of the conversation root, so it needs no session state).
+   fingerprint of the conversation root and the experiment id, so it needs no
+   session state and each experiment splits independently).
    Compare cost and outcome signals against the control.
 3. **On.** Promote when savings are significant and no outcome signal
    regresses beyond a threshold.

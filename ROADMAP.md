@@ -11,8 +11,11 @@ developer machines comes last (M4).
 findings report with estimated savings. No proxy, no server.
 
 - Transcript importer for Claude Code (`~/.claude/projects/**/*.jsonl`).
-- Keyed fingerprints and `trimloop key init` (per-machine key for solo use;
-  [ADR 0011](docs/adr/0011-keyed-fingerprints.md)).
+- Keyed fingerprints and `trimloop key init` / `import` / `status`
+  (per-machine key for solo use; [ADR 0011](docs/adr/0011-keyed-fingerprints.md),
+  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
+- Content-addressed segment storage: each segment stored once, turns hold
+  references ([ADR 0017](docs/adr/0017-content-addressed-segments.md)).
 - Normaliser: segmenting, redaction, fingerprinting, pricing.
 - DuckDB store.
 - Detectors P01–P07.
@@ -38,9 +41,19 @@ software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-
 
 - Organisation fingerprint key distributed to sidecars (environment variable
   or Kubernetes secret); `fp_key_id` mismatch detection.
+- **First task:** benchmark the plugin on LiteLLM under realistic load
+  against the ≤ 1 ms p99 budget; fall back to delta sending and off-loop
+  serialisation if needed ([ADR 0016](docs/adr/0016-m1-sidecar-operation.md)).
+- Findings output without a collector: read-only findings API and page on
+  `trimloop serve`, webhook sink, Helm persistence values.
+- Plugin forwards the provider-bound request; `normalize/litellm` envelope;
+  gateway fingerprints use `fidelity = gateway`.
+- Reorder window, session merging and history-edit handling in the
+  sessioniser.
 - Supported topologies: one gateway instance, or replicas with sticky routing
   by API key or user ([ADR 0012](docs/adr/0012-gateway-sessions-and-parity.md)).
-  Session kinds (`main`, `subagent`, `auxiliary`); 2-hour idle window;
+  Session kinds (`main`, `subagent`, `auxiliary`); idle window of at least
+  2 hours, extended to the longest observed cache TTL (capped at 24 hours);
   plugin buffer capped by bytes.
 - `trimloop serve`: ingest API (`/v1/events`), sessioniser, streaming detector
   driver, memory and DuckDB stores ([analyzer.md](docs/analyzer.md) §5.2, §6).

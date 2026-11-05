@@ -1,6 +1,6 @@
 # ADR 0013: Self-contained decide requests, gateway quality signals, transform safety
 
-- Status: Proposed
+- Status: Proposed — buckets, rejection trigger, tool sorting amended by [ADR 0018](0018-rollout-refinements.md)
 - Date: 2026-11-05
 
 ## Context

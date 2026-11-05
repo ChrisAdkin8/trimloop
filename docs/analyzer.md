@@ -219,6 +219,7 @@ Runs next to the gateway (same pod or host). Exposes:
 | `POST /v1/events` (batched, protobuf or JSON) | Observe path: plugin forwards completed calls | Async; plugin never waits on it |
 | `POST /v1/decide` | Decide path: plugin asks for a transform before the call | p99 < 10 ms; plugin times out at 25 ms and fails open |
 | `GET /v1/health`, `/metrics` | Liveness, Prometheus metrics | — |
+| `GET /v1/findings`, `/` on the findings port (default `:7342`, token auth) | Read-only findings, coverage and session summaries, and a small page — the M1 output ([ADR 0016](adr/0016-m1-sidecar-operation.md)) | — |
 
 Binding to loopback by default means raw request bodies cross only the local
 network stack inside the gateway's host or pod (ADR 0006). The sidecar
@@ -255,13 +256,23 @@ sessions. `pkg/sessionize` rebuilds them:
    opens a new one.
 3. **Scoping.** Matching is restricted to the same gateway key / user and
    harness (from `User-Agent` or metadata), within an idle window
-   (default 2 hours — longer than the longest cache TTL, so P02 sees
-   expiries), which also closes sessions.
-4. **Forks and compaction.** A compaction or `/clear` breaks the prefix and
+   — the larger of 2 hours and the longest cache TTL observed in the session,
+   capped at 24 hours, so P02 sees expiries — which also closes sessions.
+   Turns are first held per gateway key for a 5-second **reorder window** and
+   released in request-timestamp order; a late turn that shows two open
+   sessions are one merges them and replays their detectors.
+4. **History edits.** Harnesses rewrite history: providers clear old tool
+   results, and Claude Code records requests as an earlier request cut to
+   `keep` messages plus a new `tail`. A request joins an open session when it
+   shares the conversation root and its history starts with *any* prefix of
+   that session's last request; the divergence point is recorded as
+   `history_edit_at`, and P01 attributes cache breaks there to context
+   editing.
+5. **Forks and compaction.** A compaction or `/clear` breaks the prefix and
    starts a new session linked by `resumed_from` when the system prompt and
    tool-definition fingerprints match the previous one.
 
-5. **Kinds.** Each session is labelled `main`, `subagent` or `auxiliary`
+6. **Kinds.** Each session is labelled `main`, `subagent` or `auxiliary`
    (titles, summaries and similar side calls), by rules in the harness
    profile. Sub-agents link to their parent session. Per-session statistics
    count `main` sessions only.
@@ -329,15 +340,20 @@ produces new findings; old ones are kept for before/after comparisons.
 - A decide request carries the full request body, so the sidecar sessionises
   it from the request's own history without waiting for `/v1/events`. The
   canary bucket comes from the keyed fingerprint of the conversation root
+  combined with the experiment id (sub-agents inherit their parent's bucket;
+  [ADR 0018](adr/0018-rollout-refinements.md))
   (system prompt plus first user message), so a session lands in the same
   bucket on every replica.
 - Each op has preconditions checked before it is returned — for example
   `set_cache_breakpoint` only if the request stays within the provider's
   breakpoint limit, counting the harness's own markers. `move_segment` is L3.
-- If the provider rejects a transformed request (4xx other than rate limits),
-  the plugin resends the original once and reports `transform_rejected`; the
-  op is disabled for that provider and model until a person re-enables it
-  ([ADR 0013](adr/0013-decide-path-and-transform-safety.md)).
+- If the provider rejects a transformed request with an invalid-request
+  error, the plugin resends the original once and reports
+  `transform_rejected`. An op is disabled for a provider and model only after
+  at least 3 such rejections within an hour where the resend succeeded; auth,
+  size, context-length and server errors never count
+  ([ADR 0013](adr/0013-decide-path-and-transform-safety.md),
+  [ADR 0018](adr/0018-rollout-refinements.md)).
 
 ## 9. The thin LiteLLM plugin
 
@@ -346,10 +362,10 @@ LiteLLM's `CustomLogger`:
 
 | Hook | What the plugin does |
 |---|---|
-| `async_log_success_event` / `async_log_failure_event` | Build an `event.Raw` from the request, response, usage and timings; append to an in-memory ring buffer |
+| `async_log_success_event` / `async_log_failure_event` | Build an `event.Raw` from the **provider-bound request** (after LiteLLM's translation), the response, usage, timings and LiteLLM call id; append to an in-memory ring buffer |
 | Background task | Flush the buffer to `POST /v1/events` every 1 s or 100 events; the buffer is capped at 50 MB as well as by event count, and on overflow drops the oldest events and counts them |
 | `async_pre_call_hook` (only if `decide` enabled) | `POST /v1/decide` with the request body and a 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged |
-| `async_post_call_failure_hook` (only if `decide` enabled) | Detect a transformed request the provider rejected (4xx, not rate limiting), arrange one resend of the original, and report `transform_rejected`. A failure hook cannot resend by itself; the exact LiteLLM mechanism is open question 7 |
+| `async_post_call_failure_hook` (only if `decide` enabled) | Detect a transformed request the provider rejected with an invalid-request error, arrange one resend of the original, and report `transform_rejected`. A failure hook cannot resend by itself; the exact LiteLLM mechanism is open question 7 |
 
 It contains no parsing beyond reading LiteLLM's own objects, no detectors and
 no fingerprinting. When the sidecar is not co-located (ADR 0006, remote mode)
@@ -585,6 +601,8 @@ sources:
   codex:       { enabled: true }
 serve:
   listen: 127.0.0.1:7341
+  findings_listen: 0.0.0.0:7342   # read-only findings API and page (token auth)
+  reorder_window: 5s
   decide: false
 store:
   kind: duckdb             # duckdb | memory | clickhouse
@@ -682,8 +700,11 @@ Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
    Code `Reader`, DuckDB and memory stores, incremental re-runs, detectors
    P01–P05 (Go) and P06–P07 (aggregates), text and HTML reports, release
    pipeline dry-run.
-2. **M1 — sidecar:** ingest API, `sessionize`, `trimloop serve`, LiteLLM
-   plugin (observe only), Codex `Reader`, JSON report, conformance kit.
+2. **M1 — sidecar:** plugin overhead benchmark first; then ingest API,
+   `normalize/litellm` envelope, `sessionize` with reorder window, merging and
+   history edits, `trimloop serve` with the findings API and page, webhook
+   sink, LiteLLM plugin (observe only), Codex `Reader`, JSON report,
+   conformance kit.
 3. **M2 — team collector:** ClickHouse and Postgres stores, upload sink, OTel
    sink, OTLP receiver, recommendations.
 4. **M3 — automatic fixes:** `decide`, ops, policy, plugin pre-call hook

@@ -1,6 +1,6 @@
 # ADR 0011: Keyed fingerprints (HMAC-SHA-256) with a customer-held key
 
-- Status: Proposed
+- Status: Proposed — key management amended by [ADR 0019](0019-fingerprint-key-management.md)
 - Date: 2026-11-05
 - Amends: [ADR 0004](0004-local-first-hashes-only.md) (what "hashes-only" protects)
 

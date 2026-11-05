@@ -36,8 +36,10 @@ Trimloop is designed to do all four.
 - **Local-first.** Prompts contain source code and secrets. Raw content never
   leaves the developer's machine unless explicitly enabled. Teams share keyed
   hashes, sizes, counts and cost — not code or names. The key stays with the
-  customer, so Trimloop's servers cannot test guesses against the hashes
-  ([ADR 0011](docs/adr/0011-keyed-fingerprints.md)).
+  customer: a hosted Trimloop server cannot read your code or names or test
+  guesses against them; on a self-hosted collector the same holds for anyone
+  without the key ([ADR 0011](docs/adr/0011-keyed-fingerprints.md),
+  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
 - **Observe before acting.** Every optimisation ships report-only first, then
   shadow, then canary, then on. Each is measured and reversible.
 - **Quality is a constraint, not an afterthought.** A saving that makes the

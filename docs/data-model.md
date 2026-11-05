@@ -59,21 +59,26 @@ One model request and its response.
 | `usage.reasoning` | int? | Reasoning / thinking tokens, a subset of `output`; null if not reported |
 | `fp_version` | string | Fingerprint spec version, e.g. `fp1` ([fingerprinting](#fingerprinting)) |
 | `fp_key_id` | string | Identifies the fingerprint key used; codes with different key ids are never compared |
-| `exact_prefix_at_breakpoints` | string[] | Exact prefix-hash value at each cache breakpoint |
-| `content_prefix_at_messages` | string[] | Content prefix-hash value at each message boundary (used for sessionising) |
+| `segment_refs` | id[] | Ordered references to the turn's segments ([ADR 0017](adr/0017-content-addressed-segments.md)) |
+| `shared_prefix_len` | int | Segments shared with the session's previous turn |
+| `breakpoints` | int[] | Positions in `segment_refs` after which a cache marker was placed (a property of the request, not the segment) |
+| `exact_prefix_new` | string[] | Exact prefix-chain values for segments beyond the shared prefix, at cache breakpoints |
+| `content_prefix_new` | string[] | Content prefix-chain values beyond the shared prefix, at message boundaries (sessionising) |
+| `history_edit_at` | int? | Segment index where this request's history diverges from the previous turn's (clearing, compaction, truncation) |
 | `cost_estimate` | decimal | From the price catalogue |
 | `price_catalogue_version` | string | Makes costs reproducible |
 | `transform_version` | string? | Set if an actuator changed the request |
 
 ### Segment
 
-A typed slice of a turn's input. The unit of fingerprinting.
+A typed slice of a turn's input. The unit of fingerprinting. Stored **once**,
+keyed by `(fp_key_id, exact_hash)`, and referenced by every turn that contains
+it ([ADR 0017](adr/0017-content-addressed-segments.md)).
 
 | Field | Type | Notes |
 |---|---|---|
-| `segment_id` | string | |
-| `turn_id` | string | |
-| `position` | int | Order in the request |
+| `segment_id` | string | Compact id; order within a request comes from the turn's `segment_refs` |
+| `fp_key_id` | string | Key the hashes were made with |
 | `kind` | enum | See the segment table in [fingerprinting](#specification) |
 | `source_kind` | enum? | For `tool_result`: `file`, `url`, `command`, `mcp`, `other` |
 | `source` | string? | Keyed hash of the file path, URL, tool name or MCP server, where known |
@@ -82,7 +87,6 @@ A typed slice of a turn's input. The unit of fingerprinting.
 | `line_hashes` | string[]? | Per-line hashes; memory files, system prompt and user messages only |
 | `tokens` | int | Provider tokenizer where available, else an estimate (flagged) |
 | `bytes` | int | |
-| `cache_breakpoint_after` | bool | Was a cache marker placed after this segment |
 | `content` | text? | Only when `capture.content = full`; redacted |
 
 ### ToolCall
@@ -125,7 +129,7 @@ Output of a detector. This is the single definition; other docs refer here.
 | `est_saving` | decimal | Money, from the price catalogue |
 | `price_catalogue_version` | string | Makes `est_saving` reproducible |
 | `confidence` | float | 0–1 |
-| `fidelity` | enum | `transcript` or `wire` ([analyzer.md §5.1](analyzer.md#51-standalone-trimloop-analyse)) |
+| `fidelity` | enum | `transcript`, `gateway` (canonical re-serialisation of the provider-bound body) or `wire` (bytes as sent, local proxy) |
 | `fix_ref` | string | Recommendation template or actuator op that applies |
 | `root_cause_key` | string | Groups findings with the same cause |
 
@@ -272,7 +276,8 @@ Label registry — no other labels may be used:
 | `branch` | Branch name | Session `branch` |
 | `tool` | MCP tool name | Tool-call `name` |
 | `mcp` | MCP server name | `mcp_server` |
-| `root` | Content hashes of the system segments and first user message, concatenated | Conversation root (canary buckets, ADR 0013) |
+| `root` | Content hashes of the system segments and first user message, concatenated | Conversation root (sessionising, canary buckets) |
+| `bucket` | Root hash ‖ experiment id | Canary bucket ([ADR 0018](adr/0018-rollout-refinements.md)) |
 | `key-id` | Empty | `fp_key_id`: first 8 hex characters |
 
 Every turn records `fp_key_id`, so codes made with different keys are never
@@ -297,7 +302,7 @@ Segments never split a content block in any other way. Earlier turns are not a
 separate kind: history is the same kinds, in order.
 
 **Cache markers.** `cache_control` and equivalent fields are removed before
-hashing and recorded as `cache_breakpoint_after`. They change where a provider
+hashing and recorded as the turn's `breakpoints`. They change where a provider
 caches, not what.
 
 **Two hashes per segment.**

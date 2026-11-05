@@ -20,7 +20,8 @@ and append to one draft GitHub release:
 1. **macOS job** (Apple-silicon runner): builds `darwin/arm64` natively and
    `darwin/amd64` with Apple's clang (`-arch x86_64`); signs with a Developer
    ID and notarises; uploads archives to the draft release.
-2. **Linux jobs** (amd64 and arm64 runners): build natively; produce
+2. **Linux jobs** (amd64 and arm64 runners): build natively inside a
+   glibc 2.34 container (the supported baseline, packaging.md §4); produce
    archives, `.deb` and `.rpm` packages and per-architecture container images;
    upload to the draft release.
 3. **Final job:** merges the checksum files, signs them, combines the

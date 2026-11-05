@@ -1,6 +1,6 @@
 # ADR 0012: Gateway sessions across replicas, M1 parity, and idle windows
 
-- Status: Proposed
+- Status: Proposed — idle window rule amended by [ADR 0016](0016-m1-sidecar-operation.md)
 - Date: 2026-11-05
 
 ## Context
