@@ -115,7 +115,7 @@ type Detector interface {
 }
 
 // An Aggregate runs across sessions in a Store (e.g. P06 unused tools
-// per repo, P15 duplicated exploration). Written as SQL.
+// per repo, P15–P18 cross-session repeats). Written as SQL.
 type Aggregate interface {
     ID() string
     Version() string
@@ -326,6 +326,8 @@ the two.
 | `session.explicit_id` | Source supplies a session id | Transcripts; some harnesses via headers |
 | `context.repo` | Repo, branch and working directory known | Transcripts, local proxy — not gateways |
 | `harness.config` | Harness config files readable (MCP servers, memory files) | Local shapes only |
+| `harness.skills` | Harness supports on-demand skills or an equivalent (slash commands, custom prompts) | Harness profile |
+| `content.local` | Raw text readable on this machine when a recommendation is rendered (transcripts on disk, or full local capture) | Local shapes only |
 | `outcome.git` | Git outcomes linkable to sessions | Local shapes only |
 | `timing.per_turn` | Request and response timestamps | All |
 
@@ -402,7 +404,9 @@ transcripts:
   parser: adapters/source/claudecode
 memory_files: ["CLAUDE.md", "CLAUDE.local.md"]
 config_files: [".mcp.json", ".claude/settings.json"]
-capabilities: [session.explicit_id, context.repo, harness.config, outcome.git]
+skills: { kind: skill_md, paths: [".claude/skills/", "~/.claude/skills/"] }
+capabilities: [session.explicit_id, context.repo, harness.config, harness.skills,
+               content.local, outcome.git]
 fix_templates: templates/claude-code/
 ```
 
@@ -427,7 +431,10 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P04 Oversized tool output | `response.tool_calls` | — |
 | P05 Tool-call loops | `response.tool_calls` | `outcome.git` |
 | P06 Unused tool definitions | `request.full_body` **or** `harness.config` | — |
-| P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config` |
+| P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `content.local` |
+| P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |
+| P17 Repeated instructions | — | `content.local`, `harness.skills` |
+| P18 Hot documentation | `response.tool_calls` | `content.local`, `harness.skills` |
 
 For each session the engine resolves a status per detector:
 

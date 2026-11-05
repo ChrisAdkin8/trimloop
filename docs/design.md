@@ -30,6 +30,10 @@
 - **No semantic answer caching for code.** Reusing a model answer for a
   "similar" prompt is unsafe for code generation; Trimloop only exploits
   provider-side *prefix* caching, which is exact.
+- **Not a RAG platform.** Trimloop recommends skills and documentation
+  retrieval (P16–P18) and can hand a list of frequently used docs to a RAG
+  builder, but it does not store document content or host indexes
+  ([ADR 0007](adr/0007-recommend-skills-and-doc-retrieval.md)).
 
 ## 2. Users and jobs
 

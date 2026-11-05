@@ -67,7 +67,7 @@ A typed slice of a turn's input. The unit of fingerprinting.
 | `turn_id` | string | |
 | `position` | int | Order in the request |
 | `kind` | enum | `system`, `tool_definitions`, `memory_file`, `history`, `file_read`, `tool_result`, `user_message`, `assistant_message` |
-| `source` | string? | File path, tool name or MCP server, where known |
+| `source` | string? | File path, URL, tool name or MCP server, where known |
 | `fingerprint` | string | SHA-256 of normalised text |
 | `chunk_hashes` | string[] | Rolling-hash chunks for near-duplicate detection |
 | `tokens` | int | Provider tokenizer where available, else an estimate (flagged) |
@@ -148,7 +148,7 @@ In the default `hashes` capture mode, the team collector receives:
 
 - Session, Turn, ToolCall, Outcome, Finding and DetectorCoverage records.
 - Segments **without** `content`: fingerprints, chunk hashes, sizes, kinds.
-  The `source` path is hashed unless the repo opts in to plain paths.
+  The `source` path or URL is hashed unless the repo opts in to plain paths.
 
 It never receives prompt text, file contents, tool output, or auth headers.
 

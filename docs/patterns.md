@@ -33,6 +33,9 @@ neutral, so P01 and P02 describe each provider cache model.
 | P13 | Model over-provisioning | later | 3 |
 | P14 | Thinking-budget overspend | later | 3 |
 | P15 | Duplicated exploration across a team | later | 1 |
+| P16 | Repeated workflow (skill candidate) | v1 | 1 |
+| P17 | Repeated instructions | v1 | 1 |
+| P18 | Hot documentation | v1 | 1 |
 
 ---
 
@@ -188,8 +191,12 @@ contributors.
 **Saving:** Hard to estimate precisely; reported as an upper bound with low
 confidence.
 
-**Fix:** L1 — report the largest sections. No automatic rewrite: a human
-decides what instructions matter.
+**Fix:** L1 — report the largest sections. Where a section is relevant to
+only some sessions, recommend moving it into a skill (or the harness's
+equivalent) so it loads on demand instead of on every request — see P16.
+No automatic rewrite: a human decides what instructions matter. Judging
+relevance needs the section text, so that part runs locally
+(`content.local`).
 
 ## P08 — Stale context
 
@@ -280,3 +287,90 @@ developers in one repo.
 
 **Fix:** L1 — recommend a shared, version-controlled architecture summary in
 the repo's memory file, and generate a draft of it.
+
+## P16 — Repeated workflow (skill candidate)
+
+**What happens:** The same multi-step task — "add a database migration", "cut
+a release", "fix a failing test" — is done from scratch in many sessions. The
+agent rediscovers the steps every time.
+
+**Signals:**
+- A normalised tool-call sequence (tool names plus argument templates, e.g.
+  run tests → read failing test → edit → re-run) recurring across N or more
+  sessions.
+- The same files read at the start of each occurrence.
+- High turn count per occurrence.
+
+**Detection:** Normalise each session's tool calls into a sequence of
+`(tool, argument-template fingerprint)` and mine frequent sub-sequences across
+sessions: per developer locally, per repo and team at the collector, on
+fingerprints only. Optionally, and locally only, cluster the user prompts that
+start each occurrence to give the task a readable label.
+
+**Saving:** `(turns per occurrence − expected turns with a skill) × average
+turn cost × occurrences per week`, plus developer time. Low confidence until
+measured before and after.
+
+**Fix:** L1 — recommend a skill, or the harness's equivalent (slash command,
+custom prompt), with a draft generated locally from the recorded occurrences.
+A human edits and commits it. For harnesses without skills, recommend a
+memory-file section instead.
+
+**Requires:** `response.tool_calls`. **Optional:** `content.local` (draft and
+task labels), `harness.skills` (otherwise the memory-file fallback).
+
+## P17 — Repeated instructions
+
+**What happens:** The developer types the same guidance into many sessions —
+"use our logger", "don't touch the generated files", "run the linter first".
+
+**Signals:** The same user-message chunk fingerprint appearing in N or more
+sessions for a developer or repo.
+
+**Detection:** Frequency of chunk hashes in `user_message` segments, per
+developer and per repo.
+
+**Saving:** Mostly developer time and consistency; the token saving is small.
+Reported as frequency rather than money.
+
+**Fix:** L1 — move the guidance into the memory file if it applies to every
+session, or into a skill if it applies to one kind of task. The draft is
+rendered locally.
+
+**Requires:** — (user messages are always present). **Optional:**
+`content.local`, `harness.skills`.
+
+## P18 — Hot documentation
+
+**What happens:** The same documentation is pulled into context again and
+again — web pages fetched, large doc files read, documentation looked up
+through MCP tools — across sessions and developers.
+
+**Signals:**
+- The same URL or file fingerprint in tool results across many sessions.
+- Large token counts per fetch.
+- Little of the fetched content used afterwards (the P04 ratio).
+
+**Detection:** Aggregate tool-result segments by source (URL or path hash)
+and content fingerprint across sessions; rank by total tokens × frequency.
+A source whose content fingerprint keeps changing is flagged as volatile.
+
+**Saving:** Repeated fetch tokens minus the cost of the cheaper alternative,
+plus fetch latency.
+
+**Fix:** L1, simplest option first:
+
+1. **Short summary** in the memory file or a skill — for small, stable docs.
+2. **Local documentation search tool** (an MCP server over an index), so the
+   agent retrieves only the parts it needs — for large or changing docs.
+3. **Full retrieval-augmented generation (RAG)** — only where measured data
+   shows it beats the agent's own search. Trimloop exports the hot-doc list
+   (sources, frequency, sizes, volatility) as input to a RAG builder; it does
+   not build or host the index itself
+   ([ADR 0007](adr/0007-recommend-skills-and-doc-retrieval.md)).
+
+Volatile sources get option 2 or 3 with a refresh schedule, never a static
+summary. Every recommendation is measured before and after.
+
+**Requires:** `response.tool_calls`. **Optional:** `content.local` (to draft
+summaries), `harness.skills`.

@@ -50,7 +50,8 @@ developer agrees at least half of the top-5 are worth fixing.
 - Turn-complexity classifier from outcome data.
 - L3 transforms behind opt-in: output truncation with pointers, model routing,
   thinking-budget caps.
-- Detectors P13–P15.
+- Detectors P13–P18 (P16–P18: skill and documentation-retrieval
+  recommendations, ADR 0007).
 - Optional hosted collector.
 
 ## Open questions
