@@ -1,6 +1,6 @@
 # ADR 0004: Local-first, hashes-only by default
 
-- Status: Proposed
+- Status: Proposed — amended by [ADR 0011](0011-keyed-fingerprints.md) (hashes are keyed; names are hashed; honest threat model)
 - Date: 2026-11-05
 
 ## Context

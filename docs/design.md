@@ -183,7 +183,8 @@ Steps, in order:
 3. **Redact.** Run secret detection (entropy + known key formats) over segment
    text. Matches are replaced before any text is stored; hashes are taken
    from the original text (see the fingerprinting specification).
-4. **Fingerprint.** For each segment, store an exact hash, a content hash,
+4. **Fingerprint.** With the customer's fingerprint key (HMAC), store for each
+   segment an exact hash, a content hash,
    line hashes where applicable, and byte and token counts
    ([specification](data-model.md#fingerprinting)). Raw text is kept only if `capture.content = full` (default:
    `hashes`).
@@ -290,6 +291,7 @@ the transform version, the sent request can be reproduced exactly.
 | Threat | Mitigation |
 |---|---|
 | Source code / secrets leaving the machine | Default `capture.content = hashes`; team collector receives only fingerprints, counts, cost and findings; content upload requires an explicit per-repo opt-in |
+| Guessing attacks on fingerprints (hash a likely path, URL or secret and look for a match) | Fingerprints are HMAC-SHA-256 with a customer-held key the collector never receives; names (paths, URLs, repo, branch, MCP servers) are keyed by default ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
 | Secrets stored locally | Redaction before storage; local store encrypted at rest using the OS keychain |
 | API keys captured by the proxy | Auth headers are never parsed, logged or stored |
 | Malicious use of the local CA | CA private key generated per machine, stored in the OS keychain, scoped to harness processes via env var, 90-day rotation |

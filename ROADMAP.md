@@ -11,6 +11,8 @@ developer machines comes last (M4).
 findings report with estimated savings. No proxy, no server.
 
 - Transcript importer for Claude Code (`~/.claude/projects/**/*.jsonl`).
+- Keyed fingerprints and `trimloop key init` (per-machine key for solo use;
+  [ADR 0011](docs/adr/0011-keyed-fingerprints.md)).
 - Normaliser: segmenting, redaction, fingerprinting, pricing.
 - DuckDB store.
 - Detectors P01–P07.
@@ -29,6 +31,8 @@ developer agrees at least half of the top-5 are worth fixing.
 the same findings as `trimloop analyse`, live, for every developer — with no
 software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-local-proxy.md)).
 
+- Organisation fingerprint key distributed to sidecars (environment variable
+  or Kubernetes secret); `fp_key_id` mismatch detection.
 - `trimloop serve`: ingest API (`/v1/events`), sessioniser, streaming detector
   driver, memory and DuckDB stores ([analyzer.md](docs/analyzer.md) §5.2, §6).
 - `trimloop-litellm` plugin, observe-only: success/failure callbacks, batched

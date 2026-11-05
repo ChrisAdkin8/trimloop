@@ -318,7 +318,8 @@ LiteLLM's `CustomLogger`:
 
 It contains no parsing beyond reading LiteLLM's own objects, no detectors and
 no fingerprinting. When the sidecar is not co-located (ADR 0006, remote mode)
-it can fingerprint locally using the shared spec and test vectors.
+it can fingerprint locally, with the organisation's fingerprint key, using
+the shared spec and test vectors.
 
 ```mermaid
 sequenceDiagram
@@ -531,6 +532,10 @@ One file, `trimloop.yaml`, read by every shape; CLI flags override it.
 ```yaml
 capture:
   content: hashes          # hashes | full (full is local-only, per repo)
+fingerprint:
+  key: keychain            # keychain | file:PATH | env:TRIMLOOP_FINGERPRINT_KEY (ADR 0011)
+privacy:
+  plain_names: []          # opt in per field: repo, branch, mcp
 sources:
   claude_code: { enabled: true }
   codex:       { enabled: true }
@@ -559,7 +564,7 @@ already use (Datadog, Grafana, etc.).
 
 ```text
 cmd/trimloop/               CLI: analyse, serve, proxy, report, explain, conformance,
-                            update-catalogue, version
+                            update-catalogue, key, version
 pkg/engine/                 public embedding API
 pkg/event/                  canonical model
 pkg/normalize/{anthropic,openai,gemini}/

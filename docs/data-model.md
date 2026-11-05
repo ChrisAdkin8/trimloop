@@ -27,8 +27,8 @@ One run of a harness, from start to exit (or resume chain).
 | `harness` | enum | `claude-code`, `codex`, `gemini-cli`, `gateway:<name>`, … |
 | `harness_version` | string | Detectors are tested per version |
 | `developer_id` | string | Pseudonymous; mapping to a person lives only in the team collector |
-| `repo` | string | Normalised git remote URL hash + display name |
-| `branch` | string | |
+| `repo` | string | `fp("repo", normalised remote URL)`; display name only if opted in |
+| `branch` | string | `fp("branch", name)`; plain only if opted in |
 | `started_at` / `ended_at` | timestamp | |
 | `resumed_from` | string? | Links resume chains (P09) |
 | `capture_source` | enum | `proxy`, `otel`, `transcript`, `gateway` |
@@ -54,6 +54,7 @@ One model request and its response.
 | `usage.output` | int | All billed output, including reasoning |
 | `usage.reasoning` | int? | Reasoning / thinking tokens, a subset of `output`; null if not reported |
 | `fp_version` | string | Fingerprint spec version, e.g. `fp1` ([fingerprinting](#fingerprinting)) |
+| `fp_key_id` | string | Identifies the fingerprint key used; codes with different key ids are never compared |
 | `exact_prefix_at_breakpoints` | string[] | Exact prefix-hash value at each cache breakpoint |
 | `content_prefix_at_messages` | string[] | Content prefix-hash value at each message boundary (used for sessionising) |
 | `cost_estimate` | decimal | From the price catalogue |
@@ -70,9 +71,9 @@ A typed slice of a turn's input. The unit of fingerprinting.
 | `turn_id` | string | |
 | `position` | int | Order in the request |
 | `kind` | enum | `system`, `tool_definitions`, `memory_file`, `history`, `file_read`, `tool_result`, `user_message`, `assistant_message` |
-| `source` | string? | File path, URL, tool name or MCP server, where known |
-| `exact_hash` | string | SHA-256 of the segment exactly as sent ([fingerprinting](#fingerprinting)) |
-| `content_hash` | string | SHA-256 of the segment's canonical form |
+| `source` | string? | Keyed hash of the file path, URL, tool name or MCP server, where known |
+| `exact_hash` | string | Keyed hash of the segment exactly as sent ([fingerprinting](#fingerprinting)) |
+| `content_hash` | string | Keyed hash of the segment's canonical form |
 | `line_hashes` | string[]? | Per-line hashes; memory files, system prompt and user messages only |
 | `tokens` | int | Provider tokenizer where available, else an estimate (flagged) |
 | `bytes` | int | |
@@ -85,8 +86,8 @@ A typed slice of a turn's input. The unit of fingerprinting.
 |---|---|---|
 | `tool_call_id` | string | |
 | `turn_id` | string | Turn whose response requested it |
-| `name` | string | |
-| `mcp_server` | string? | |
+| `name` | string | Plain for the harness's built-in tools; `fp("tool", …)` for MCP tools unless opted in |
+| `mcp_server` | string? | `fp("mcp", name)` unless opted in |
 | `args_fingerprint` | string | For loop detection (P05) |
 | `result_segment_id` | string? | Links to the segment carrying the result |
 | `is_error` | bool | |
@@ -189,14 +190,62 @@ Rules:
 
 ## Fingerprinting
 
+### Why fingerprints are needed
+
+Most detectors ask one question over and over: *is this the same as something
+seen before?*
+
+| Detector | The comparison |
+|---|---|
+| P01 cache-prefix churn | Is this turn's request prefix identical to the last one? If not, which segment — and which line — changed? |
+| P03 repeated file reads | Is this the same file content read earlier in the session? |
+| P06 unused tool definitions | Is this the same tool definition sent on hundreds of requests and never called? |
+| P15, P17 repeated work | Did several developers read the same files, or type the same instruction? |
+| P18 hot documentation | Is this the same documentation fetched again and again? |
+| Sessionising (analyzer §6) | Does this gateway request continue that earlier conversation? |
+
+None of these needs to know *what* the text says, only whether two pieces of
+text are equal. The alternatives fail:
+
+| Option | Problem |
+|---|---|
+| Keep the text | Requests run to tens of thousands of tokens; a month of sessions is gigabytes of source code and secrets. On a server it breaks the privacy promise (ADR 0004); locally it creates a large, sensitive file |
+| Keep only sizes and costs | Cannot tell "one 40 KB file read nine times" from "nine different 40 KB files"; most detectors go blind |
+| **Fingerprints** | A fixed-size code per segment or line. Equal text gives equal codes, so repeats and changes are visible; the text is not |
+
+Where fingerprints are required, and where they are a choice:
+
+- **Required** wherever data leaves a developer machine — the team collector
+  and the gateway sidecar's uploads. They make team-wide findings possible
+  without collecting code.
+- **A deliberate choice** for local `trimloop analyse`, where the text is
+  already on disk in the harness's own logs. Fingerprints keep the local store
+  small and fast, keep it free of copies of code and secrets, and let the same
+  detectors run unchanged locally and at the collector. When a fix needs the
+  text (naming a changed line, drafting a skill), it is read back from the
+  harness logs on that machine (`content.local`).
+
+### Specification
+
 The single specification. `pkg/fingerprint` (Go) implements it; the Python
 plugin implements it only in remote mode (ADR 0006). Both must pass the shared
 vectors in `pkg/fingerprint/testdata/vectors.json`. Every turn records the spec
 version (`fp_version`, currently `fp1`) so hashes made under different rules
 are never compared.
 
-**Hash function.** SHA-256, hex-encoded. Whether to key it per organisation
-(HMAC) is an open design question; adopting it will bump the spec to `fp2`.
+**Hash function.** HMAC-SHA-256 with the organisation's **fingerprint key**,
+hex-encoded ([ADR 0011](adr/0011-keyed-fingerprints.md)). Every input is
+prefixed with a context label and a zero byte, so a hash made for one purpose
+can never equal a hash made for another:
+
+```text
+fp(label, data) = HMAC-SHA-256(fingerprint_key, label ‖ 0x00 ‖ data)
+labels: seg.exact, seg.content, line, path, url, repo, branch, tool, mcp
+```
+
+Every turn records `fp_key_id`, a short identifier derived from the key
+(`fp("key-id", "")`, first 8 hex characters), so codes made with different
+keys are never compared.
 
 **Segments.** A request is split into ordered segments, one per:
 
@@ -236,13 +285,13 @@ caches, not what.
   in request *n+1* — which sessionising relies on.
 
 **Prefix hashes.** Two rolling chains over the ordered segments:
-`P₀ = SHA-256("")`, `Pᵢ = SHA-256(Pᵢ₋₁ ‖ hᵢ)`, where `hᵢ` is the segment's
+`P₀ = fp("prefix", "")`, `Pᵢ = fp("prefix", Pᵢ₋₁ ‖ hᵢ)`, where `hᵢ` is the segment's
 exact hash (exact chain) or content hash (content chain). A turn stores the
 exact chain at each cache breakpoint and the content chain at each message
 boundary.
 
 **Line hashes.** For memory files, the system prompt and user messages only:
-the SHA-256 of each canonical line, empty lines skipped, in order, at most 2,000
+`fp("line", …)` of each canonical line, empty lines skipped, in order, at most 2,000
 per segment. They let P01 name the line that changed and P17 find repeated
 instructions without content leaving the machine. Tool results get sizes, not
 line hashes.
@@ -250,20 +299,27 @@ line hashes.
 **Order relative to redaction.** Hashes are computed over the original text,
 before redaction, so a random ID that changes every turn still shows up as
 churn (P01). Redaction governs only text that is stored
-(`capture.content = full`) or rendered. A hash of a whole segment cannot
-practically be reversed, but a line hash of a short line containing a secret
-could confirm a guessed secret; keyed hashing would remove that risk.
+(`capture.content = full`) or rendered. Because hashes are keyed, nobody
+without the fingerprint key can confirm a guessed secret, path or line from
+them.
 
 ## What leaves the machine
 
 In the default `hashes` capture mode, the team collector receives:
 
 - Session, Turn, ToolCall, Outcome, Finding and DetectorCoverage records.
-- Segments **without** `content`: exact and content hashes, line hashes, sizes,
+- Segments **without** `content`: keyed exact, content and line hashes, sizes,
   kinds.
-  The `source` path or URL is hashed unless the repo opts in to plain paths.
+- Names as keyed hashes: file paths, URLs, repo, branch, MCP server and MCP
+  tool names. Each can be sent in plain text only if the organisation opts in
+  for that field (`privacy.plain_names`). The harness's own built-in tool names
+  (for example `Read`, `Bash`) are sent in plain text; they reveal nothing about
+  the customer.
 
-It never receives prompt text, file contents, tool output, or auth headers.
+It never receives prompt text, file contents, tool output, auth headers or the
+fingerprint key. What it can still see — counts, sizes, timing, costs, and
+which sessions share an (unnamed) item — is listed in
+[ADR 0011](adr/0011-keyed-fingerprints.md#what-it-protects-and-what-it-does-not).
 
 ## Storage
 

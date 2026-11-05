@@ -55,6 +55,7 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | `trimloop report`, `explain` | Render reports; explain a finding |
 | `trimloop conformance` | Test a provider or harness profile against fixtures |
 | `trimloop update-catalogue` | Opt-in: fetch a signed price catalogue ([below](#price-catalogue-updates)) |
+| `trimloop key init`, `key rotate` | Create or rotate the fingerprint key ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
 | `trimloop version` | Version, build provenance, embedded data versions |
 
 ### Why one binary
@@ -182,6 +183,9 @@ serve:
   decide: false
   upload:
     url: ""              # team collector, hashes only
+fingerprintKey:
+  existingSecret: ""     # Kubernetes secret holding the organisation's key (ADR 0011);
+                         # required in sidecar mode, never set in collector mode
 collector:
   clickhouse: { enabled: true }
   postgres:   { enabled: true }
