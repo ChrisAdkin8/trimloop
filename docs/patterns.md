@@ -27,7 +27,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P06 | Unused tool definitions | M0 | SQL | 1 |
 | P07 | Bloated standing context | M0 | SQL | 1 |
 | P08 | Stale context | M3 | Go | 3 |
-| P09 | Resume bloat | M3 | Go | 2 |
+| P09 | Resume bloat | M3 | Go | 1 |
 | P10 | Compaction thrash | M3 | Go | 1 |
 | P11 | Post-failure burn | M3 | Go | 0 |
 | P12 | Retry storms | M3 | Go | 1 |
@@ -71,12 +71,13 @@ fidelity and cannot name the cause.
 **Fix:**
 - L1 (all models): diff that moves volatile content below stable content in
   the memory file, or removes it.
-- L2, explicit breakpoints: sort tool definitions; move volatile segments after
-  the breakpoint; place breakpoints (`sort_tools`, `move_segment`,
-  `set_cache_breakpoint`).
-- L2, automatic prefix: sort tool definitions; move volatile segments to the
-  end; set a per-session cache key where the provider supports one
-  (`sort_tools`, `move_segment`, `set_cache_key`).
+- L2, explicit breakpoints: sort tool definitions; place breakpoints within
+  the provider's limit (`sort_tools`, `set_cache_breakpoint`).
+- L2, automatic prefix: sort tool definitions; set a per-session cache key
+  where the provider supports one (`sort_tools`, `set_cache_key`).
+- L3 (all models, opt-in): move volatile segments behind stable ones
+  (`move_segment`) — it changes what the model sees
+  ([ADR 0013](adr/0013-decide-path-and-transform-safety.md)).
 - Managed caches: reuse one cache per session instead of re-creating it (L1).
 
 **Requires:** `usage.cache_read`. **Optional:** `request.full_body`,
@@ -222,7 +223,9 @@ cache, or in a form that does not match the earlier cached prefix.
 **Signals:** First turn after a resume shows a large cache write; prefix
 fingerprints differ from the pre-resume turn despite identical content.
 
-**Fix:** L2 — normalise the resumed request so it matches the previous prefix.
+**Fix:** L1 — report the cost of cold resumes and recommend continuing within
+the cache lifetime or starting fresh. (No automatic fix: rewriting a resumed
+request has no safe, defined operation.)
 
 ## P10 — Compaction thrash
 

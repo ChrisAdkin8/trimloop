@@ -101,7 +101,7 @@ separately; users never install DuckDB to use Trimloop.
 | Component | How it is included | Used by | Notes |
 |---|---|---|---|
 | **DuckDB** | Static library via DuckDB's official Go driver (cgo) | `analyse`, `serve` with the DuckDB store, `proxy` | MIT licence. Version pinned in `go.mod`, listed in the SBOM, printed by `trimloop version`. The reason builds are native per platform (§4) |
-| **DuckDB extensions** | Only those the detectors need (expected: JSON), statically linked | As DuckDB | Never downloaded at run time — see below |
+| **DuckDB extensions** | JSON, and `httpfs` for its crypto library — statically linked | As DuckDB | Never downloaded at run time — see below |
 | **ClickHouse client, Postgres driver** | Pure Go | Collector mode | No cgo |
 | **Web UI** | Built from `web/`, embedded | `serve`, local UI | |
 
@@ -116,8 +116,17 @@ therefore:
 - sets `autoinstall_known_extensions = false` and
   `autoload_known_extensions = false`;
 - refuses community extensions;
+- disables remote file systems (DuckDB's `disabled_filesystems` setting, to
+  verify for DuckDB 2.0), because `httpfs` is linked in only for its crypto;
 - locks the configuration (`lock_configuration = true`) so a query cannot
   change these settings.
+
+**Why `httpfs` is bundled.** In DuckDB 2.0, writing an encrypted database
+needs the OpenSSL-based crypto that `httpfs` provides; without it DuckDB
+refuses unless an explicitly unsafe mode is forced. Tested 2026-11-05: an
+encrypted `ATTACH` made the stock DuckDB CLI **download** `httpfs` from the
+internet. Trimloop links it in so the local store can be encrypted without any
+download.
 
 CI checks that every extension the detectors use is reported as built in, that
 nothing is written to DuckDB's extension directory, and that `trimloop
@@ -149,10 +158,11 @@ pre-upgrade job.
 | Linux (glibc) | amd64, arm64 | `.tar.gz`, `.deb`, `.rpm`; base of the container image |
 | Windows | amd64 | Later; no Windows-specific design work until demand exists |
 
-The DuckDB Go driver needs cgo, so binaries are built **natively on each
-platform** in CI (macOS and Linux runners for each architecture) rather than
-cross-compiled from one machine. A static musl build is not planned; the
-container image uses a glibc base instead.
+The DuckDB Go driver needs cgo, so binaries are built **per operating system**
+([ADR 0014](adr/0014-release-builds-per-os.md)): a macOS Apple-silicon runner
+builds both macOS architectures (`amd64` with Apple's clang `-arch x86_64`),
+and Linux runners build `amd64` and `arm64` natively. A static musl build is
+not planned; the container image uses a glibc base instead.
 
 ## 5. Container image
 
@@ -171,7 +181,8 @@ One chart, two modes:
 
 | Mode | What it deploys |
 |---|---|
-| `sidecar` | Values to add a `trimloop serve` container to an existing LiteLLM deployment, listening on loopback; plugin configured to point at it |
+| `sidecar` | A `trimloop serve` container for the LiteLLM pod, listening on loopback, with the plugin pointed at it. A separate Helm release cannot change another release's Deployment, so the container is added **through the LiteLLM chart's own extra-containers values** — this chart renders that values block (`helm template --show-only`) for the user to merge. If the LiteLLM chart version in use has no such option, the `litellm-bundle` mode deploys LiteLLM (as a dependency) and the sidecar together |
+| `litellm-bundle` | LiteLLM plus the sidecar in one release; the fallback for the case above |
 | `collector` | `trimloop serve` as the team collector; optional ClickHouse and Postgres sub-charts, or connection settings for existing ones |
 
 ```yaml
@@ -218,7 +229,10 @@ The chart version and `appVersion` track the binary version (§9).
 - **Envoy.** `trimloop serve --extproc` implements Envoy's external-processing
   gRPC API; shipped in the standard binary and image.
 - **Kong.** `trimloop-kong` is built from `cmd/trimloop-kong/` against Kong's
-  Go plugin development kit; versioned with the binary.
+  Go plugin development kit; versioned with the binary. Before M4, verify that
+  Kong's Go plugins can read response bodies without buffering whole
+  streamed responses; if they cannot, Kong support is limited to request-side
+  data or replaced by a log connector.
 
 ## 9. Versioning and compatibility
 
@@ -237,14 +251,22 @@ which sidecar API versions.
 
 Run by CI on a version tag:
 
-1. Build and test on each platform runner (§4).
-2. GoReleaser assembles archives, checksums, `.deb`/`.rpm`, the Homebrew tap
-   update, and multi-arch container images.
-3. macOS binaries are signed with a Developer ID and notarised by Apple.
-4. Everything is signed and attested (§11).
-5. The web UI is built first and embedded; the Python plugin and Helm chart
+1. **macOS job** (Apple-silicon runner): build both macOS architectures, sign
+   with a Developer ID, notarise, and upload archives to a draft release.
+2. **Linux jobs** (amd64 and arm64 runners): build, then produce archives,
+   `.deb`/`.rpm` and per-architecture container images, and upload them to
+   the same draft release.
+3. **Final job:** merge and sign the checksum files, combine the container
+   images into a multi-arch manifest, attach SBOMs and provenance (§11),
+   update the Homebrew tap, and publish the release.
+
+Each job runs open-source GoReleaser with `release.mode: append`
+([ADR 0014](adr/0014-release-builds-per-os.md)); GoReleaser Pro is the
+fallback if the merge step proves fragile.
+
+4. The web UI is built first and embedded; the Python plugin and Helm chart
    are published by their own jobs in the same workflow.
-6. Release notes list changed detectors, profiles and price-catalogue
+5. Release notes list changed detectors, profiles and price-catalogue
    versions, because those change findings.
 
 ## 11. Supply chain
@@ -290,3 +312,5 @@ licensing decision (open-core or otherwise) does not force a restructure.
    analysis needs no proxy?
 4. **Air-gapped installs.** Is a bundle (binary + image + chart + catalogue)
    needed for regulated customers?
+5. **LiteLLM chart.** Confirm the name and shape of the LiteLLM Helm chart's
+   extra-containers values for the versions supported (§6).

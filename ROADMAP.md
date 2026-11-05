@@ -17,10 +17,15 @@ findings report with estimated savings. No proxy, no server.
 - DuckDB store.
 - Detectors P01–P07.
 - CLI report (terminal + static HTML).
-- Fixture corpus of real (redacted) sessions; detector unit tests.
+- Fixtures: synthetic sessions in the repository; real (redacted) sessions
+  only in a private, access-controlled store, never committed. Detector unit
+  tests.
+- Encrypted local store (DuckDB encryption with `httpfs` linked in for its
+  crypto; no extension downloads).
 - Aggregate runner for the cross-session detectors (P06, P07).
 - Release pipeline: signed binary on GitHub Releases, `.deb` / `.rpm`
-  packages and a Homebrew tap ([packaging.md](docs/packaging.md)).
+  packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved by a
+  release dry-run of the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)).
 
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.
@@ -33,6 +38,10 @@ software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-
 
 - Organisation fingerprint key distributed to sidecars (environment variable
   or Kubernetes secret); `fp_key_id` mismatch detection.
+- Supported topologies: one gateway instance, or replicas with sticky routing
+  by API key or user ([ADR 0012](docs/adr/0012-gateway-sessions-and-parity.md)).
+  Session kinds (`main`, `subagent`, `auxiliary`); 2-hour idle window;
+  plugin buffer capped by bytes.
 - `trimloop serve`: ingest API (`/v1/events`), sessioniser, streaming detector
   driver, memory and DuckDB stores ([analyzer.md](docs/analyzer.md) §5.2, §6).
 - `trimloop-litellm` plugin, observe-only: success/failure callbacks, batched
@@ -47,13 +56,16 @@ software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-
 - Conformance kit (`trimloop conformance`) for provider and harness profiles.
 - Local web UI: sessions, turns, prefix-divergence view.
 
-**Done when:** on the same sessions, the sidecar's findings match
-`trimloop analyse`; the plugin adds no latency to model calls; killing the
-sidecar causes zero failed model calls.
+**Done when:** on the same fixture sessions, for every detector both sources
+can run, finding counts match exactly and estimated savings match within 2 %;
+the plugin adds at most 1 ms at p99 to model calls with decide off; killing
+the sidecar causes zero failed model calls.
 
 ## M2 — Team collector and recommendations
 
 - Hashes-only upload from sidecars and developer machines.
+- Collector-side sessionising across gateway replicas, and session-scope
+  detectors at the collector when one is configured (ADR 0012).
 - ClickHouse/Postgres collector: container image and Helm chart collector
   mode ([packaging.md](docs/packaging.md)).
 - Root-cause grouping and ranked recommendations.
@@ -67,10 +79,14 @@ sidecar causes zero failed model calls.
 
 - Outcome signals (git, tests, interrupts).
 - Decide path through the LiteLLM plugin first (`/v1/decide`, 25 ms budget,
-  fail-open).
+  fail-open): self-contained decide requests, canary buckets from the
+  conversation root, op preconditions, and resend-untransformed on rejection
+  ([ADR 0013](docs/adr/0013-decide-path-and-transform-safety.md)).
+- Gateway quality signals (errors, retries, turns per session, corrections)
+  gate gateway rollouts.
 - Shadow → canary → on rollout, kill switch, signed policies.
-- L2 transforms: deterministic tool ordering, volatile-segment reordering,
-  cache-breakpoint placement, TTL selection.
+- L2 transforms: deterministic tool ordering, cache-breakpoint placement
+  within provider limits, TTL selection, cache keys.
 - Detectors P08–P12.
 
 ## M4 — Local proxy and broader coverage
@@ -81,10 +97,12 @@ sidecar causes zero failed model calls.
 - More harnesses (Gemini CLI, others) and gateways (Portkey, Helicone,
   OpenRouter).
 - Envoy integration (`trimloop serve --extproc`) and the `trimloop-kong`
-  binary.
+  binary, after verifying that Kong's Go plugins can read streamed response
+  bodies without buffering them.
 - Turn-complexity classifier from outcome data.
-- L3 transforms behind opt-in: output truncation with pointers, model routing,
-  thinking-budget caps.
+- L3 transforms behind opt-in: moving volatile segments, output truncation
+  with pointers, model routing, thinking-budget caps. At a gateway only once
+  developer-side outcome signals can be joined to gateway sessions.
 - Detectors P13–P18 (P16–P18: skill and documentation-retrieval
   recommendations, ADR 0007).
 - Optional hosted collector.

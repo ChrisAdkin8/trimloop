@@ -31,6 +31,8 @@ One run of a harness, from start to exit (or resume chain).
 | `branch` | string | `fp("branch", name)`; plain only if opted in |
 | `started_at` / `ended_at` | timestamp | |
 | `resumed_from` | string? | Links resume chains (P09) |
+| `kind` | enum | `main`, `subagent` or `auxiliary` ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)) |
+| `parent_session_id` | string? | Parent of a `subagent` session |
 | `capture_source` | enum | `proxy`, `otel`, `transcript`, `gateway` |
 
 ### Turn
@@ -325,7 +327,7 @@ which sessions share an (unnamed) item — is listed in
 
 | Where | Engine | Retention (default) |
 |---|---|---|
-| Developer machine | DuckDB file `~/.trimloop/trimloop.duckdb`, encrypted at rest | 30 days of events; findings kept 1 year |
+| Developer machine | DuckDB file `~/.trimloop/trimloop.duckdb`, encrypted at rest (key in the OS keychain) | 30 days of events; findings kept 1 year |
 | Team collector | ClickHouse (events, findings), Postgres (recommendations, policies) | 13 months |
 
 Schema versions, migrations and backups for the local DuckDB file are

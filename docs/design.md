@@ -256,6 +256,11 @@ locally:
 | Session abandoned (no commit, short, ended mid-task) | heuristic |
 | Edits reverted within 24 h | git |
 
+At a gateway, git and test signals are not visible. Gateway rollouts use what
+the gateway can see: provider error and retry rates, tool-call error rate,
+turns per session, sessions ending on an error, and user corrections
+([ADR 0013](adr/0013-decide-path-and-transform-safety.md)).
+
 These are noisy. They are used comparatively (cohort A vs cohort B), never as
 an absolute quality score.
 
@@ -268,16 +273,17 @@ allowed; the default is 1.
 |---|---|---|---|
 | 0 | Report | Findings in CLI/UI | none |
 | 1 | Config patch | Edit CLAUDE.md to move volatile lines below stable ones; disable an unused MCP server for a repo; add a tool-output limit to settings | Human approves a diff (local, or as a PR) |
-| 2 | In-path transform, semantics-preserving | Re-order stable segments to the front; add cache breakpoints; de-duplicate identical tool definitions; extend cache TTL where the provider supports it | Shadow → canary → on, auto-rollback on regression |
-| 3 | In-path transform, behaviour-changing | Truncate tool output with a retrievable pointer; route low-complexity turns to a cheaper model; cap thinking budget on trivial turns | Opt-in per repo, canary only, outcome signals must not regress |
+| 2 | In-path transform, semantics-preserving | Sort tool definitions; add cache breakpoints within the provider's limit; choose the cache TTL; set a cache key | Shadow → canary → on, auto-rollback on regression; rejected requests resent untransformed |
+| 3 | In-path transform, behaviour-changing | Move volatile segments behind stable ones; truncate tool output with a retrievable pointer; route low-complexity turns to a cheaper model; cap thinking budget on trivial turns | Opt-in per repo, canary only, outcome signals must not regress; not at a gateway until developer-side outcomes are joined (M4) |
 
 ### Rollout for levels 2 and 3
 
 1. **Shadow.** Compute the transformed request, don't send it. Record what
    *would* have changed: predicted cache hit, tokens saved.
 2. **Canary.** Apply to a percentage of sessions (by session, never by turn, so
-   a conversation is internally consistent). Compare cost and outcome signals
-   against the control.
+   a conversation is internally consistent; the bucket comes from the keyed
+   fingerprint of the conversation root, so it needs no session state).
+   Compare cost and outcome signals against the control.
 3. **On.** Promote when savings are significant and no outcome signal
    regresses beyond a threshold.
 4. **Kill switch.** One command or policy flag reverts every transform
@@ -292,7 +298,7 @@ the transform version, the sent request can be reproduced exactly.
 |---|---|
 | Source code / secrets leaving the machine | Default `capture.content = hashes`; team collector receives only fingerprints, counts, cost and findings; content upload requires an explicit per-repo opt-in |
 | Guessing attacks on fingerprints (hash a likely path, URL or secret and look for a match) | Fingerprints are HMAC-SHA-256 with a customer-held key the collector never receives; names (paths, URLs, repo, branch, MCP servers) are keyed by default ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
-| Secrets stored locally | Redaction before storage; local store encrypted at rest using the OS keychain |
+| Secrets stored locally | Redaction before storage; the DuckDB store is encrypted (AES via DuckDB's encryption, which needs the bundled `httpfs` extension for writing). Key from the OS keychain on developer machines; from an environment variable or Kubernetes secret on servers and in containers |
 | API keys captured by the proxy | Auth headers are never parsed, logged or stored |
 | Malicious use of the local CA | CA private key generated per machine, stored in the OS keychain, scoped to harness processes via env var, 90-day rotation |
 | Tampered policies pushing harmful transforms | Policies signed by the collector; actuators verify signatures; level 3 needs local opt-in as well as policy |

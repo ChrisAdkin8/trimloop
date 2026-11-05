@@ -246,13 +246,26 @@ sessions. `pkg/sessionize` rebuilds them:
    opens a new one.
 3. **Scoping.** Matching is restricted to the same gateway key / user and
    harness (from `User-Agent` or metadata), within an idle window
-   (default 60 min), which also closes sessions.
+   (default 2 hours — longer than the longest cache TTL, so P02 sees
+   expiries), which also closes sessions.
 4. **Forks and compaction.** A compaction or `/clear` breaks the prefix and
    starts a new session linked by `resumed_from` when the system prompt and
    tool-definition fingerprints match the previous one.
 
+5. **Kinds.** Each session is labelled `main`, `subagent` or `auxiliary`
+   (titles, summaries and similar side calls), by rules in the harness
+   profile. Sub-agents link to their parent session. Per-session statistics
+   count `main` sessions only.
+
 Index memory is bounded (LRU on open sessions); evicted sessions are closed
 and `OnSessionEnd` runs.
+
+**Replicas.** One sidecar sees only the traffic of its own gateway replica.
+M1 therefore requires a single gateway instance or sticky routing by API key
+or user; a sidecar that sees a prefix continue from a turn it never received
+reports it. From M2, when a team collector is configured, sidecars upload
+keyed turn records and the collector sessionises across all replicas and runs
+the session-scope detectors ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)).
 
 ## 7. Detector execution
 
@@ -286,7 +299,7 @@ produces new findings; old ones are kept for before/after comparisons.
   "session_id": "s_…",
   "ops": [
     {"op": "sort_tools", "by": "name"},
-    {"op": "move_segment", "kind": "memory_file", "source_hash": "…", "to": "after_breakpoint"},
+    {"op": "set_cache_breakpoint", "after_segment": 3},
     {"op": "set_cache_ttl", "value": "1h"}
   ],
   "mode": "canary",
@@ -304,6 +317,18 @@ produces new findings; old ones are kept for before/after comparisons.
 - Any error or timeout ⇒ empty spec ⇒ request goes through unchanged.
 - Only ops listed in the provider profile's `ops` are ever returned (§10.2);
   for example `set_cache_ttl` exists for Anthropic, `set_cache_key` for OpenAI.
+- A decide request carries the full request body, so the sidecar sessionises
+  it from the request's own history without waiting for `/v1/events`. The
+  canary bucket comes from the keyed fingerprint of the conversation root
+  (system prompt plus first user message), so a session lands in the same
+  bucket on every replica.
+- Each op has preconditions checked before it is returned — for example
+  `set_cache_breakpoint` only if the request stays within the provider's
+  breakpoint limit, counting the harness's own markers. `move_segment` is L3.
+- If the provider rejects a transformed request (4xx other than rate limits),
+  the plugin resends the original once and reports `transform_rejected`; the
+  op is disabled for that provider and model until a person re-enables it
+  ([ADR 0013](adr/0013-decide-path-and-transform-safety.md)).
 
 ## 9. The thin LiteLLM plugin
 
@@ -313,8 +338,9 @@ LiteLLM's `CustomLogger`:
 | Hook | What the plugin does |
 |---|---|
 | `async_log_success_event` / `async_log_failure_event` | Build an `event.Raw` from the request, response, usage and timings; append to an in-memory ring buffer |
-| Background task | Flush the buffer to `POST /v1/events` every 1 s or 100 events; drop and count on overflow |
-| `async_pre_call_hook` (only if `decide` enabled) | `POST /v1/decide` with a 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged |
+| Background task | Flush the buffer to `POST /v1/events` every 1 s or 100 events; the buffer is capped at 50 MB as well as by event count, and on overflow drops the oldest events and counts them |
+| `async_pre_call_hook` (only if `decide` enabled) | `POST /v1/decide` with the request body and a 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged |
+| `async_post_call_failure_hook` (only if `decide` enabled) | Detect a transformed request the provider rejected (4xx, not rate limiting), arrange one resend of the original, and report `transform_rejected`. A failure hook cannot resend by itself; the exact LiteLLM mechanism is open question 7 |
 
 It contains no parsing beyond reading LiteLLM's own objects, no detectors and
 no fingerprinting. When the sidecar is not co-located (ADR 0006, remote mode)
@@ -598,14 +624,23 @@ adapters stay outside it so the core has no I/O dependencies. Packaging adds
 | Path | Target |
 |---|---|
 | `trimloop analyse`, 30 days of one developer's sessions | < 30 s cold, < 3 s incremental |
-| Sidecar ingest | ≥ 2,000 turns/s per core; memory bounded by open-session LRU |
+| Sidecar ingest | Stated in MB/s of request bodies per core; target set from the M1 benchmark. Memory bounded by the open-session LRU |
 | `Decide` | p99 < 10 ms server side |
-| Plugin overhead on the request path | 0 ms with decide off; ≤ 25 ms worst case with decide on |
+| Plugin overhead on the request path | ≤ 1 ms at p99 with decide off (callbacks are asynchronous); ≤ 25 ms worst case with decide on |
+
+Each request repeats the conversation so far, so the sidecar processes each
+message once: parsing, redaction and fingerprints are cached by the message's
+exact hash, and a new turn costs roughly its new messages, not its whole
+body.
 
 ## 14. Testing
 
-- **Golden fixtures.** Redacted real sessions in `testdata/sessions/` with
-  expected findings; every detector change must update them deliberately.
+- **Golden fixtures.** Sessions with expected findings; every detector change
+  must update them deliberately. Fixtures committed to the repository
+  (`testdata/sessions/`) are **synthetic** — written or generated, never
+  taken from real work. Real (redacted) sessions live only in a private,
+  access-controlled fixture store, are reviewed before use, and are never
+  committed.
 - **Parity.** Batch vs streaming drivers (§7).
 - **Conformance kit.** Every provider and harness profile must pass
   `trimloop conformance` before it is enabled by default (§10.5).
@@ -652,3 +687,6 @@ Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 6. For providers with no local tokenizer, how large is the token-estimate
    error, and should findings that depend on estimates carry lower
    confidence by default?
+7. How does the LiteLLM plugin resend an untransformed request after a
+   rejection — LiteLLM's retry settings, wrapping the call, or a router
+   fallback? Must be settled before M3 ([ADR 0013](adr/0013-decide-path-and-transform-safety.md)).
