@@ -96,10 +96,25 @@ flowchart LR
 ### Key interfaces (sketch)
 
 ```go
-// A Source produces raw events from somewhere: files, a socket, an HTTP body.
+// A Source produces raw events from a live stream: a socket, an HTTP body
+// (the gateway ingest API, the OTLP receiver, the local proxy).
 type Source interface {
     Name() string
     Run(ctx context.Context, emit func(event.Raw) error) error
+}
+
+// A Reader reads one harness's session logs from disk (Claude Code, Codex, …).
+// Discover and Read are separate so that a re-run reads only new lines
+// (Log.Offset) and the user can choose which harness to read (--harness).
+type Reader interface {
+    Name() string                                                  // "claude-code"
+    Discover(ctx context.Context) ([]Log, error)                   // find logs on disk
+    Read(ctx context.Context, log Log) iter.Seq2[event.Raw, error] // stream one log
+}
+
+type Log struct {
+    Path   string
+    Offset int64 // where the previous run stopped
 }
 
 // A Detector is an incremental state machine over one session.
@@ -469,7 +484,12 @@ can ship marked `experimental`.
 |---|---|---|
 | A new model on a known provider | Price catalogue entry; `model_families` match | Code |
 | A new provider / API surface | Provider profile; parser in `pkg/normalize`; price entries; recorded fixtures (including streamed responses) | Detectors |
-| A new harness | Harness profile; transcript parser (if it writes logs); fix templates; recorded fixtures | Detectors, parsers for providers it uses |
+| A new harness | Harness profile; a `Reader` package under `adapters/source/` (if it writes logs) and one line adding it to the reader registry in `cmd/trimloop`; fix templates; recorded fixtures | Detectors, parsers for providers it uses, other readers |
+
+Readers are listed explicitly in `cmd/trimloop` rather than registering
+themselves on import, so tests can build exactly the set they need. Every
+reader shares one JSONL line-reading helper and is run through the same
+conformance tests (§10.5).
 
 ## 11. Configuration
 
