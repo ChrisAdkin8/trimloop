@@ -11,6 +11,11 @@ from that point on.
 Priority: **MVP** = ships with the transcript analyser; **v1** = needs the proxy
 or the team collector; **later** = needs outcome data or routing.
 
+Detectors are provider- and harness-neutral: each declares the capabilities it
+needs ([analyzer.md §10.4](analyzer.md#104-capability-gated-detectors)) and
+reports "not applicable" where they are missing, never zero. Caching is not
+neutral, so P01 and P02 describe each provider cache model.
+
 | ID | Pattern | Priority | Max fix level |
 |---|---|---|---|
 | P01 | Cache-prefix churn | MVP | 2 |
@@ -34,19 +39,24 @@ or the team collector; **later** = needs outcome data or routing.
 ## P01 — Cache-prefix churn
 
 **What happens:** Something early in the request changes between turns, so the
-provider re-writes the cache (paid at a premium) instead of reading it (paid at
-a discount).
+provider cannot reuse its cached copy of the prefix. It charges full price —
+or, on providers that bill cache writes, a write premium — for content it saw
+moments ago.
 
-**Signals:**
-- `cache_creation_input_tokens` high relative to `cache_read_input_tokens` on
-  consecutive turns of the same session.
-- The first differing segment fingerprint between turn *n* and turn *n+1*
-  sits before the last cache breakpoint.
+**By cache model** ([analyzer.md §10.2](analyzer.md#102-provider-profiles)):
+
+| Cache model | Example providers | Signal | Saving |
+|---|---|---|---|
+| Explicit breakpoints | Anthropic; Claude on Bedrock/Vertex | `cache_write` high relative to `cache_read` on consecutive turns; first differing segment sits before the last breakpoint | `(cache_write − expected_write) × (write_price − read_price)` |
+| Automatic prefix | OpenAI | `cache_read ÷ input` low on consecutive turns whose prefixes should match; first differing segment early in the request | `uncached_but_cacheable × (input_price − cached_price)` |
+| Implicit + managed | Gemini | Implicit: as automatic prefix. Managed: the same cached content re-created repeatedly | Implicit: as automatic prefix. Managed: re-creation cost plus overlapping storage |
 
 **Detection:** For each consecutive pair of turns, walk the ordered segment
 fingerprints and record the first divergence. Group by the segment type and
 source of the divergence (e.g. `system_prompt` line 3, `tool_definitions`
-reordered, memory file changed).
+reordered, memory file changed). Without the full request body the detector
+still sees *that* churn happened from usage figures, but runs at reduced
+fidelity and cannot name the cause.
 
 **Common root causes:**
 - Timestamps, git status or random IDs embedded in the system prompt or a
@@ -54,35 +64,42 @@ reordered, memory file changed).
 - MCP servers returning tool lists in a non-deterministic order.
 - Tools added or removed mid-session.
 
-**Saving:** `(cache_write_tokens − expected_write_tokens) × (write_price −
-read_price)`.
-
 **Fix:**
-- L1: diff that moves volatile content below stable content in the memory file,
-  or removes it.
-- L2: proxy sorts tool definitions deterministically; moves volatile segments
-  after the cache breakpoint.
+- L1 (all models): diff that moves volatile content below stable content in
+  the memory file, or removes it.
+- L2, explicit breakpoints: sort tool definitions; move volatile segments after
+  the breakpoint; place breakpoints (`sort_tools`, `move_segment`,
+  `set_cache_breakpoint`).
+- L2, automatic prefix: sort tool definitions; move volatile segments to the
+  end; set a per-session cache key where the provider supports one
+  (`sort_tools`, `move_segment`, `set_cache_key`).
+- Managed caches: reuse one cache per session instead of re-creating it (L1).
+
+**Requires:** `usage.cache_read`. **Optional:** `request.full_body`,
+`usage.cache_write`, `request.cache_markers`.
 
 ## P02 — Cache TTL expiry
 
-**What happens:** The developer pauses longer than the cache lifetime, so the
-next turn re-writes a prefix that was cached moments before the pause.
+**What happens:** The developer pauses longer than the cache lives, so the
+next turn pays again for a prefix that was cached moments before the pause.
 
-**Signals:** Gap between turns greater than the provider's cache TTL, followed
-by a large cache write of an unchanged prefix (same fingerprints).
+**By cache model:**
 
-**Detection:** Join turns on session; flag gaps over TTL where the prefix
-fingerprint is unchanged.
+| Cache model | Lifetime | Signal | Fix |
+|---|---|---|---|
+| Explicit breakpoints | Short default plus a longer paid option (Anthropic: 5 min and 1 h) | Gap longer than the TTL, then a large cache write of an unchanged prefix | L1: recommend the longer TTL for sessions with this pause profile. L2: `set_cache_ttl` when pause history predicts it pays off |
+| Automatic prefix | Provider-managed, typically minutes of inactivity; some models offer extended retention | Gap, then `cache_read` falls to near zero for an unchanged prefix | L1: recommend extended retention where the model offers it; otherwise report only (L0) |
+| Implicit + managed | Implicit: provider-managed. Managed: TTL you set, storage billed over time | Implicit: as automatic prefix. Managed: cache expired, then re-created | L1: tune the managed-cache TTL against storage cost |
 
-**Saving:** Re-write cost minus the cost of the longer-TTL option (where the
-provider offers one) or of a keep-alive request.
+**Detection:** Join turns on session; flag gaps over the profile's TTL where
+the prefix fingerprint is unchanged and cached reads drop.
 
-**Fix:**
-- L1: recommend the longer cache TTL where the provider supports it, for
-  sessions with this pause profile.
-- L2: proxy requests the longer TTL automatically when the session's pause
-  history predicts it will pay off. Keep-alives are **off by default**: they
-  cost money and may conflict with provider terms.
+**Saving:** Cost of re-caching minus the cost of the longer-lifetime option.
+Keep-alive requests are **off by default** on every model: they cost money and
+may conflict with provider terms.
+
+**Requires:** `usage.cache_read`, `timing.per_turn`. **Optional:**
+`usage.cache_write`.
 
 ## P03 — Repeated file reads
 

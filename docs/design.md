@@ -55,22 +55,22 @@ flowchart LR
     P --> N[Normaliser + redactor]
     OT --> N
     LI --> N
-    N --> LS[(Local store\nDuckDB)]
+    N --> LS[(Local store<br/>DuckDB)]
     LS --> D[Detectors]
     D --> F[Findings]
     F --> UI[Local UI / CLI report]
     F --> A[Actuators]
     A -->|in-path transforms| P
-    A -->|config patches| CFG[(CLAUDE.md, settings,\nMCP config)]
+    A -->|config patches| CFG[(CLAUDE.md, settings,<br/>MCP config)]
   end
   subgraph Team["Team collector (optional, self-hosted)"]
-    C[Ingest API] --> TS[(ClickHouse /\nPostgres)]
+    C[Ingest API] --> TS[(ClickHouse /<br/>Postgres)]
     TS --> R[Recommendation engine]
     R --> TUI[Team dashboard]
     R --> POL[Policy service]
   end
-  GW[(LLM gateway logs:\nLiteLLM, Portkey, Helicone)] -. connector .-> C
-  F -->|hashes, sizes, counts,\ncost — no content| C
+  GW[(LLM gateway logs:<br/>LiteLLM, Portkey, Helicone)] -. connector .-> C
+  F -->|hashes, sizes, counts,<br/>cost — no content| C
   POL -->|signed policies| A
 ```
 
@@ -174,6 +174,9 @@ same 40 KB file was read nine times, or that the system prompt changes every
 turn, without ever seeing the file or the prompt.
 
 ## 6. Analysis
+
+The engine that runs detectors standalone, as a gateway sidecar or embedded
+in a host is specified in [analyzer.md](analyzer.md).
 
 ### 6.1 Detectors
 
@@ -291,6 +294,7 @@ the transform version, the sent request can be reproduced exactly.
 | Area | Choice | Why | ADR |
 |---|---|---|---|
 | Proxy, agent, CLI | Go | Single static binary; strong HTTP/2, TLS, SSE; easy cross-compile | [0002](adr/0002-go-for-agent-and-proxy.md) |
+| LiteLLM gateway plugin | Python, thin: capture and forward to a `trimloop serve` sidecar | LiteLLM plugins must be Python; parsing, fingerprinting and detection stay in the Go core | [0005](adr/0005-thin-python-plugin-for-litellm.md), [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md) |
 | Local analytics | DuckDB | Embedded, fast SQL over columnar data; detectors as SQL | [0003](adr/0003-duckdb-local-clickhouse-team.md) |
 | Team analytics | ClickHouse | High-volume event analytics; self-hostable | [0003](adr/0003-duckdb-local-clickhouse-team.md) |
 | Wire format | OTLP + protobuf event schema | Reuse OTel ecosystem; versioned schema | [0001](adr/0001-capture-proxy-otel-transcripts.md) |

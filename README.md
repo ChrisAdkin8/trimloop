@@ -40,13 +40,47 @@ Trimloop is designed to do all four.
   shadow, then canary, then on. Each is measured and reversible.
 - **Quality is a constraint, not an afterthought.** A saving that makes the
   agent worse is not a saving. Trimloop tracks outcome signals alongside cost.
-- **Harness-neutral.** One event model for every harness and gateway.
+- **Harness- and provider-neutral.** One event model for every harness,
+  gateway and model provider; their differences live in profiles, not in
+  detectors.
+
+## Architecture
+
+![Trimloop high-level architecture: coding agents send traffic through Trimloop taps to model providers; a normaliser, local store, detectors and actuators run on the developer machine; an optional team collector receives hashes-only findings and gateway logs and ranks recommendations](docs/images/architecture.svg)
+
+Everything in the top box runs on the developer's machine; raw prompts and code
+never leave it. The dashed arrow is the fix loop: actuators feed safe
+transforms back into the proxy. The team collector is optional and receives
+only hashes, counts, cost and findings. Detail in
+[docs/design.md §3](docs/design.md#3-architecture).
+
+## Technology
+
+**Go for the core, plus a thin Python plugin for LiteLLM.**
+
+| Part | Language | Why |
+|---|---|---|
+| Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One static binary to install; strong HTTP, TLS and streaming support; one codebase for every tap to feed |
+| Detectors | SQL over DuckDB (called from Go) | Language-neutral, easy to test against fixtures, runs locally and in the team collector |
+| LiteLLM gateway plugin | Python, kept thin | LiteLLM plugins must be Python. The plugin only captures events and forwards them to a `trimloop serve` sidecar on loopback, which does all parsing, redaction and fingerprinting; it applies transforms the core has decided on but contains no detection logic |
+| Envoy and Kong gateways (later) | Go | Envoy's external processing and Kong's Go plugin server let the core plug in directly — no third language |
+| Web UI | TypeScript | Embedded in the Go binary |
+
+By default all fingerprinting happens in Go, in the sidecar. Where a sidecar
+cannot sit beside the gateway, the plugin fingerprints locally; the rules are
+specified once and both implementations are tested against shared test vectors.
+
+Decisions: [ADR 0002](docs/adr/0002-go-for-agent-and-proxy.md) (Go),
+[ADR 0005](docs/adr/0005-thin-python-plugin-for-litellm.md) (thin Python
+plugin), [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)
+(plugin forwards to a sidecar). Engine design: [docs/analyzer.md](docs/analyzer.md).
 
 ## Documents
 
 | Doc | What's in it |
 |---|---|
 | [docs/design.md](docs/design.md) | Architecture, components, deployment, security |
+| [docs/analyzer.md](docs/analyzer.md) | Analyzer engine: standalone CLI, gateway sidecar, embeddable library; harness and provider profiles |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/data-model.md](docs/data-model.md) | Normalised event model and storage |
 | [docs/adr/](docs/adr/) | Architecture decision records |

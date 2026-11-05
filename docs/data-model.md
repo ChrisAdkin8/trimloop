@@ -12,6 +12,7 @@ erDiagram
   TURN ||--o{ TOOL_CALL : requests
   TOOL_CALL ||--o| SEGMENT : "result becomes"
   SESSION ||--o{ OUTCOME : "ends with"
+  SESSION ||--o{ DETECTOR_COVERAGE : records
   FINDING }o--o{ TURN : "evidence"
   RECOMMENDATION ||--o{ FINDING : groups
 ```
@@ -42,6 +43,7 @@ One model request and its response.
 | `session_id` | string | |
 | `seq` | int | Order within the session |
 | `provider` | enum | `anthropic`, `openai`, `google`, … |
+| `provider_profile` | string | API surface, e.g. `anthropic-messages`, `openai-responses`; selects parser and cache model ([analyzer.md §10.2](analyzer.md#102-provider-profiles)) |
 | `model` | string | As sent |
 | `request_at` / `first_token_at` / `completed_at` | timestamp | Latency analysis |
 | `status` | int | HTTP status; errors feed P12 |
@@ -113,6 +115,19 @@ Output of a detector (design §6.1).
 | `confidence` | float 0–1 |
 | `root_cause_key` | string (groups findings with the same cause) |
 
+### DetectorCoverage
+
+Whether each detector ran for a session (or, for aggregates, a repo / org
+scope). Lets reports distinguish "no waste found" from "could not check".
+
+| Field | Type | Notes |
+|---|---|---|
+| `scope_id` | string | Session id, or repo / org key for aggregates |
+| `detector` | string | `id@version`, e.g. `P01@3` |
+| `status` | enum | `ran`, `reduced`, `not_applicable` |
+| `missing_capabilities` | string[] | Why the status is `reduced` or `not_applicable` |
+| `profiles` | json | Provider and harness profile ids and versions used |
+
 ### Recommendation
 
 Built by the team collector from grouped findings.
@@ -131,7 +146,7 @@ Built by the team collector from grouped findings.
 
 In the default `hashes` capture mode, the team collector receives:
 
-- Session, Turn, ToolCall, Outcome, Finding records.
+- Session, Turn, ToolCall, Outcome, Finding and DetectorCoverage records.
 - Segments **without** `content`: fingerprints, chunk hashes, sizes, kinds.
   The `source` path is hashed unless the repo opts in to plain paths.
 
