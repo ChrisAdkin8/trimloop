@@ -20,6 +20,8 @@ findings report with estimated savings. No proxy, no server.
 - DuckDB store.
 - Detectors P01–P07.
 - CLI report (terminal + static HTML).
+- Minimal conformance runner: profile schema, capability claims against
+  fixtures, golden events — so the M0 profiles pass it before being enabled.
 - Fixtures: synthetic sessions in the repository; real (redacted) sessions
   only in a private, access-controlled store, never committed. Detector unit
   tests.
@@ -41,15 +43,25 @@ software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-
 
 - Organisation fingerprint key distributed to sidecars (environment variable
   or Kubernetes secret); `fp_key_id` mismatch detection.
-- **First task:** benchmark the plugin on LiteLLM under realistic load
-  against the ≤ 1 ms p99 budget; fall back to delta sending and off-loop
-  serialisation if needed ([ADR 0016](docs/adr/0016-m1-sidecar-operation.md)).
+- **First task:** benchmark the plugin on LiteLLM under realistic load —
+  observe path against the ≤ 1 ms p99 budget, and a decide round trip — using
+  the content-addressed transport ([ADR 0023](docs/adr/0023-content-addressed-plugin-transport.md));
+  also confirm whether the pre-call hook runs on pass-through routes
+  ([ADR 0021](docs/adr/0021-decide-body-ops-and-policy-signing.md)).
+- Paired fixture capture: run Claude Code through a test LiteLLM and keep
+  each session both as transcript and as gateway capture, in the private
+  fixture store, for the parity test.
 - Findings output without a collector: read-only findings API and page on
   `trimloop serve`, webhook sink, Helm persistence values.
 - Plugin forwards the provider-bound request; `normalize/litellm` envelope;
   gateway fingerprints use `fidelity = gateway`.
 - Reorder window, session merging and history-edit handling in the
   sessioniser.
+- Per-pod sidecar storage, liveness-only probes, native sidecar where
+  available; fail-open test on a real cluster; output per replica, merged by
+  `trimloop report --from` ([ADR 0022](docs/adr/0022-sidecar-deployment-and-storage.md)).
+- Session anchors and joining on the latest response
+  ([ADR 0020](docs/adr/0020-session-identity.md)).
 - Supported topologies: one gateway instance, or replicas with sticky routing
   by API key or user ([ADR 0012](docs/adr/0012-gateway-sessions-and-parity.md)).
   Session kinds (`main`, `subagent`, `auxiliary`); idle window of at least
@@ -66,7 +78,8 @@ software on developer machines ([ADR 0009](docs/adr/0009-gateway-sidecar-before-
   example, plugin on PyPI, schemas on the Buf registry
   ([packaging.md](docs/packaging.md)).
 - Codex CLI transcript reader.
-- Conformance kit (`trimloop conformance`) for provider and harness profiles.
+- Full conformance kit (`trimloop conformance`) for provider and harness
+  profiles (a minimal runner ships in M0).
 - Local web UI: sessions, turns, prefix-divergence view.
 
 **Done when:** on the same fixture sessions, for every detector both sources

@@ -29,8 +29,15 @@ and append to one draft GitHub release:
    provenance, updates the Homebrew tap from the uploaded archives, and
    publishes the release.
 
-GoReleaser's `release.mode: append` lets each job add to the same draft
-release.
+GoReleaser settings for each job: `release.mode: append` with
+`release.draft: true` and `release.use_existing_draft: true`, so jobs add to
+one draft found by tag; a distinct `checksum.name_template` per job
+(`checksums-<os>-<arch>.txt`) so checksum files do not collide. The final job
+is hand-written, not GoReleaser: it concatenates and signs the checksum files,
+creates the multi-arch manifest with `docker buildx imagetools create`,
+generates the Homebrew formula from the uploaded archives, and publishes the
+draft. The M0 dry-run also runs `objdump -T` on Linux binaries to confirm no
+`GLIBC_`/`GLIBCXX_` symbol is newer than the baseline.
 
 ## Consequences
 

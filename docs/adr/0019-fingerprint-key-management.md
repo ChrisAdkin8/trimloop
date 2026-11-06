@@ -1,6 +1,6 @@
 # ADR 0019: Fingerprint key management
 
-- Status: Proposed
+- Status: Proposed — key storage on developer machines by [ADR 0024](0024-developer-identity-and-key-handling.md)
 - Date: 2026-11-05
 - Amends: [ADR 0011](0011-keyed-fingerprints.md)
 

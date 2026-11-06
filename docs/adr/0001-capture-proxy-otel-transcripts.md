@@ -1,6 +1,6 @@
 # ADR 0001: Capture through four taps — proxy, OTel, transcripts, gateway connectors
 
-- Status: Proposed — order amended by [ADR 0009](0009-gateway-sidecar-before-local-proxy.md) (gateway sidecar before local proxy)
+- Status: Proposed — order amended by [ADR 0009](0009-gateway-sidecar-before-local-proxy.md) (gateway sidecar before local proxy); item 4 (connectors) amended by [ADR 0011](0011-keyed-fingerprints.md): connectors run in `serve` connector mode, not inside the collector
 - Date: 2026-11-05
 
 ## Context

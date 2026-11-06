@@ -90,7 +90,7 @@ flowchart LR
 | `pkg/detectors` | One file per pattern: `p01_cache_churn.go`, … | yes |
 | `pkg/aggregate` | Cross-session aggregates (repo / developer / org scope): SQL, plus P16's Go sequence miner | runs on a Store |
 | `pkg/decide` | Turns policy + session context into a declarative transform spec (L2/L3) | yes |
-| `pkg/store` | Store interface; `duckdb` and `memory` implementations | adapter |
+| `pkg/store` | Store interface and the memory implementation; DuckDB and ClickHouse stores live in `internal/store` | adapter |
 | `pkg/engine` | Wires the above; the public embedding API | — |
 
 ### Key interfaces (sketch)
@@ -203,7 +203,7 @@ Code transcripts (versions 2.1.288–2.1.318, 2026-11-05) found:
   (`cleanupPeriodDays`), which bounds `--since` and `--rebuild`.
 
 Older or other harnesses may log less. Findings carry a `fidelity` field
-(`transcript` | `wire`) so the report can say so.
+(`transcript`, `gateway` or `wire`) so the report can say so.
 
 ### 5.2 Gateway sidecar: `trimloop serve`
 
@@ -246,14 +246,16 @@ Hosts written in Go import `pkg/engine` directly and call `Ingest` and
 Gateways see independent HTTP requests, not sessions. Detectors need
 sessions. `pkg/sessionize` rebuilds them:
 
-1. **Explicit id.** If the harness sends a session identifier (header or
-   metadata field), use it.
-2. **Prefix continuity.** Otherwise: a coding agent's request *n+1* contains
-   request *n*'s messages plus *n*'s response as its history prefix. For every
-   turn, compute rolling prefix hashes at each message boundary. Keep an index
-   `prefix_hash(turn n input + turn n output) → session`. A new turn whose
-   history prefix matches an indexed hash joins that session; otherwise it
-   opens a new one.
+1. **Anchor.** Every session has an anchor: the harness's own session id
+   when the request carries one, otherwise
+   `fp("root", harness ‖ principal ‖ first user_text)` — which excludes
+   system, tool, memory-file and injected segments, so a system prompt that
+   changes every turn does not change it
+   ([ADR 0020](adr/0020-session-identity.md)).
+2. **Joining.** A request joins open session *S* when it has the same anchor
+   **and** its history contains *S*'s most recent assistant response (by
+   content hash). Otherwise it opens a new session. If two open sessions
+   match, the one with the most recent turn wins.
 3. **Scoping.** Matching is restricted to the same gateway key / user and
    harness (from `User-Agent` or metadata), within an idle window
    — the larger of 2 hours and the longest cache TTL observed in the session,
@@ -263,14 +265,13 @@ sessions. `pkg/sessionize` rebuilds them:
    sessions are one merges them and replays their detectors.
 4. **History edits.** Harnesses rewrite history: providers clear old tool
    results, and Claude Code records requests as an earlier request cut to
-   `keep` messages plus a new `tail`. A request joins an open session when it
-   shares the conversation root and its history starts with *any* prefix of
-   that session's last request; the divergence point is recorded as
-   `history_edit_at`, and P01 attributes cache breaks there to context
-   editing.
-5. **Forks and compaction.** A compaction or `/clear` breaks the prefix and
-   starts a new session linked by `resumed_from` when the system prompt and
-   tool-definition fingerprints match the previous one.
+   `keep` messages plus a new `tail`. Because joining needs only the latest
+   response, edits do not break a session; the first point where the request
+   differs from *S*'s previous one is recorded as `history_edit_at`, and P01
+   attributes cache breaks there to context editing.
+5. **Forks and compaction.** A compaction or `/clear` replaces the history,
+   so the request opens a new session, linked by `resumed_from` when its
+   anchor matches.
 
 6. **Kinds.** Each session is labelled `main`, `subagent` or `auxiliary`
    (titles, summaries and similar side calls), by rules in the harness
@@ -337,13 +338,14 @@ produces new findings; old ones are kept for before/after comparisons.
 - Any error or timeout ⇒ empty spec ⇒ request goes through unchanged.
 - Only ops listed in the provider profile's `ops` are ever returned (§10.2);
   for example `set_cache_ttl` exists for Anthropic, `set_cache_key` for OpenAI.
-- A decide request carries the full request body, so the sidecar sessionises
-  it from the request's own history without waiting for `/v1/events`. The
-  canary bucket comes from the keyed fingerprint of the conversation root
-  combined with the experiment id (sub-agents inherit their parent's bucket;
-  [ADR 0018](adr/0018-rollout-refinements.md))
-  (system prompt plus first user message), so a session lands in the same
-  bucket on every replica.
+- A decide request carries the request, so the sidecar sessionises it from
+  the request's own history without waiting for `/v1/events`. The canary
+  bucket is `fp("bucket", anchor ‖ experiment_id)` — the session anchor
+  (§6), not the system prompt, so it is stable across turns and replicas.
+  Sub-agents inherit their parent's bucket only when the harness links them
+  visibly to the replica handling the request
+  ([ADR 0018](adr/0018-rollout-refinements.md),
+  [ADR 0020](adr/0020-session-identity.md)).
 - Each op has preconditions checked before it is returned — for example
   `set_cache_breakpoint` only if the request stays within the provider's
   breakpoint limit, counting the harness's own markers. `move_segment` is L3.
@@ -357,14 +359,16 @@ produces new findings; old ones are kept for before/after comparisons.
 
 ## 9. The thin LiteLLM plugin
 
-Package `trimloop-litellm` (Python), roughly 300 lines. It subclasses
+Package `trimloop-litellm` (Python): a few hundred lines of capture, message
+splitting and transport bookkeeping, with no fingerprinting or detection
+([ADR 0023](adr/0023-content-addressed-plugin-transport.md)). It subclasses
 LiteLLM's `CustomLogger`:
 
 | Hook | What the plugin does |
 |---|---|
 | `async_log_success_event` / `async_log_failure_event` | Build an `event.Raw` from the **provider-bound request** (after LiteLLM's translation), the response, usage, timings and LiteLLM call id; append to an in-memory ring buffer |
 | Background task | Flush the buffer to `POST /v1/events` every 1 s or 100 events; the buffer is capped at 50 MB as well as by event count, and on overflow drops the oldest events and counts them |
-| `async_pre_call_hook` (only if `decide` enabled) | `POST /v1/decide` with the request body and a 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged |
+| `async_pre_call_hook` (only if `decide` enabled) | `POST /v1/decide` with the **client-format** request (before LiteLLM's translation; ops are defined for that format, [ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)), sent as message digests with a 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged |
 | `async_post_call_failure_hook` (only if `decide` enabled) | Detect a transformed request the provider rejected with an invalid-request error, arrange one resend of the original, and report `transform_rejected`. A failure hook cannot resend by itself; the exact LiteLLM mechanism is open question 7 |
 
 It contains no parsing beyond reading LiteLLM's own objects, no detectors and
@@ -569,8 +573,9 @@ detector that did not run.
 5. Fingerprint vectors pass, and every listed op applies correctly.
 6. Harness detection rules match that harness's traffic and no other's.
 
-Passing is required before a profile is enabled by default. Community profiles
-can ship marked `experimental`.
+Passing is required before a profile is enabled by default. M0 ships a
+minimal runner (checks 1–3) so its own profiles pass before they are enabled;
+the full kit arrives in M1. Community profiles can ship marked `experimental`.
 
 ### 10.6 Adding support
 
@@ -593,15 +598,15 @@ One file, `trimloop.yaml`, read by every shape; CLI flags override it.
 capture:
   content: hashes          # hashes | full (full is local-only, per repo)
 fingerprint:
-  key: keychain            # keychain | file:PATH | env:TRIMLOOP_FINGERPRINT_KEY (ADR 0011)
+  key: keychain            # developer machines: keychain only; servers/CI: file:PATH | env:TRIMLOOP_FINGERPRINT_KEY (ADR 0024)
 privacy:
-  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp
+  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp, developer, alias
 sources:
   claude_code: { enabled: true }
   codex:       { enabled: true }
 serve:
   listen: 127.0.0.1:7341
-  findings_listen: 0.0.0.0:7342   # read-only findings API and page (token auth)
+  findings_listen: 0.0.0.0:7342   # read-only findings API and page; will not start without a token (ADR 0022)
   reorder_window: 5s
   decide: false
 store:
@@ -626,7 +631,8 @@ already use (Datadog, Grafana, etc.).
 
 ```text
 cmd/trimloop/               CLI: analyse, serve, proxy, report, explain, conformance,
-                            update-catalogue, key, version
+                            update-catalogue, key, recommendations (M2),
+                            identity, policy (M3), version
 pkg/engine/                 public embedding API
 pkg/event/                  canonical model
 pkg/normalize/{anthropic,openai,gemini}/
@@ -698,7 +704,8 @@ Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 1. **M0 — `trimloop analyse`:** `pkg/event`, `normalize/anthropic`,
    `redact`, `fingerprint` (keyed) and `trimloop key init`, `price`, Claude
    Code `Reader`, DuckDB and memory stores, incremental re-runs, detectors
-   P01–P05 (Go) and P06–P07 (aggregates), text and HTML reports, release
+   P01–P05 (Go) and P06–P07 (aggregates), text and HTML reports, a minimal
+   conformance runner (schema, capability claims, golden events), release
    pipeline dry-run.
 2. **M1 — sidecar:** plugin overhead benchmark first; then ingest API,
    `normalize/litellm` envelope, `sessionize` with reorder window, merging and

@@ -23,8 +23,11 @@ ORIG_PATH="$PATH"
 GO_MIN="1.25"
 PYTHON_VERSION="3.12"   # pinned for the LiteLLM plugin
 NODE_MIN="22"
-# Pinned tool versions. DUCKDB_VERSION must match the DuckDB bundled by the Go
+# Pinned tool versions. DUCKDB_VERSION should match the DuckDB bundled by the Go
 # driver in go.mod, so aggregate SQL is written against the engine that ships.
+# The DuckDB CLI is a convenience: on Linux the pinned release is installed; on
+# macOS Homebrew installs its current release and a mismatch is reported but
+# does not fail --check.
 DUCKDB_VERSION="v2.0.0"
 BUF_VERSION="v1.75.0"
 PROTOC_GEN_GO_VERSION="v1.36.12"
@@ -79,7 +82,19 @@ fail() { printf '  %s✗%s %s\n' "$RED" "$RESET" "$1" >&2; }
 die()  { fail "$1"; exit 1; }
 
 MISSING=()
-note_missing() { MISSING+=("$1"); todo "$1: missing or too old"; }
+CONFIRMED=0
+# Records a missing item. The first time something is missing in install mode,
+# asks once whether to go ahead, so nothing is asked when all is present.
+note_missing() {
+  MISSING+=("$1"); todo "$1: missing or too old"
+  if ((!CHECK_ONLY && !CONFIRMED)); then
+    if ! confirm "Install missing SDKs and tools now?"; then
+      echo "Nothing changed. Re-run with --check to see what is missing."
+      exit 0
+    fi
+    CONFIRMED=1
+  fi
+}
 
 # version_ge A B  ->  true if version A >= version B (numeric, dot-separated)
 version_ge() {
@@ -147,10 +162,6 @@ trap 'rm -rf "$TMP"' EXIT
 printf '%sTrimloop development setup%s (%s, %s)%s\n' "$BOLD" "$RESET" "$PLATFORM" "$GOARCH" \
   "$( ((CHECK_ONLY)) && echo ' — check only, no changes' )"
 
-if ((!CHECK_ONLY)) && ! confirm "Install missing SDKs and tools now?"; then
-  echo "Nothing changed. Re-run with --check to see what is missing."
-  exit 0
-fi
 
 # ---------- base packages / C toolchain ----------
 
@@ -226,7 +237,13 @@ fi
 
 step "Go tools (buf, protoc plugins, linters)"
 GOBIN_DIR=""
-have go && GOBIN_DIR="$(go env GOPATH)/bin" && export PATH="$GOBIN_DIR:$PATH"
+if have go; then
+  GOBIN_DIR="$(go env GOBIN)"
+  [[ -n $GOBIN_DIR ]] || GOBIN_DIR="$(go env GOPATH)/bin"
+  export PATH="$GOBIN_DIR:$PATH"
+fi
+# Module version a Go binary was built from ("" if unknown).
+go_bin_version() { have go && go version -m "$(command -v "$1")" 2>/dev/null | awk '$1=="mod"{print $3; exit}'; }
 go_tools=(
   "buf|github.com/bufbuild/buf/cmd/buf@${BUF_VERSION}"
   "protoc-gen-go|google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VERSION}"
@@ -235,10 +252,14 @@ go_tools=(
   "govulncheck|golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}"
 )
 for entry in "${go_tools[@]}"; do
-  bin="${entry%%|*}"; pkg="${entry#*|}"
-  if have "$bin"; then
-    ok "$bin"
+  bin="${entry%%|*}"; pkg="${entry#*|}"; want="${pkg##*@}"
+  have_ver=""; have "$bin" && have_ver="$(go_bin_version "$bin")"
+  if have "$bin" && [[ $have_ver == "$want" ]]; then
+    ok "$bin $have_ver"
+  elif have "$bin" && [[ -z $have_ver ]]; then
+    todo "$bin present, version unknown (pinned $want); reinstall with: go install $pkg"
   else
+    [[ -n $have_ver ]] && todo "$bin $have_ver installed; $want pinned"
     note_missing "$bin"
     if have go; then run go install "$pkg"; else todo "  (needs Go first) go install $pkg"; fi
   fi

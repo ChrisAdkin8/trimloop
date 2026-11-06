@@ -68,6 +68,8 @@ fidelity and cannot name the cause.
 - MCP servers returning tool lists in a non-deterministic order.
 - Context editing: the provider or harness clearing old tool results or
   compacting history (`history_edit_at`) — reported as its own cause.
+- Key or block order changed: same content hash, different exact hash
+  ([ADR 0025](adr/0025-exact-hash-order-preserving-json.md)).
 - Tools added or removed mid-session.
 
 **Fix:**
@@ -145,8 +147,9 @@ cached.
 **Fix:**
 - L1: suggest command flags (`--quiet`, `| tail -n 200`, test reporter
   settings) via a memory-file or settings diff.
-- L3: proxy truncates with head + tail + a pointer the agent can use to fetch
-  the rest. Behaviour-changing, so opt-in only.
+- L3 (M4, op `truncate_tool_result`): truncate with head + tail + a pointer
+  the agent can use to fetch the rest. Behaviour-changing, so opt-in only.
+  Until the op ships, L1 only.
 
 ## P05 — Tool-call loops
 
@@ -214,8 +217,10 @@ content is widespread and that removing it cut input tokens by roughly 40–60%.
 **Signals:** A file's older fingerprint still in history after a newer
 fingerprint of the same path appears.
 
-**Fix:** L3 — proxy elides superseded segments, with a marker. Behaviour-
-changing and harness-specific; opt-in, canary-gated.
+**Fix:** L1 in M3 — report the stale share and recommend compaction or
+clearing settings. L3 in M4 (op `elide_segment`): elide superseded segments,
+with a marker; behaviour-changing and harness-specific, opt-in, canary-gated
+([ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)).
 
 ## P09 — Resume bloat
 
@@ -273,7 +278,7 @@ in the top price tier.
 **Detection:** Needs a turn-complexity classifier trained on outcome data, so
 it waits until outcome signals exist.
 
-**Fix:** L3 — routing policy per turn class, canary-gated on outcome signals.
+**Fix:** L3 (M4, op `route_model`) — routing policy per turn class, canary-gated on outcome signals.
 Many harnesses already support sub-agents on cheaper models; the L1 version
 recommends that configuration.
 
@@ -283,7 +288,7 @@ recommends that configuration.
 
 **Signals:** Reasoning tokens high on turns labelled low-complexity.
 
-**Fix:** L3 — cap the budget per turn class; canary-gated.
+**Fix:** L3 (M4, op `cap_thinking`) — cap the budget per turn class; canary-gated. Until then, L1.
 
 ## P15 — Duplicated exploration across a team
 

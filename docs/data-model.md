@@ -26,7 +26,7 @@ One run of a harness, from start to exit (or resume chain).
 | `session_id` | string | Harness's own id where available, else generated |
 | `harness` | enum | `claude-code`, `codex`, `gemini-cli`, `gateway:<name>`, … |
 | `harness_version` | string | Detectors are tested per version |
-| `developer_id` | string | Pseudonymous; mapping to a person lives only in the team collector |
+| `developer_id` | string | `fp("developer", …)`; the mapping to a person stays on the customer side ([ADR 0024](adr/0024-developer-identity-and-key-handling.md)) |
 | `repo` | string | `fp("repo", normalised remote URL)`; display name only if opted in |
 | `branch` | string | `fp("branch", name)`; plain only if opted in |
 | `started_at` / `ended_at` | timestamp | |
@@ -82,7 +82,7 @@ it ([ADR 0017](adr/0017-content-addressed-segments.md)).
 | `kind` | enum | See the segment table in [fingerprinting](#specification) |
 | `source_kind` | enum? | For `tool_result`: `file`, `url`, `command`, `mcp`, `other` |
 | `source` | string? | Keyed hash of the file path, URL, tool name or MCP server, where known |
-| `exact_hash` | string | Keyed hash of the segment exactly as sent ([fingerprinting](#fingerprinting)) |
+| `exact_hash` | string? | Keyed hash of the segment's order-preserving compact JSON ([fingerprinting](#fingerprinting)) |
 | `content_hash` | string | Keyed hash of the segment's canonical form |
 | `line_hashes` | string[]? | Per-line hashes; memory files, system prompt and user messages only |
 | `tokens` | int | Provider tokenizer where available, else an estimate (flagged) |
@@ -122,8 +122,8 @@ Output of a detector. This is the single definition; other docs refer here.
 | `finding_id` | string | |
 | `pattern_id` | string | `P01` … `P18` |
 | `detector_version` | string | `id@version`, e.g. `P01@3` |
-| `scope` | enum | `turn`, `session`, `repo`, `developer`, `org` |
-| `scope_id` | string | Session id, or the repo / developer / org key |
+| `scope` | enum | `turn`, `session`, `repo`, `gateway_key`, `developer`, `org` (`gateway_key` groups by key alias and harness where repo is unknown) |
+| `scope_id` | string | Session id, or the repo / gateway-key / developer / org key |
 | `evidence` | json | Typed per pattern: turn ids, segment fingerprints, counts. No free text |
 | `wasted_tokens` | json | By token class: `input_uncached`, `cache_read`, `cache_write_5m`, `cache_write_1h`, `output` |
 | `est_saving` | decimal | Money, from the price catalogue |
@@ -140,7 +140,7 @@ scope). Lets reports distinguish "no waste found" from "could not check".
 
 | Field | Type | Notes |
 |---|---|---|
-| `scope_id` | string | Session id, or repo / org key for aggregates |
+| `scope_id` | string | Session id, or repo / gateway-key / developer / org key for aggregates |
 | `detector` | string | `id@version`, e.g. `P01@3` |
 | `status` | enum | `ran`, `reduced`, `not_applicable` |
 | `missing_capabilities` | string[] | Why the status is `reduced` or `not_applicable` |
@@ -263,7 +263,7 @@ Label registry — no other labels may be used:
 
 | Label | Input | Used for |
 |---|---|---|
-| `seg.exact` | Segment bytes as sent, cache markers removed | `exact_hash` |
+| `seg.exact` | Segment's order-preserving compact JSON, cache markers removed ([ADR 0025](adr/0025-exact-hash-order-preserving-json.md)) | `exact_hash` |
 | `seg.content` | Segment canonical form | `content_hash` |
 | `prefix.exact` | Previous chain value (32 bytes) ‖ segment `exact_hash` (32 bytes) | Exact prefix chain |
 | `prefix.content` | Previous chain value ‖ segment `content_hash` | Content prefix chain |
@@ -276,9 +276,24 @@ Label registry — no other labels may be used:
 | `branch` | Branch name | Session `branch` |
 | `tool` | MCP tool name | Tool-call `name` |
 | `mcp` | MCP server name | `mcp_server` |
-| `root` | Content hashes of the system segments and first user message, concatenated | Conversation root (sessionising, canary buckets) |
-| `bucket` | Root hash ‖ experiment id | Canary bucket ([ADR 0018](adr/0018-rollout-refinements.md)) |
+| `root` | Harness id ‖ 0x00 ‖ principal ‖ 0x00 ‖ content hash of the first `user_text` segment (system, tool, memory-file and injected segments excluded) | Fallback session anchor ([ADR 0020](adr/0020-session-identity.md)) |
+| `bucket` | Session anchor ‖ 0x00 ‖ experiment id (UTF-8 `<op>@<policy_version>`) | Canary bucket ([ADR 0018](adr/0018-rollout-refinements.md), [ADR 0020](adr/0020-session-identity.md)) |
+| `developer` | Stable developer identity (git email, else OS user ‖ machine id) | `developer_id` ([ADR 0024](adr/0024-developer-identity-and-key-handling.md)) |
+| `alias` | Gateway key alias or team name | Principal, gateway grouping |
+| `diff` | Normalised unified diff of the working tree (local only) | Diff progress (P05, P11) |
 | `key-id` | Empty | `fp_key_id`: first 8 hex characters |
+
+A **request fingerprint** (P12) is the turn's final exact prefix-chain value;
+it needs no label of its own.
+
+**Normalisation before hashing names.**
+
+| Name | Rule |
+|---|---|
+| `path` | Inside the repo: repo-relative POSIX path (forward slashes, no `./`, case kept). Outside: absolute path with the home directory replaced by `~` |
+| `url` | Lower-case scheme and host; default port removed; fragment removed; path and query kept as given |
+| `repo` | Remote reduced to `host/owner/name`: lower-case host, `.git` suffix removed, SSH and HTTPS forms equal (`git@github.com:o/r.git` → `github.com/o/r`) |
+| `branch`, `alias`, `tool`, `mcp` | As given (UTF-8, NFC) |
 
 Every turn records `fp_key_id`, so codes made with different keys are never
 compared.
@@ -309,7 +324,7 @@ caches, not what.
 
 | Hash | Input | Used for |
 |---|---|---|
-| `exact_hash` | The segment's bytes exactly as serialised in the request, minus cache markers | Cache analysis (P01, P02, P09): any byte change breaks a provider cache, so nothing is normalised away |
+| `exact_hash` | The segment's order-preserving compact JSON, minus cache markers; null where a transcript lacks the request ([ADR 0025](adr/0025-exact-hash-order-preserving-json.md)) | Cache analysis (P01, P02, P09): any change to content or member order breaks a provider cache, so neither is normalised away |
 | `content_hash` | The segment's canonical form (below) | Content identity regardless of formatting (P03, P15, P17, P18) and sessionising |
 
 **Canonical form.**
@@ -356,7 +371,9 @@ In the default `hashes` capture mode, the team collector receives:
 - Names as keyed hashes: file paths, URLs, repo, branch, MCP server and MCP
   tool names. Each can be sent in plain text only if the organisation opts in
   for that field (`privacy.plain_names`: `repo`, `branch`, `path`, `url`,
-  `mcp` — the last covers MCP server and tool names). The harness's own built-in tool names
+  `mcp` — MCP server and tool names — `developer` and `alias`).
+- Developer ids and gateway key aliases as keyed hashes; the mapping to
+  people stays on the customer side ([ADR 0024](adr/0024-developer-identity-and-key-handling.md)). The harness's own built-in tool names
   (for example `Read`, `Bash`) are sent in plain text; they reveal nothing about
   the customer.
 

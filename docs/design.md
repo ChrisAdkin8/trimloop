@@ -77,7 +77,8 @@ flowchart LR
     R --> TUI[Team dashboard]
     R --> POL[Policy service]
   end
-  GW[(Logs from gateways<br/>without a plugin)] -. connector .-> C
+  GW[(Logs from gateways<br/>without a plugin)] -.-> CN[trimloop serve<br/>connector mode, holds key]
+  CN -->|keyed records| C
   SC -->|hashes, counts, cost,<br/>findings| C
   F -->|hashes, sizes, counts,<br/>cost — no content| C
   POL -->|signed policies| A
@@ -171,7 +172,8 @@ agents, background agents):
 | Gemini CLI | ✅ | ? | ? | To investigate |
 | Cursor | ❌ | ❌ | ❌ | Traffic goes to Cursor's backend, not the model provider; admin API only |
 | GitHub Copilot | ❌ | ❌ | ❌ | Metrics API only |
-| LiteLLM / Portkey / Helicone | — | — | — | Gateway connector |
+| LiteLLM | — | — | — | Gateway plugin + sidecar (M1) |
+| Portkey / Helicone | — | — | — | Log connector, `serve` connector mode (M2) |
 
 Closed backends (Cursor, Copilot) get spend-level data only. That limit is
 stated in the product rather than hidden.
@@ -287,7 +289,7 @@ allowed; the default is 1.
 | 0 | Report | Findings in CLI/UI | none |
 | 1 | Config patch | Edit CLAUDE.md to move volatile lines below stable ones; disable an unused MCP server for a repo; add a tool-output limit to settings | Human approves a diff (local, or as a PR) |
 | 2 | In-path transform, semantics-preserving | Sort tool definitions (where tool order is shown not to matter, ADR 0018); add cache breakpoints within the provider's limit; choose the cache TTL; set a cache key | Shadow → canary → on, auto-rollback on regression; rejected requests resent untransformed |
-| 3 | In-path transform, behaviour-changing | Move volatile segments behind stable ones; truncate tool output with a retrievable pointer; route low-complexity turns to a cheaper model; cap thinking budget on trivial turns | Opt-in per repo, canary only, outcome signals must not regress; not at a gateway until developer-side outcomes are joined (M4) |
+| 3 | In-path transform, behaviour-changing | `move_segment`, `truncate_tool_result`, `elide_segment`, `route_model`, `cap_thinking` (all M4; [ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)) | Opt-in per repo, canary only, outcome signals must not regress; not at a gateway until developer-side outcomes are joined (M4) |
 
 ### Rollout for levels 2 and 3
 
@@ -295,8 +297,8 @@ allowed; the default is 1.
    *would* have changed: predicted cache hit, tokens saved.
 2. **Canary.** Apply to a percentage of sessions (by session, never by turn, so
    a conversation is internally consistent; the bucket comes from the keyed
-   fingerprint of the conversation root and the experiment id, so it needs no
-   session state and each experiment splits independently).
+   session anchor and the experiment id, so it needs no session state and
+   each experiment splits independently — [ADR 0020](adr/0020-session-identity.md)).
    Compare cost and outcome signals against the control.
 3. **On.** Promote when savings are significant and no outcome signal
    regresses beyond a threshold.
@@ -315,7 +317,7 @@ the transform version, the sent request can be reproduced exactly.
 | Secrets stored locally | Redaction before storage; by default the store holds only keyed hashes and is protected by file permissions. Encryption at rest becomes required when full-content capture is enabled ([ADR 0015](adr/0015-defer-local-store-encryption.md)) |
 | API keys captured by the proxy | Auth headers are never parsed, logged or stored |
 | Malicious use of the local CA | CA private key generated per machine, stored in the OS keychain, scoped to harness processes via env var, 90-day rotation |
-| Tampered policies pushing harmful transforms | Policies signed by the collector; actuators verify signatures; level 3 needs local opt-in as well as policy |
+| Tampered policies pushing harmful transforms | Policies signed with a customer-held policy key the collector never holds; sidecars and proxies verify against that trust anchor; level 3 needs local opt-in as well as policy ([ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)) |
 | Provider terms of service | Trimloop changes request *structure* (order, cache markers) but never impersonates a client or bypasses limits. Review each provider's terms before shipping level 2+ for it — see open questions |
 
 ## 9. Deployment modes
@@ -340,7 +342,7 @@ one Helm chart, one Python package) is in [packaging.md](packaging.md).
 | Team analytics | ClickHouse | High-volume event analytics; self-hostable | [0003](adr/0003-duckdb-local-clickhouse-team.md) |
 | Wire format | OTLP + protobuf event schema | Reuse OTel ecosystem; versioned schema | [0001](adr/0001-capture-proxy-otel-transcripts.md) |
 | UI | TypeScript web app, served by the binary | No separate install for solo mode | — |
-| Privacy model | Hashes-only by default | Adoption depends on security sign-off | [0004](adr/0004-local-first-hashes-only.md) |
+| Privacy model | Keyed hashes only by default, customer-held key | Adoption depends on security sign-off | [0004](adr/0004-local-first-hashes-only.md), [0011](adr/0011-keyed-fingerprints.md), [0024](adr/0024-developer-identity-and-key-handling.md) |
 
 ## 11. Risks
 

@@ -52,7 +52,10 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | `trimloop serve` | Sidecar, connector or team collector, depending on configuration |
 | `trimloop serve --extproc` | Envoy external-processing server |
 | `trimloop proxy` | Local forward/reverse proxy |
-| `trimloop report`, `explain` | Render reports; explain a finding |
+| `trimloop report`, `explain` | Render reports (also from one or more sidecars with `--from`); explain a finding |
+| `trimloop recommendations` | Fetch open recommendations from the collector and render the exact change locally (M2); authenticates with a per-developer collector token |
+| `trimloop identity resolve` | Map keyed developer ids back to people, for key holders (ADR 0024) |
+| `trimloop policy key init` | Create the customer-held policy-signing key (M3, ADR 0021) |
 | `trimloop conformance` | Test a provider or harness profile against fixtures |
 | `trimloop update-catalogue` | Opt-in: fetch a signed price catalogue ([below](#price-catalogue-updates)) |
 | `trimloop key init`, `import`, `export`, `rotate`, `status` | Manage the fingerprint key ([ADR 0011](adr/0011-keyed-fingerprints.md), [ADR 0019](adr/0019-fingerprint-key-management.md)) |
@@ -139,7 +142,7 @@ created at first run and changes over time in two ways:
 
 | Change | Handling |
 |---|---|
-| **Trimloop's own schema** (tables, columns) | Schema version kept in a `meta` table. On open, forward-only migrations run in a transaction, after copying the file to `trimloop.duckdb.bak-<old-version>` |
+| **Trimloop's own schema** (tables, columns) | Schema version kept in a `meta` table. On open, the owning process runs `CHECKPOINT`, copies the file to `trimloop.duckdb.bak-<old-version>`, then runs forward-only migrations in a transaction. Only one process writes the store (ADR 0022) |
 | **DuckDB's storage format** | A newer DuckDB can write files an older one cannot read. Release notes flag every DuckDB version bump. An older `trimloop` that meets a newer file stops with a clear message pointing to the backup, and never modifies the file |
 
 The local store is derived data: anything that came from transcripts can be
@@ -170,7 +173,10 @@ not planned; the container image uses a glibc base instead.
 newer). Linux binaries are built inside a container with glibc 2.34 (for
 example an AlmaLinux 9 image) on the Linux runners, so they never require
 newer glibc symbols than that; `.rpm` and `.deb` packages declare the
-dependency. The distroless runtime image (glibc 2.36) is above the baseline.
+dependency on both glibc and libstdc++. The distroless `cc` runtime image
+(glibc 2.36, with libstdc++) is above the baseline. The release dry-run checks
+binaries with `objdump -T` for `GLIBC_` and `GLIBCXX_` symbols newer than the
+baseline (ADR 0014).
 
 ## 5. Container image
 
@@ -204,12 +210,13 @@ serve:
   upload:
     url: ""              # team collector, hashes only
 persistence:
-  enabled: true          # DuckDB store on a volume; off = memory store (findings lost on restart)
-  size: 10Gi
+  type: emptyDir         # emptyDir (per pod, default) | pvc (litellm-bundle mode only, per pod) | none (memory)
+  size: 10Gi             # never shared between replicas (ADR 0022)
   storageClass: ""
 findings:
   port: 7342             # read-only findings API and page (ADR 0016)
-  tokenSecret: ""
+  tokenSecret: ""       # required: the findings listener will not start without it
+  tls: { secretName: "" }
 webhook:
   url: ""                # e.g. a Slack incoming webhook for findings
 fingerprintKey:

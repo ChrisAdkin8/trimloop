@@ -1,6 +1,6 @@
 # ADR 0011: Keyed fingerprints (HMAC-SHA-256) with a customer-held key
 
-- Status: Proposed — key management amended by [ADR 0019](0019-fingerprint-key-management.md)
+- Status: Proposed — key management amended by [ADR 0019](0019-fingerprint-key-management.md); developer identity and key storage on developer machines by [ADR 0024](0024-developer-identity-and-key-handling.md)
 - Date: 2026-11-05
 - Amends: [ADR 0004](0004-local-first-hashes-only.md) (what "hashes-only" protects)
 
@@ -28,8 +28,9 @@ made.
    - `trimloop key init` creates it. Solo: stored in the OS keychain where
      there is one, else `~/.trimloop/fingerprint.key` with mode 0600.
    - Teams: an administrator creates one key and distributes it to developer
-     machines and gateway sidecars — environment variable
-     `TRIMLOOP_FINGERPRINT_KEY`, a file path in `trimloop.yaml`, or a
+     machines (OS credential store only, ADR 0024) and gateway sidecars —
+     environment variable `TRIMLOOP_FINGERPRINT_KEY`, a file path in
+     `trimloop.yaml` (servers, containers and CI only), or a
      Kubernetes secret referenced by the Helm chart.
    - The team collector never needs the key; detectors there compare codes
      only. A hosted collector never receives it.
@@ -39,7 +40,7 @@ made.
 4. **Names are keyed by default.** File paths, URLs, repo, branch, MCP server
    and MCP tool names are sent as keyed hashes. An organisation may opt in to
    plain text per field (`privacy.plain_names`: any of `repo`, `branch`, `path`,
-   `url`, `mcp`) for
+   `url`, `mcp`, `developer`, `alias`) for
    readable team dashboards. The harness's built-in tool names stay plain.
 5. **Evidence is typed.** Finding evidence holds ids, codes and counts only —
    no free text.
@@ -57,9 +58,11 @@ made.
 | Learning names from a database leak, a backup, or a hosted collector | Patterns: counts, sizes, timing, costs, and which sessions share an unnamed item |
 | Linking codes across organisations (different keys give different codes) | Plain-text fields an organisation has opted in to |
 
-The documented promise becomes: **Trimloop's servers cannot read your code or
-your names, and cannot test guesses against them.** It does not claim that
-nothing can be inferred from usage patterns.
+The documented promise, stated per mode in [ADR 0019](0019-fingerprint-key-management.md):
+in hosted mode **Trimloop's servers cannot read your code or your names, and
+cannot test guesses against them**; on a self-hosted collector the same holds
+for anyone without the key. It does not claim that nothing can be inferred
+from usage patterns.
 
 ## Consequences
 

@@ -1,6 +1,6 @@
 # ADR 0016: M1 sidecar operation — output, ordering, forwarded body, history edits
 
-- Status: Proposed
+- Status: Proposed — history-edit joining rule amended by [ADR 0020](0020-session-identity.md); gateway exact hash by [ADR 0025](0025-exact-hash-order-preserving-json.md); storage and delta fallback by [ADR 0022](0022-sidecar-deployment-and-storage.md) and [ADR 0023](0023-content-addressed-plugin-transport.md)
 - Date: 2026-11-05
 - Amends: [ADR 0012](0012-gateway-sessions-and-parity.md) (idle window rule)
 
@@ -46,7 +46,7 @@ The second cold review found gaps that block M1:
 - The Helm sidecar mode gains `persistence` values (volume size, storage
   class) for the DuckDB store; with persistence off, the memory store is used
   and the page says findings are lost on restart.
-- `trimloop report --from http://sidecar:7342` renders the same reports as
+- `trimloop report --from http://sidecar:7342` (one or more endpoints; ADR 0022) renders the same reports as
   `analyse` from a sidecar.
 
 **2. Ordering.**
@@ -66,11 +66,10 @@ The second cold review found gaps that block M1:
   translation for the target provider — plus the provider name, model and
   LiteLLM call id. A `normalize/litellm` envelope parser unwraps it and hands
   the body to the provider parser.
-- At the gateway, `exact_hash` is defined over a **canonical re-serialisation
-  of the provider-bound body** (RFC 8785 JSON with cache markers removed), and
-  the capture records `fidelity = gateway`. Cache-churn detection still works,
-  because any content change changes the canonical form; differences that
-  exist only in whitespace or key order on the wire are not visible.
+- *(Superseded by [ADR 0025](0025-exact-hash-order-preserving-json.md).)*
+  At the gateway, `exact_hash` is computed from the provider-bound body as
+  order-preserving compact JSON, and the capture records `fidelity =
+  gateway`.
 - Whether cache markers survive LiteLLM's translation is checked per LiteLLM
   version by the conformance kit.
 
@@ -89,7 +88,7 @@ It is bounded by the open-session LRU and the idle window.
 **6. History edits.** Sessionising matches a new request to an open session
 when it shares the conversation root and its history starts with **any
 prefix** of that session's last request — not necessarily all of it. The
-point where it diverges is recorded as a `history_edit` event (clearing,
+point where it diverges is recorded in the turn's `history_edit_at` field (clearing,
 compaction, truncation). P01 counts cache breaks at a `history_edit` as their
 own root cause ("context editing"), not as churn in the memory file.
 

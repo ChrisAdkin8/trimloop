@@ -1,6 +1,6 @@
 # ADR 0018: Rollout refinements — experiment buckets, sub-agents, rejection trigger, tool sorting
 
-- Status: Proposed
+- Status: Proposed — bucket input amended by [ADR 0020](0020-session-identity.md); `sort_tools` gate by [ADR 0021](0021-decide-body-ops-and-policy-signing.md)
 - Date: 2026-11-05
 - Amends: [ADR 0013](0013-decide-path-and-transform-safety.md)
 
@@ -31,7 +31,8 @@ moved to L3 — and sorting can move a cache marker placed on a tool entry.
   marker (or the marker is kept on the same tool after sorting) and the
   provider profile does not mark tool order as significant. Each provider
   profile states whether tool order affects behaviour; until the conformance
-  kit confirms it does not, `sort_tools` runs in shadow mode only.
+  kit confirms it does not, `sort_tools` runs in shadow mode only. *(Superseded
+  by ADR 0021: the gate is a canary on gateway quality signals and cost.)*
 
 ## Consequences
 
