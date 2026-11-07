@@ -54,8 +54,11 @@ func appendLog(t *testing.T, log *source.Log, content string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
 	if _, err := f.WriteString(content); err != nil {
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil { // a write is only safe once Close succeeds
 		t.Fatal(err)
 	}
 }
@@ -154,7 +157,10 @@ func TestLinesMissingFile(t *testing.T) {
 func TestLinesStopsEarly(t *testing.T) {
 	log := writeLog(t, line("a", 1)+line("b", 2))
 	n := 0
-	for range Lines(log, parse) {
+	for _, err := range Lines(log, parse) {
+		if err != nil {
+			t.Fatal(err)
+		}
 		n++
 		break
 	}

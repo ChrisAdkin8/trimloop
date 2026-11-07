@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -247,10 +248,24 @@ func TestDuration(t *testing.T) {
 
 func TestReportRuns(t *testing.T) {
 	var buf bytes.Buffer
-	report(&buf, stats{logs: 1}, nil, detectors.ContextSize{}, detectors.LongPause{})
+	if err := report(&buf, stats{logs: 1}, nil, detectors.ContextSize{}, detectors.LongPause{}); err != nil {
+		t.Fatal(err)
+	}
 	for _, want := range []string{"COST BY TOKEN CLASS", "P19 ", "P09 "} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}
+	}
+}
+
+// failingWriter fails every write, like a closed pipe or a full disk.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
+
+func TestReportReturnsWriteError(t *testing.T) {
+	err := report(failingWriter{}, stats{logs: 1}, nil, detectors.ContextSize{}, detectors.LongPause{})
+	if err == nil {
+		t.Fatal("got no error from a writer that always fails")
 	}
 }

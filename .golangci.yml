@@ -1,0 +1,24 @@
+# golangci-lint v2 configuration. Run through scripts/check.sh.
+version: "2"
+
+linters:
+  # standard: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - errorlint # errors wrapped with %w and compared with errors.Is / As
+    - misspell
+    - revive    # naming and doc comments
+    - unparam   # parameters that always receive the same value
+  settings:
+    errcheck:
+      # Reports are written through a bufio.Writer, whose first write error
+      # is kept and returned by Flush, which is checked. Checking every
+      # Fprintf as well would add noise without catching anything more.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+formatters:
+  enable:
+    - gofmt

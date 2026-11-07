@@ -29,7 +29,7 @@ func Lines(log *source.Log, parse ParseFunc) iter.Seq2[source.Message, error] {
 			yield(source.Message{}, err)
 			return
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }() // read-only: closing cannot lose data
 
 		info, err := f.Stat()
 		if err != nil {
@@ -63,7 +63,7 @@ func Lines(log *source.Log, parse ParseFunc) iter.Seq2[source.Message, error] {
 			}
 			m, ok, err := parse(line)
 			if err != nil {
-				if !yield(source.Message{}, fmt.Errorf("at byte %d: %w: %v", start, source.ErrBadLine, err)) {
+				if !yield(source.Message{}, fmt.Errorf("at byte %d: %w: %w", start, source.ErrBadLine, err)) {
 					return
 				}
 				continue

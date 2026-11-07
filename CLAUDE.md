@@ -3,7 +3,9 @@
 Trimloop is building M0 (`trimloop analyse`): the design documents are the
 spec, and a Go prototype lives in `cmd/`, `internal/` and `pkg/`. Run it with
 `go run ./cmd/trimloop/` (the package, not `main.go`) and test with
-`go test ./...`.
+`go test ./...`. Before a commit, run `scripts/check.sh` (gofmt, vet,
+golangci-lint per `.golangci.yml`, race tests, govulncheck; `--offline` skips
+govulncheck) and keep it passing.
 
 - Read `docs/design.md` first; `docs/patterns.md` and `docs/data-model.md` hold
   the detail. Decisions live in `docs/adr/` — add a new ADR rather than

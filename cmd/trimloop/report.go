@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"strings"
@@ -11,8 +12,11 @@ import (
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
-// report prints the cost summary and the findings.
-func report(w io.Writer, st stats, sessions []event.Session, ctx detectors.ContextSize, pause detectors.LongPause) {
+// report prints the cost summary and the findings to out. It writes through a
+// bufio.Writer, which keeps the first write error; the error Flush returns is
+// the only one that needs checking.
+func report(out io.Writer, st stats, sessions []event.Session, ctx detectors.ContextSize, pause detectors.LongPause) error {
+	w := bufio.NewWriter(out)
 	turns, unpriced := 0, 0
 	for _, s := range sessions {
 		for _, t := range s.Turns {
@@ -74,6 +78,7 @@ func report(w io.Writer, st stats, sessions []event.Session, ctx detectors.Conte
 
 	fmt.Fprintln(w, "\nSavings are upper bounds: some context is needed, and a compacted or new")
 	fmt.Fprintln(w, "session still pays for what it keeps. The two findings overlap, so do not add them.")
+	return w.Flush()
 }
 
 // sessionTable prints the sessions with the largest savings.

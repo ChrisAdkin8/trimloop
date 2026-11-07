@@ -75,9 +75,11 @@ func main() {
 	}
 
 	// 4. Run the findings and print the report.
-	report(os.Stdout, st, sessions,
+	if err := report(os.Stdout, st, sessions,
 		detectors.FindContextSize(sessions, contextThreshold, topSessions),
-		detectors.FindLongPauses(sessions, pauseGap, topSessions))
+		detectors.FindLongPauses(sessions, pauseGap, topSessions)); err != nil {
+		log.Fatal(err)
+	}
 }
 
 // stats counts what was read.

@@ -98,6 +98,16 @@ and the DuckDB CLI. `--with-collector` also checks Docker for the team
 collector stack; `--skip-node` and `--skip-python` skip those parts. Re-running
 is safe: anything already at the minimum version is left alone.
 
+Before committing Go changes, run the code checks:
+
+```bash
+scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, govulncheck
+scripts/check.sh --offline   # the same without govulncheck, which needs network
+```
+
+It runs every check even when one fails, lists the failures at the end and
+exits 1 if there are any. The linters are set in [.golangci.yml](.golangci.yml).
+
 ## Documents
 
 | Doc | What's in it |
