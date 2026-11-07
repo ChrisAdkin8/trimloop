@@ -18,7 +18,10 @@ findings report with estimated savings. No proxy, no server.
   references ([ADR 0017](docs/adr/0017-content-addressed-segments.md)).
 - Normaliser: segmenting, redaction, fingerprinting, pricing.
 - DuckDB store.
-- Detectors P01–P07, P09 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md)).
+- Detectors P01–P07, P09, P10, P12, P14 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
+  [ADR 0028](docs/adr/0028-harness-recorded-signals.md)).
+- Reader also takes the harness's own cost and compaction records;
+  reconciliation with them is the reader's acceptance test (ADR 0028).
 - CLI report (terminal + static HTML).
 - Minimal conformance runner: profile schema, capability claims against
   fixtures, golden events — so the M0 profiles pass it before being enabled.
@@ -114,7 +117,7 @@ the sidecar causes zero failed model calls.
 - Shadow → canary → on rollout, kill switch, signed policies.
 - L2 transforms: deterministic tool ordering, cache-breakpoint placement
   within provider limits, TTL selection, cache keys.
-- Detectors P08–P12.
+- Detectors P08, P11; full-fidelity P10 and P12.
 
 ## M4 — Local proxy and broader coverage
 
@@ -130,7 +133,7 @@ the sidecar causes zero failed model calls.
 - L3 transforms behind opt-in: moving volatile segments, output truncation
   with pointers, model routing, thinking-budget caps. At a gateway only once
   developer-side outcome signals can be joined to gateway sessions.
-- Detectors P13–P18 (P16–P18: skill and documentation-retrieval
+- Detectors P13, P15–P18 and full-fidelity P14 (P16–P18: skill and documentation-retrieval
   recommendations, ADR 0007).
 - Optional hosted collector.
 

@@ -55,4 +55,5 @@ The third cold review found two gaps in the privacy model:
 - Administrators need the key to see who a code belongs to, which is the
   intended trade-off.
 - A credential-store prompt may appear the first time `trimloop` runs.
-- The fingerprint label registry gains `developer` and `alias`.
+- The fingerprint label registry gains `developer` and `alias` (and, with
+  ADR 0028, `skill` and `plugin`).

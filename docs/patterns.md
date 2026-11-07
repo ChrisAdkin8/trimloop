@@ -25,14 +25,14 @@ neutral, so P01 and P02 describe each provider cache model.
 | P04 | Oversized tool output | M0 | Go | 3 |
 | P05 | Tool-call loops | M0 | Go | 0 |
 | P06 | Unused tool definitions | M0 | SQL | 1 |
-| P07 | Bloated standing context | M0 | SQL | 1 |
+| P07 | Bloated standing and injected context | M0 | SQL | 1 |
 | P08 | Stale context | M3 | Go | 3 |
 | P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
-| P10 | Compaction thrash | M3 | Go | 1 |
+| P10 | Compaction thrash | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |
 | P11 | Post-failure burn | M3 | Go | 0 |
-| P12 | Retry storms | M3 | Go | 1 |
+| P12 | Retry storms | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |
 | P13 | Model over-provisioning | M4 | Go | 3 |
-| P14 | Thinking-budget overspend | M4 | Go | 3 |
+| P14 | Thinking-budget overspend | M0 reduced, M4 full ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 3 |
 | P15 | Duplicated exploration across a team | M4 | SQL | 1 |
 | P16 | Repeated workflow (skill candidate) | M4 | Go + SQL | 1 |
 | P17 | Repeated instructions | M4 | SQL | 1 |
@@ -187,16 +187,20 @@ when uncached).
 **Fix:** L1 — diff to disable the MCP server, or the specific tools, for that
 repo.
 
-## P07 — Bloated standing context
+## P07 — Bloated standing and injected context
 
-**What happens:** Memory files, system rules and instructions sent on every
-request are much larger than needed.
+**What happens:** Memory files, system rules, tool definitions and the context
+the harness injects (skill listings, MCP instructions, environment and sandbox
+text, agent listings, reminders) are much larger than needed.
 
 **Signals:** Standing-context segments (system prompt + memory files + tool
-definitions) above a threshold share of total input tokens.
+definitions) and harness-injected kinds above a threshold share of total
+input tokens. Where `harness.injected_context` is available, each injected
+kind is sized separately.
 
 **Detection:** Per repo: standing tokens ÷ total input tokens; list the largest
-contributors.
+contributors by kind — memory file, system prompt, tool definitions, and each
+injected kind — so the fix names the skill, plugin or MCP server.
 
 **Saving:** Hard to estimate precisely; reported as an upper bound with low
 confidence.
@@ -252,10 +256,16 @@ request has no safe, defined operation.)
 repeatedly, each time paying for the summary and losing cache.
 
 **Signals:** Several compaction events per session; short intervals between
-them.
+them. Where the harness records compaction (`harness.compaction`): tokens
+before and after, tokens dropped, and the time each compaction took.
+
+**Detection:** From harness compaction records (M0), else from history
+fingerprints that reset while the system prompt is unchanged.
 
 **Fix:** L1 — recommend splitting the task, trimming standing context (P07),
-or tackling P04 and P08 first.
+or tackling P04 and P08 first; report what each compaction kept and cost.
+
+**Requires:** `harness.compaction` **or** `request.full_body`.
 
 ## P11 — Post-failure burn
 
@@ -273,10 +283,17 @@ session ends without a commit.
 retries, each re-sending the full request.
 
 **Signals:** Several error responses with the same request fingerprint within
-seconds.
+seconds; or, where the harness records retries (`harness.retries`), retry
+attempts, delays and causes per turn, and time spent retrying.
+
+**Detection:** From harness retry records (M0), else from repeated request
+fingerprints.
 
 **Fix:** L1 — recommend backoff or concurrency settings; alert on rate-limit
 headroom.
+
+**Requires:** `harness.retries` **or** `request.full_body`. **Optional:**
+`timing.per_turn`.
 
 ## P13 — Model over-provisioning
 
@@ -298,9 +315,15 @@ recommends that configuration.
 
 **What happens:** Extended reasoning tokens are spent on trivial turns.
 
-**Signals:** Reasoning tokens high on turns labelled low-complexity.
+**Signals:** Reasoning tokens high on turns labelled low-complexity. In
+reduced fidelity (M0): reasoning tokens and output cost by requested effort
+level (`request.effort`), and the share spent at the highest levels.
 
-**Fix:** L3 (M4, op `cap_thinking`) — cap the budget per turn class; canary-gated. Until then, L1.
+**Fix:** L1 (M0) — report spend by effort level and recommend a lower
+default or per-turn effort where the harness supports it. L3 (M4, op
+`cap_thinking`) — cap the budget per turn class; canary-gated.
+
+**Requires:** `usage.reasoning`. **Optional:** `request.effort`.
 
 ## P15 — Duplicated exploration across a team
 

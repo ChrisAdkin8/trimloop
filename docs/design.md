@@ -270,6 +270,11 @@ locally:
 | User interrupted or re-prompted with a correction | transcript |
 | Session abandoned (no commit, short, ended mid-task) | heuristic |
 | Edits reverted within 24 h | git |
+| Lines added and removed | harness record (`outcome.lines_changed`) |
+| Tool error rate, tool denials | tool-call results, harness record |
+| Prompts queued while the agent was busy | harness record |
+| Edits that collided with the user's own changes | tool-call results |
+| Time spent in retries | harness record (`harness.retries`) |
 
 At a gateway, git and test signals are not visible. Gateway rollouts use what
 the gateway can see: provider error and retry rates, tool-call error rate,

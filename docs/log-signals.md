@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Analysis, 2026-11-07 — informs decisions, makes none |
+| Status | Analysis, 2026-11-07 — its §4 proposals were adopted in [ADR 0028](adr/0028-harness-recorded-signals.md) |
 | Sample | One developer's machine: 598 logs (445 main sessions, 176 sub-agent logs), ~16,000 turns, $2,021 at list prices; Claude Code versions 2.1.288–2.1.318 |
 | Method | Structure-only survey (field names, counts, sizes, timings); no prompt or file content was read |
 | Builds on | [ADR 0027](adr/0027-measured-m0-findings.md) (measured P19 and P09), the M0 prototype's report, [patterns.md](patterns.md), [analyzer.md §10](analyzer.md#10-extensibility-harnesses-and-providers) |

@@ -427,6 +427,16 @@ the two.
 | `content.local` | Raw text readable on this machine when a recommendation is rendered (transcripts on disk, or full local capture) | Local shapes only |
 | `outcome.git` | Git outcomes linkable to sessions | Local shapes only |
 | `timing.per_turn` | Request and response timestamps | All |
+| `timing.turn_duration` | Wall-clock duration per turn | Harness records; proxy, gateway |
+| `harness.cost_record` | The harness's own per-session usage and cost, including calls it did not log as turns ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Claude Code transcripts |
+| `harness.injected_context` | Context the harness adds, recorded by kind with sizes | Claude Code transcripts |
+| `harness.compaction` | Compaction events with before and after token counts | Claude Code transcripts |
+| `harness.retries` | Retry attempts, delays and causes | Claude Code transcripts |
+| `request.shape_hash` | Harness identifier for the system prompt and tool list as sent | Claude Code transcripts |
+| `request.effort` | Reasoning effort or budget per request | Claude Code transcripts; request body at a gateway |
+| `session.origin` | Who or what started each turn (person, automation, notification, schedule) | Harness records |
+| `usage.server_tools` | Server-side tool requests (web search, fetch) in usage | Anthropic |
+| `outcome.lines_changed` | Lines added and removed, recorded by the harness | Claude Code transcripts |
 
 Each capability has one **owner**: the provider profile (usage fields, cache
 markers), the harness profile (logs, config, skills, repo context) or the shape
@@ -515,7 +525,9 @@ memory_files: ["CLAUDE.md", "CLAUDE.local.md"]
 config_files: [".mcp.json", ".claude/settings.json"]
 skills: { kind: skill_md, paths: [".claude/skills/", "~/.claude/skills/"] }
 capabilities: [session.explicit_id, context.repo, harness.config, harness.skills,
-               content.local, outcome.git]
+               content.local, outcome.git, harness.cost_record, harness.injected_context,
+               harness.compaction, harness.retries, request.shape_hash, request.effort,
+               session.origin, outcome.lines_changed, timing.turn_duration]
 capabilities_by_version:
   ">=2.1.288": [request.full_body]   # api-request records seen from this version
 detect_capabilities: true            # the reader also checks each transcript and reports what it found
@@ -544,7 +556,10 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P04 Oversized tool output | `response.tool_calls` | — |
 | P05 Tool-call loops | `response.tool_calls` | `outcome.git` |
 | P06 Unused tool definitions | `response.tool_calls`, and `request.full_body` **or** `harness.config` | `context.repo` |
-| P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `content.local` |
+| P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `harness.injected_context`, `content.local` |
+| P10 Compaction thrash | `harness.compaction` **or** `request.full_body` | — |
+| P12 Retry storms | `harness.retries` **or** `request.full_body` | `timing.per_turn` |
+| P14 Thinking-budget overspend | `usage.reasoning` | `request.effort`, `outcome.git` (turn-complexity classes, M4) |
 | P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |
 | P17 Repeated instructions | — | `content.local`, `harness.skills` |
 | P18 Hot documentation | `response.tool_calls` | `content.local`, `harness.skills` |
@@ -604,7 +619,7 @@ capture:
 fingerprint:
   key: keychain            # developer machines: keychain only; servers/CI: file:PATH | env:TRIMLOOP_FINGERPRINT_KEY (ADR 0024)
 privacy:
-  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp, developer, alias
+  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp, developer, alias, skill, plugin
 sources:
   claude_code: { enabled: true }
   codex:       { enabled: true }
@@ -707,8 +722,10 @@ Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 
 1. **M0 — `trimloop analyse`:** `pkg/event`, `normalize/anthropic`,
    `redact`, `fingerprint` (keyed) and `trimloop key init`, `price`, Claude
-   Code `Reader`, DuckDB and memory stores, incremental re-runs, detectors
-   P01–P05, P09 and P19 (Go) and P06–P07 (aggregates), text and HTML
+   Code `Reader` (turns, cost and compaction records), reconciliation with
+   the harness cost record, DuckDB and memory stores, incremental re-runs,
+   detectors P01–P05, P09, P10, P12, P14 and P19 (Go) and P06–P07
+   (aggregates), text and HTML
    reports, a minimal
    conformance runner (schema, capability claims, golden events), release
    pipeline dry-run.

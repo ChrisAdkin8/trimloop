@@ -33,6 +33,10 @@ One run of a harness, from start to exit (or resume chain).
 | `resumed_from` | string? | Links resume chains (P09) |
 | `kind` | enum | `main`, `subagent` or `auxiliary` ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)) |
 | `parent_session_id` | string? | Parent of a `subagent` session |
+| `entrypoint` | string? | How the harness was started: `cli`, `desktop`, `ide`, `sdk` ([ADR 0028](adr/0028-harness-recorded-signals.md)) |
+| `agent_type` / `spawn_depth` | string? / int? | For sub-agents, from the harness's agent record |
+| `harness_cost` | json? | The harness's own per-model usage and cost for the session (`harness.cost_record`); reconciled against Trimloop's totals |
+| `lines_added` / `lines_removed` | int? | From the harness record (`outcome.lines_changed`) |
 | `capture_source` | enum | `proxy`, `otel`, `transcript`, `gateway` |
 
 ### Turn
@@ -47,6 +51,15 @@ One model request and its response.
 | `provider` | enum | `anthropic`, `openai`, `google`, … |
 | `provider_request_id` | string? | Provider or gateway request id, where available — de-duplicates the same turn seen by two taps |
 | `response_id` | string? | Provider response or message id — usage is counted once per response |
+| `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`) |
+| `effort` | string? | Reasoning effort or budget requested (`request.effort`) |
+| `requested_model` | string? | Model asked for, where it differs from `model` (fallbacks) |
+| `stop_reason` | string? | As reported by the provider |
+| `shape_hash` | string? | Harness identifier for the system prompt and tool list (`request.shape_hash`) |
+| `cache_ttl_requested` | string? | Cache lifetime asked for, e.g. `5m`, `1h` |
+| `history_keep` | int? | Messages kept from the previous request when the harness edited history |
+| `duration_ms` | int? | Wall-clock turn duration (`timing.turn_duration`) |
+| `server_tool_requests` | json? | Server-side tool requests by kind (`usage.server_tools`), priced per request |
 | `provider_profile` | string | API surface, e.g. `anthropic-messages`, `openai-responses`; selects parser and cache model ([analyzer.md §10.2](analyzer.md#102-provider-profiles)) |
 | `model` | string | As sent |
 | `request_at` / `first_token_at` / `completed_at` | timestamp | Latency analysis |
@@ -194,6 +207,13 @@ Rules:
   every line of a multi-block message — are de-duplicated, across all logs a
   run reads, not per log ([ADR 0026](adr/0026-usage-dedup-across-logs.md)).
 - For streamed responses, only the final usage is used.
+- Where the harness keeps its own cost record (`harness.cost_record`), calls
+  it billed but did not log as turns — Claude Code's title generation, for
+  example — are added as `auxiliary` turns with the harness's usage and
+  model. The reader's acceptance test is **reconciliation**: per session and
+  token class, Trimloop's totals match the harness record within 2 %,
+  auxiliary calls included; the report shows unobserved spend where they do
+  not ([ADR 0028](adr/0028-harness-recorded-signals.md)).
 - The Anthropic row was confirmed against usage blocks in local Claude Code
   transcripts (2026-11-05). The OpenAI and Gemini rows are from provider
   documentation and must be confirmed by recorded fixtures (conformance kit).
@@ -282,6 +302,8 @@ Label registry — no other labels may be used:
 | `developer` | Stable developer identity (git email, else OS user ‖ machine id) | `developer_id` ([ADR 0024](adr/0024-developer-identity-and-key-handling.md)) |
 | `alias` | Gateway key alias or team name | Principal, gateway grouping |
 | `diff` | Normalised unified diff of the working tree (local only) | Diff progress (P05, P11) |
+| `skill` | Skill name | Skill attribution, skill listings |
+| `plugin` | Plugin name | Plugin attribution |
 | `key-id` | Empty | `fp_key_id`: first 8 hex characters |
 
 A **request fingerprint** (P12) is the turn's final exact prefix-chain value;
@@ -371,7 +393,7 @@ In the default `hashes` capture mode, the team collector receives:
   kinds.
 - Names as keyed hashes: file paths, URLs, repo, branch, MCP server and MCP
   tool names. Each can be sent in plain text only if the organisation opts in
-  for that field (`privacy.plain_names`: `repo`, `branch`, `path`, `url`,
+  for that field (`privacy.plain_names`: `skill`, `plugin`, `repo`, `branch`, `path`, `url`,
   `mcp` — MCP server and tool names — `developer` and `alias`).
 - Developer ids and gateway key aliases as keyed hashes; the mapping to
   people stays on the customer side ([ADR 0024](adr/0024-developer-identity-and-key-handling.md)). The harness's own built-in tool names
@@ -396,6 +418,7 @@ described in [packaging.md](packaging.md#bundled-components).
 ## Price catalogue
 
 A versioned YAML file of per-model prices by token class (input, output, cache
-write by TTL, cache read) with effective dates. Shipped with each release and
+write by TTL, cache read) and per-request prices for server-side tools (web
+search, web fetch), with effective dates. Shipped with each release and
 overridable for negotiated rates. Every cost figure records the catalogue
 version used.
