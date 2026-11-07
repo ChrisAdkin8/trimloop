@@ -2,7 +2,9 @@
 
 Each pattern has an ID, the signals that reveal it, how it is detected, how the
 saving is estimated, and the fix (with the actuator safety level from
-[design.md §7](design.md#7-actuators-fixing-things)).
+[design.md §7](design.md#7-actuators-fixing-things)). How Trimloop chooses
+among a pattern's fixes, keeps cuts failure-preserving and measures the
+result is set by [ADR 0030](adr/0030-how-fixes-are-chosen.md).
 
 "Prefix" means the leading part of a request that a provider can serve from its
 prompt cache. Anything that changes inside the prefix invalidates the cache
@@ -22,7 +24,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P01 | Cache-prefix churn | M0 | Go | 3 |
 | P02 | Cache TTL expiry | M0 | Go | 2 |
 | P03 | Repeated file reads | M0 | Go | 1 |
-| P04 | Oversized tool output | M0 | Go | 3 |
+| P04 | Oversized and noisy tool output | M0 | Go | 3 |
 | P05 | Tool-call loops | M0 | Go | 0 |
 | P06 | Unused tool definitions | M0 | SQL | 1 |
 | P07 | Bloated standing and injected context | M0 | SQL | 1 |
@@ -129,28 +131,107 @@ the file changed (the fingerprint differs).
   key facts; or flag the harness behaviour upstream.
 - No L2: replacing a re-read with a reference changes what the model sees.
 
-## P04 — Oversized tool output
+## P04 — Oversized and noisy tool output
 
-**What happens:** A tool returns an enormous result (full test log, recursive
-directory listing, minified bundle, large JSON) that the model barely uses.
+**What happens:** A tool returns much more than the agent needed — a whole
+file, a broad search, a verbose build log, a data dump. The cost is not paid
+once: the output stays in the conversation, so every later turn re-sends it
+(at cache-read price while the cache holds, at cache-write price whenever it
+is rebuilt). It also makes the context large sooner (P19) and every cache
+re-write after a pause bigger (P09).
 
-**Signals:** A tool-result segment above a size threshold (default 8k tokens),
-especially when the next assistant turn references only a small part of it.
+Most of the cost is **volume times how long it is carried**, not single huge
+results. Claude Code already caps what the model sees of one result (about
+30 KB; larger output is saved to disk), so a single dump is bounded; thousands
+of moderate outputs carried for hundreds of turns are not.
 
-**Detection:** Size threshold, plus a ratio of tokens in the result to tokens
-in the follow-up action.
+**In the founder's sample** (one developer, ≈ $2,021 of spend; program names
+only, no command text or output read):
 
-**Saving:** Tokens above the threshold × input price on the turn it arrives,
-plus, for each later turn that carries it in history, the same tokens at that
-turn's price for them — usually the cache-read rate when the prefix was
-cached.
+| Source | Calls | Output on arrival | Carried cost (est.) |
+|---|---|---|---|
+| Bash | 12,994 | 28.6 MB | ≈ $197 |
+| Read tool | 1,641 | 17.2 MB | ≈ $136 |
+| MCP, WebSearch, WebFetch, other | — | 7.7 MB | ≈ $46 |
 
-**Fix:**
-- L1: suggest command flags (`--quiet`, `| tail -n 200`, test reporter
-  settings) via a memory-file or settings diff.
-- L3 (M4, op `truncate_tool_result`): truncate with head + tail + a pointer
-  the agent can use to fetch the rest. Behaviour-changing, so opt-in only.
-  Until the op ships, L1 only.
+The noisiest Bash programs were file viewing and searching, not builds or
+tests: `sed` (mostly `sed -n 'X,Yp' file`) $57, `grep` $31, inline `python3`
+$23, `cat` $19. Of 5,377 file views (Read, `cat`, `sed -n`, `head`, `tail`),
+38 % re-read a file already seen in the same session (P03). Half or more of
+these commands were already piped through a filter; the waste is whole-file
+views, broad searches and repeats.
+
+**Kinds of noise:**
+
+| Kind | Example shapes | Recommended fix |
+|---|---|---|
+| File viewing through the shell | `cat`, `sed -n`, `head -n`, `tail -n` on a file | Use the harness's file-read tool with offset and limit; read only the lines needed; avoid re-reading an unchanged file (P03) |
+| Broad searches | `grep -r`, `ls -R`, `find` | `grep -l`, `-m N`, a narrower path, or the harness's search tool with a result limit |
+| Build, test and install logs | `go test -v`, `npm install`, `docker build`, `pytest -v` | Quiet flags, failures only, `\| tail -n 50` |
+| Data dumps | inline scripts printing whole structures, `gh api`, `curl` JSON, `kubectl get -o yaml` | Filter first (`jq`, selected fields) |
+| Repeated polling | the same status or log command again and again | Check less often or wait for the event (P05) |
+
+**Signals:**
+- A tool result's size (bytes and estimated tokens), and how many later turns
+  carry it before the session ends or is compacted.
+- For shell tools, the **command shape**: program, subcommand and the flags
+  that change output size (`sed -n`, `grep -r`, `go test -v`), and whether
+  the output was already piped through a filter.
+- For file views, the file (as a keyed `path`) and whether it was already
+  viewed, unchanged, in the session.
+- Results the harness saved to disk because they exceeded its cap
+  (Claude Code: `persistedOutputPath`, `persistedOutputSize`).
+
+**Detection:** Per tool result, compute its **carried cost**: its tokens at
+the arrival turn's write price, plus its tokens at each later turn's price
+for cached history, until the session ends or is compacted. Group by tool
+and, for shell tools, by command shape; rank groups by carried cost. Command
+shapes are derived on the developer's machine from the command text; only
+the keyed shape code (`fp("cmd.shape", …)`), sizes and costs leave it
+(ADRs [0011](adr/0011-keyed-fingerprints.md),
+[0024](adr/0024-developer-identity-and-key-handling.md)).
+
+**Saving:** For each group, the carried cost of the tokens above a target
+size per result (default 2k tokens), as an upper bound. Reported as part of
+P19's breakdown of what fills the context; never added to P19's saving.
+
+**Fix:** chosen and presented by the fix ladder of
+[ADR 0030](adr/0030-how-fixes-are-chosen.md): one primary fix and up to two
+alternatives of different kinds, all failure-preserving, measured after.
+
+| Kind | Level | Fixes for noisy output | Claude Code rendering |
+|---|---|---|---|
+| `source` | L1 | Make the tool print less: quiet flags (`-q`, `--silent`), a failures-only test reporter, a small wrapper script that prints a summary and the failures; filter data at the source (`jq`, selected fields, `--limit`); configure MCP servers to return summaries or pages; disable MCP tools the repo never uses (P06) | A diff adding the wrapper script or flags; an MCP configuration change |
+| `structure` | L1 | Keep noise out of the main session: delegate exploration (wide searches, many file reads) to a sub-agent, whose summary is all that returns; compact or start a new session after an exploring phase (P19); tune when old tool output is cleared | A memory-file line asking for sub-agents on exploration; context-management settings where the harness exposes them |
+| `enforce` | L1 | Stop or rewrite the noisy action: warn or block with a reason (for example, "use Read with a line range instead of `cat` on a 3,000-line file"), or add a filter | A pre-tool hook; it can warn or block, and on versions that support it, rewrite the command |
+| `cap` | L1 | A hard per-result output limit | The harness's output-length settings for shell and MCP results (names per harness version, held in the harness profile) |
+| `advise` | L1 | Instructions per kind of noise (table above) | A memory-file line, for example *"View files with the Read tool, using offset and limit; don't use `cat` or `sed` to view files. Pipe long command output through `tail -n 100`."* |
+| `trim` | L3 (M4) | Op `truncate_tool_result`: keep head and tail plus a pointer the agent can use to fetch the rest; opt-in, canary-gated | — (applied in the request path) |
+
+Until `truncate_tool_result` ships, P04's fixes are L1.
+
+**Choosing among them.** `advise` is cheapest and often enough;
+`enforce` is the step up when the habit persists; `source` and
+`structure` last longest where the tool or the way of working can change;
+`cap` is blunt and is offered last among the L1 kinds. For the founder's
+sample, the primary fix is `advise` (Read with ranges) with `structure`
+(sub-agents for exploration) and `enforce` (a hook on `cat` and `sed -n`) as
+alternatives — together aimed at about $76 of carried cost and much of the
+38 % of repeat file views.
+
+**Cautions** (ADR 0030):
+- **Keep failures visible.** A filter or cap that hides the failing line
+  makes the agent re-run commands or read more files. Templates keep exit
+  status, error output and the end of test and build runs, where failures
+  are summarised.
+- **Measure after.** After a fix is applied, compare the same command
+  shape's carried cost over the next week of activity, and watch for re-runs
+  of the same shape, more turns per session and more tool errors. No saving:
+  escalate (`advise` → `enforce` → `cap`). Side effects: roll back.
+
+**Requires:** `response.tool_calls`. **Optional:** `content.local` (command
+shapes and file paths, derived locally), `harness.compaction` (where
+carrying stops).
 
 ## P05 — Tool-call loops
 

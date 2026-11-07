@@ -228,7 +228,9 @@ ones for the MVP:
 - **Cache TTL expiry**: idle gaps longer than the cache lifetime, forcing
   re-writes.
 - **Repeated reads**: the same file fingerprint entering context N times.
-- **Oversized tool output**: huge test logs, directory listings, JSON dumps.
+- **Oversized and noisy tool output**: whole-file views and broad searches
+  through the shell, verbose build and test logs, data dumps — costed by how
+  long each result is carried.
 - **Unused tool definitions**: MCP tools sent on every request, never called.
 - **Loops**: repeated identical tool calls, or edit → test → fail cycles with
   no diff progress.
@@ -240,7 +242,10 @@ Aggregates findings across sessions, developers and repos, then:
 1. **Groups** findings by root cause, e.g. 312 cache-churn findings across 14
    developers all trace to the same line in one repo's CLAUDE.md that embeds a
    timestamp.
-2. **Ranks** by estimated weekly saving × confidence ÷ effort to fix.
+2. **Ranks** by estimated weekly saving × confidence ÷ effort to fix, and
+   chooses each recommendation's fix by the fix ladder: one primary fix and
+   up to two alternatives of different kinds, all failure-preserving
+   ([ADR 0030](adr/0030-how-fixes-are-chosen.md)).
 3. **Describes** the fix as a template id plus keyed parameters (which
    segment, which line hash, which MCP server). The collector holds no
    content, so it cannot write the change itself.
@@ -252,7 +257,9 @@ Aggregates findings across sessions, developers and repos, then:
    recommendation's title, saving and template text in the dashboard; any
    developer who runs `trimloop recommendations` in the repo gets the diff.
 5. **Tracks** whether it was applied and the measured saving afterwards
-   (before/after on the same repo and developer cohort).
+   (before/after on the same repo and developer cohort), with side effects;
+   escalates to a stronger fix kind when no saving is seen, and recommends a
+   roll-back when side effects rise (ADR 0030).
 
 This closed loop — recommend, apply, measure — is the core product. It is what
 none of the existing tools do.

@@ -553,7 +553,7 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P01 Cache-prefix churn | `usage.cache_read` | `request.full_body`, `usage.cache_write`, `request.cache_markers` |
 | P02 Cache TTL expiry | `usage.cache_read`, `timing.per_turn` | `usage.cache_write` |
 | P03 Repeated file reads | `response.tool_calls` | `request.full_body` |
-| P04 Oversized tool output | `response.tool_calls` | — |
+| P04 Oversized and noisy tool output | `response.tool_calls` | `content.local`, `harness.compaction` |
 | P05 Tool-call loops | `response.tool_calls` | `outcome.git` |
 | P06 Unused tool definitions | `response.tool_calls`, and `request.full_body` **or** `harness.config` | `context.repo` |
 | P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `harness.injected_context`, `content.local` |

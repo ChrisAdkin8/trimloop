@@ -169,11 +169,14 @@ exact change is rendered on a developer machine (design §6.2).
 | `recommendation_id` | string |
 | `root_cause_key` | string |
 | `template_id` | string (per-harness fix template) |
+| `fix_kind` | `source`, `structure`, `enforce`, `cap`, `advise`, `trim` ([ADR 0030](adr/0030-how-fixes-are-chosen.md)) |
+| `alternatives` | json (up to two alternative fixes of other kinds: kind and template id) |
 | `params` | json (keyed hashes and counts the template needs, e.g. segment and line hashes) |
 | `title` / `body` | text (rendered from the template without content) |
 | `est_weekly_saving` | decimal |
-| `status` | `open`, `applied`, `dismissed`, `measured` |
+| `status` | `open`, `applied`, `dismissed`, `measured`, `escalated`, `rolled_back` |
 | `measured_saving` | decimal? (after/before comparison) |
+| `side_effects` | json? (re-runs, turns per session, tool errors, extra reads: before and after) |
 
 ## Usage normalisation
 
@@ -291,6 +294,7 @@ Label registry — no other labels may be used:
 | `line` | One canonical line | `line_hashes` |
 | `args` | Tool-call input, canonical JSON | `args_fingerprint` (P05) |
 | `args.template` | Tool-call input with values replaced by their JSON types | Argument templates (P16) |
+| `cmd.shape` | Shell command shape: program, subcommand and output-size flags, derived locally | Command-shape groups (P04) |
 | `path` | Normalised file path | `source`, P03, P15 |
 | `url` | Normalised URL | `source`, P18 |
 | `repo` | Normalised git remote URL | Session `repo` |
