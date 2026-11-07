@@ -41,6 +41,10 @@ type Recommendation struct {
 	Examples     []string // the shapes or tools that cost most
 	Primary      Fix
 	Alternatives []Fix
+
+	// Check says how to tell whether the fix worked or did harm, where that
+	// needs more than another run (for example, a fix untested for quality).
+	Check string
 }
 
 // ForToolOutput recommends fixes for the kinds of noise in f with the

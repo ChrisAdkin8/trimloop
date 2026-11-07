@@ -64,3 +64,35 @@ func TestForToolOutput(t *testing.T) {
 		t.Errorf("with room for 10: got %d, want 3 (file view, data, web)", len(got))
 	}
 }
+
+func TestForSubAgents(t *testing.T) {
+	f := detectors.SubAgents{Saving: 50, ByType: []detectors.AgentGroup{
+		{Type: "fork", Saving: 0},
+		{Type: "general-purpose", Saving: 50, Alternative: "claude-sonnet-5-5"},
+	}}
+	r, ok := ForSubAgents(f, 1)
+	if !ok || r.Pattern != "P13" || r.Saving != 50 || len(r.Examples) != 1 || r.Examples[0] != "general-purpose" {
+		t.Fatalf("got %+v ok=%v", r, ok)
+	}
+	if !strings.Contains(r.Primary.What, "claude-sonnet-5-5") || r.Check == "" {
+		t.Errorf("fix: got %+v", r)
+	}
+	if _, ok := ForSubAgents(detectors.SubAgents{Saving: 0.5}, 1); ok {
+		t.Error("a saving under the minimum should give no recommendation")
+	}
+}
+
+func TestForCompaction(t *testing.T) {
+	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 1)
+	if !ok || r.Saving != 0 || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
+		t.Errorf("got %+v ok=%v", r, ok)
+	}
+	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 1); ok {
+		t.Error("a cost under the minimum should give no recommendation")
+	}
+	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567"} {
+		if got := thousandsInt(n); got != want {
+			t.Errorf("thousandsInt(%d) = %q, want %q", n, got, want)
+		}
+	}
+}

@@ -76,3 +76,19 @@ func TestCostNotPriced(t *testing.T) {
 		t.Error("fast mode with no published price: got ok")
 	}
 }
+
+func TestCheaper(t *testing.T) {
+	for from, to := range cheaper {
+		if _, ok := catalogue[to]; !ok {
+			t.Errorf("%s: suggested model %s has no price", from, to)
+		}
+		a, _ := Cost(from, event.Usage{InputUncached: 1e6, Output: 1e6}, Options{})
+		b, _ := Cost(to, event.Usage{InputUncached: 1e6, Output: 1e6}, Options{})
+		if b.Total() >= a.Total() {
+			t.Errorf("%s: suggested model %s is not cheaper", from, to)
+		}
+	}
+	if _, ok := Cheaper("claude-sonnet-5-5"); ok {
+		t.Error("the cheapest models should have no suggestion")
+	}
+}

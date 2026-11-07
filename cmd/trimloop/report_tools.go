@@ -46,10 +46,7 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 			fmt.Fprintf(w, " (mostly %s)", printable(strings.Join(r.Examples, ", ")))
 		}
 		fmt.Fprintln(w)
-		fixLine(w, "Fix", r.Primary)
-		for _, alt := range r.Alternatives {
-			fixLine(w, "Or", alt)
-		}
+		printFixes(w, r)
 	}
 	fmt.Fprintln(w, "\n  Check the effect with another run a week after applying a fix.")
 }

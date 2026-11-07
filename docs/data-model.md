@@ -34,7 +34,7 @@ One run of a harness, from start to exit (or resume chain).
 | `kind` | enum | `main`, `subagent` or `auxiliary` ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)) |
 | `parent_session_id` | string? | Parent of a `subagent` session |
 | `entrypoint` | string? | How the harness was started: `cli`, `desktop`, `ide`, `sdk` ([ADR 0028](adr/0028-harness-recorded-signals.md)) |
-| `agent_type` / `spawn_depth` | string? / int? | For sub-agents, from the harness's agent record |
+| `agent_type` / `spawn_depth` | string? / int? | For sub-agents, from the harness's agent record or `harness.attribution`; `fp("agent", …)` unless opted in |
 | `harness_cost` | json? | The harness's own per-model usage and cost for the session (`harness.cost_record`); reconciled against Trimloop's totals |
 | `lines_added` / `lines_removed` | int? | From the harness record (`outcome.lines_changed`) |
 | `capture_source` | enum | `proxy`, `otel`, `transcript`, `gateway` |
@@ -53,6 +53,8 @@ One model request and its response.
 | `response_id` | string? | Provider response or message id — usage is counted once per response |
 | `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`) |
 | `effort` | string? | Reasoning effort or budget requested (`request.effort`) |
+| `repo` | string? | Where the turn ran, when it differs from the session's: sessions can move between repos ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); keyed like Session `repo` |
+| `attribution` | json? | Skill, plugin, MCP server and agent type the harness names as the turn's cause (`harness.attribution`); keyed with `skill`, `plugin`, `mcp` and `agent` unless opted in |
 | `requested_model` | string? | Model asked for, where it differs from `model` (fallbacks) |
 | `stop_reason` | string? | As reported by the provider |
 | `shape_hash` | string? | Harness identifier for the system prompt and tool list (`request.shape_hash`) |
@@ -308,6 +310,7 @@ Label registry — no other labels may be used:
 | `diff` | Normalised unified diff of the working tree (local only) | Diff progress (P05, P11) |
 | `skill` | Skill name | Skill attribution, skill listings |
 | `plugin` | Plugin name | Plugin attribution |
+| `agent` | Agent type name (custom agents can carry private names) | Session `agent_type`, turn attribution |
 | `key-id` | Empty | `fp_key_id`: first 8 hex characters |
 
 A **request fingerprint** (P12) is the turn's final exact prefix-chain value;

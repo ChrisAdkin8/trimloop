@@ -19,7 +19,8 @@ findings report with estimated savings. No proxy, no server.
 - Normaliser: segmenting, redaction, fingerprinting, pricing.
 - DuckDB store.
 - Detectors P01–P07, P09, P10, P12, P14 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
-  [ADR 0028](docs/adr/0028-harness-recorded-signals.md)).
+  [ADR 0028](docs/adr/0028-harness-recorded-signals.md)), and P13 for
+  sub-agents in reduced fidelity ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
 - Reader also takes the harness's own cost and compaction records;
   reconciliation with them is the reader's acceptance test (ADR 0028).
 - CLI report (terminal + static HTML).
@@ -35,22 +36,24 @@ findings report with estimated savings. No proxy, no server.
   packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved by a
   release dry-run of the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)).
 
-**Build order** ([ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md)), by
-value to the user. Done: reader, usage de-duplication, pricing, P19 and P09,
-and item 1.
+**Build order** ([ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md),
+re-ranked from measured spend by [ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
+Done: reader, usage de-duplication, pricing, P19 and P09; P04 (context
+composition by tool and command shape, with fixes from the ADR 0030
+ladder); sub-agent economics and P13 in reduced fidelity; P19 concentration
+and compaction point, with P10 from compaction records; spend by project,
+skill, plugin and MCP server.
 
-1. ~~Context composition by tool (P04; explains P19).~~ Done: carried cost
-   by tool and command shape, re-reads, and fixes from the ADR 0030 ladder.
-2. Reconciliation with the harness cost record, including auxiliary turns.
-3. P14 in reduced fidelity: spend by effort level.
-4. Results kept between runs: findings history, JSON output, saved offsets.
-5. Command-line options: `analyse`, `--since`, `--repo`, `--format`.
-6. P07 with injected context by kind.
-7. P02 cache-lifetime fit.
-8. P10 and P12 from harness records.
-9. P01, P03, P05, P06.
-10. Distribution: installable release, minimal conformance runner, profiles.
-11. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
+1. Reconciliation with the harness cost record: auxiliary and summary
+   requests, web-search fees. Needed before value.md §8 step 2.
+2. P07 with injected context by kind, priced by carried cost.
+3. Results kept between runs: findings history, JSON output, saved offsets.
+4. Command-line options: `analyse`, `--since`, `--repo`, `--format`.
+5. P14 in reduced fidelity: spend by effort level.
+6. P02 cache-lifetime fit.
+7. P03, P06, P01; then P05, P10 in full, P12.
+8. Distribution: installable release, minimal conformance runner, profiles.
+9. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.
@@ -150,7 +153,7 @@ the sidecar causes zero failed model calls.
 - L3 transforms behind opt-in: moving volatile segments, output truncation
   with pointers, model routing, thinking-budget caps. At a gateway only once
   developer-side outcome signals can be joined to gateway sessions.
-- Detectors P13, P15–P18 and full-fidelity P14 (P16–P18: skill and documentation-retrieval
+- Detectors P13 (per-turn routing), P15–P18 and full-fidelity P14 (P16–P18: skill and documentation-retrieval
   recommendations, ADR 0007).
 - Optional hosted collector.
 

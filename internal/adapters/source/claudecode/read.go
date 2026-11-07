@@ -18,10 +18,24 @@ import (
 
 // record is the part of a transcript line that Read uses.
 type record struct {
-	Type      string          `json:"type"`
-	Subtype   string          `json:"subtype"` // system lines: "compact_boundary", ...
-	SessionID string          `json:"sessionId"`
-	Cwd       string          `json:"cwd"`
+	Type      string `json:"type"`
+	Subtype   string `json:"subtype"` // system lines: "compact_boundary", ...
+	SessionID string `json:"sessionId"`
+	Cwd       string `json:"cwd"`
+
+	// Assistant lines: what the harness says caused the turn.
+	AttributionSkill     string `json:"attributionSkill"`
+	AttributionPlugin    string `json:"attributionPlugin"`
+	AttributionMcpServer string `json:"attributionMcpServer"`
+	AttributionAgent     string `json:"attributionAgent"`
+
+	// compact_boundary lines.
+	CompactMetadata *struct {
+		PreTokens  int    `json:"preTokens"`
+		PostTokens int    `json:"postTokens"`
+		Trigger    string `json:"trigger"` // "auto" or "manual"
+		DurationMs int64  `json:"durationMs"`
+	} `json:"compactMetadata"`
 	Timestamp json.RawMessage `json:"timestamp"` // RFC 3339 string; parsed apart, see parseLine
 	Message   struct {
 		ID      string          `json:"id"`
@@ -94,11 +108,18 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			ID:        rec.Message.ID,
 			SessionID: rec.SessionID,
 			Time:      ts,
+			Project:   projectOf(rec.Cwd),
 			Model:     rec.Message.Model,
 			Usage:     anthropic.NormalizeUsage(u.Usage),
 			Fast:      u.Speed == "fast",
 			USOnly:    u.InferenceGeo == "us",
 			ToolCalls: toolCalls(blocks(rec.Message.Content), rec.Cwd),
+			Attribution: event.Attribution{
+				Skill:     rec.AttributionSkill,
+				Plugin:    rec.AttributionPlugin,
+				MCPServer: rec.AttributionMcpServer,
+				Agent:     rec.AttributionAgent,
+			},
 		}, true, nil
 
 	case rec.Type == "user":
@@ -114,7 +135,16 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return source.Message{Kind: source.KindToolResults, SessionID: rec.SessionID, Time: ts, Results: results}, true, nil
 
 	case rec.Type == "system" && rec.Subtype == "compact_boundary":
-		return source.Message{Kind: source.KindCompaction, SessionID: rec.SessionID, Time: ts}, true, nil
+		m := source.Message{Kind: source.KindCompaction, SessionID: rec.SessionID, Time: ts}
+		if c := rec.CompactMetadata; c != nil {
+			m.Compaction = event.Compaction{
+				Before:   c.PreTokens,
+				After:    c.PostTokens,
+				Manual:   c.Trigger == "manual",
+				Duration: time.Duration(c.DurationMs) * time.Millisecond,
+			}
+		}
+		return m, true, nil
 	}
 	return source.Message{}, false, nil
 }
@@ -223,4 +253,20 @@ func firstOf(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// worktrees is where Claude Code puts temporary copies of a repo, for example
+// for a sub-agent: <project>/.claude/worktrees/<name>.
+var worktrees = string(filepath.Separator) + filepath.Join(".claude", "worktrees") + string(filepath.Separator)
+
+// projectOf names the project a working folder belongs to: the folder's own
+// name, or for a worktree, the name of the project it was copied from.
+func projectOf(cwd string) string {
+	if cwd == "" {
+		return ""
+	}
+	if i := strings.Index(cwd, worktrees); i > 0 {
+		cwd = cwd[:i]
+	}
+	return filepath.Base(cwd)
 }

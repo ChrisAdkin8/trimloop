@@ -97,3 +97,18 @@ func Cost(model string, u event.Usage, o Options) (c event.Cost, ok bool) {
 		Output:        per(u.Output, r.Output),
 	}, true
 }
+
+// cheaper lists, for each model, the model to suggest for work that does not
+// need it — in M0, sub-agents that search, read and summarise (ADR 0031).
+var cheaper = map[string]string{
+	"claude-opus-5-5":  "claude-sonnet-5-5",
+	"claude-opus-5":    "claude-sonnet-5-5",
+	"claude-fable-5-1": "claude-sonnet-5-5",
+}
+
+// Cheaper returns the model to suggest in place of model, and false if there
+// is none.
+func Cheaper(model string) (string, bool) {
+	m, ok := cheaper[model]
+	return m, ok
+}

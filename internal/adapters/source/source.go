@@ -63,6 +63,7 @@ type Message struct {
 	// Set for every kind.
 	SessionID string    // the harness's session id, if it logs one
 	Time      time.Time // when the line was logged; zero if not known
+	Project   string    // name of the project folder the line was logged in; "" if not known
 
 	// KindTurn: a model response that carries usage.
 	ID        string // provider message id; usage is counted once per id
@@ -71,9 +72,14 @@ type Message struct {
 	Fast      bool             // fast mode, which changes the price
 	USOnly    bool             // US-only inference, which changes the price
 	ToolCalls []event.ToolCall // tools called on this line, with no results yet
+	// Attribution is what the harness says caused the turn.
+	Attribution event.Attribution
 
 	// KindToolResults: the results of earlier tool calls.
 	Results []Result
+
+	// KindCompaction: what the compaction did, as far as it was recorded.
+	Compaction event.Compaction
 }
 
 // Kind is the kind of line a Message holds.

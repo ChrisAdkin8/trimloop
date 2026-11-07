@@ -252,7 +252,7 @@ func TestReportRuns(t *testing.T) {
 	if err := report(&buf, stats{logs: 1}, nil, findings{}); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"COST BY TOKEN CLASS", "P19 ", "P09 ", "P04 "} {
+	for _, want := range []string{"COST BY TOKEN CLASS", "WHERE THE SPEND WENT", "P19 ", "P10)", "P09 ", "P04 ", "P13 "} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}
@@ -289,8 +289,11 @@ func TestToolFixture(t *testing.T) {
 	if c := s.Turns[2].ToolCalls[1]; c.Shape != "go test -v" || !c.HasResult || !c.Result.Error || !c.Result.Persisted {
 		t.Errorf("go test call: got %+v", c)
 	}
-	if !s.Turns[5].CompactedBefore {
-		t.Error("the last turn should follow a compaction")
+	if c := s.Turns[5].Compaction; !s.Turns[5].CompactedBefore || !c.Manual || c.Before != 12_000 || c.After != 2_000 {
+		t.Errorf("the last turn should follow a manual compaction from 12k to 2k tokens; got %+v", c)
+	}
+	if s.Project != "repo" || s.Turns[0].Project != "repo" {
+		t.Errorf("project: got %q, want repo (from the cwd)", s.Project)
 	}
 
 	f := detectors.FindToolOutput([]event.Session{s}, 500, 10)
@@ -342,6 +345,50 @@ func TestPrintable(t *testing.T) {
 	} {
 		if got := printable(in); got != want {
 			t.Errorf("printable(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestInheritProjects(t *testing.T) {
+	sessions := []event.Session{
+		{ID: "m", Kind: "main", Project: "web"},
+		{ID: "m/a", Kind: "subagent", ParentID: "m", Turns: []event.Turn{{}, {Project: "own"}}},
+		{ID: "m/b", Kind: "subagent", ParentID: "m", Project: "kept"},
+		{ID: "x/c", Kind: "subagent", ParentID: "x"}, // parent not read
+	}
+	inheritProjects(sessions)
+	a := sessions[1]
+	if a.Project != "web" || a.Turns[0].Project != "web" || a.Turns[1].Project != "own" {
+		t.Errorf("a: got %q, turns %q and %q", a.Project, a.Turns[0].Project, a.Turns[1].Project)
+	}
+	if sessions[2].Project != "kept" || sessions[3].Project != "" {
+		t.Errorf("got %q and %q", sessions[2].Project, sessions[3].Project)
+	}
+}
+
+// The full report runs on the fixture with every finding filled in.
+func TestFullReportOnFixture(t *testing.T) {
+	l := source.Log{Path: filepath.Join("..", "..", "testdata", "sessions", "tools.jsonl")}
+	s, _, err := readSession(cc, &l, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions := []event.Session{s}
+	g := detectors.FindGrowth(sessions, 5_000, 5)
+	rec, _ := fixes.ForCompaction(g, 2_000, 0)
+	f := findings{
+		growth:      g,
+		compactFix:  &rec,
+		subAgents:   detectors.FindSubAgents(sessions, 200_000),
+		attribution: detectors.FindAttribution(sessions, 10),
+	}
+	var buf bytes.Buffer
+	if err := report(&buf, stats{logs: 1}, sessions, f); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"repo", "1 compactions (1 asked for)", "/compact", "No sub-agent runs."} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("report has no %q", want)
 		}
 	}
 }

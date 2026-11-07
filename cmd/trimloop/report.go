@@ -59,14 +59,17 @@ func report(out io.Writer, st stats, sessions []event.Session, f findings) error
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
 
+	attributionSection(w, f.attribution)
+
 	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
-	fmt.Fprintf(w, "  %d turns in %d sessions sent more than %s tokens of context.\n",
-		ctx.Turns, ctx.Sessions, thousands(ctx.Threshold))
+	fmt.Fprintf(w, "  %s turns in %d sessions sent more than %s tokens of context.\n",
+		thousands(ctx.Turns), ctx.Sessions, thousands(ctx.Threshold))
 	fmt.Fprintf(w, "  Their input cost %s (%.0f%% of all spend).\n", dollars(ctx.Cost), pct(ctx.Cost, all))
 	fmt.Fprintf(w, "  Keeping context under %s tokens would have saved up to %s (%.0f%%).\n",
 		thousands(ctx.Threshold), dollars(ctx.Saving), pct(ctx.Saving, all))
 	fmt.Fprintln(w, "  Action: start a new session for each task, or compact earlier.")
 	sessionTable(w, ctx.Top, "turns over", "peak context")
+	growthSection(w, f.growth, f.compactFix, all)
 
 	fmt.Fprintf(w, "\nP09 LONG PAUSES (RESUME BLOAT)\n")
 	fmt.Fprintf(w, "  %d times in %d sessions, work carried on after a pause of over %s.\n",
@@ -78,6 +81,7 @@ func report(out io.Writer, st stats, sessions []event.Session, f findings) error
 	sessionTable(w, pause.Top, "pauses", "context at resume")
 
 	toolOutputSection(w, f.tools, f.fixes, all)
+	subAgentSection(w, f.subAgents, f.subAgentFix, all)
 
 	fmt.Fprintln(w, "\nSavings are upper bounds: some context is needed, and a compacted or new")
 	fmt.Fprintln(w, "session still pays for what it keeps. The findings overlap, so do not add them.")
@@ -92,7 +96,7 @@ func sessionTable(w io.Writer, top []detectors.SessionStat, turnsLabel, peakLabe
 	fmt.Fprintf(w, "  Top sessions:\n")
 	fmt.Fprintf(w, "    %-10s %-18s %10s  %s\n", "saving", peakLabel, turnsLabel, "session")
 	for _, s := range top {
-		fmt.Fprintf(w, "    %-10s %-18s %10d  %s\n", dollars(s.Saving), thousands(s.Peak), s.Turns, printable(s.SessionID))
+		fmt.Fprintf(w, "    %-10s %-18s %10s  %s\n", dollars(s.Saving), thousands(s.Peak), thousands(s.Turns), printable(s.SessionID))
 	}
 }
 

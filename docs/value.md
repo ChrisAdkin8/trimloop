@@ -54,6 +54,13 @@ savings of up to about 31% and 17% of spend; cache churn (P01) was about
 representative, so the table above is re-ranked only after §8 step 2. Details
 and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
 
+A second pass on the same logs priced lever 4 without outcome data:
+sub-agents inherited the main model, and running them on a cheaper one
+would have saved about 13 % of spend, quality untested; noisy tool output
+(P04) carried about 12 % and injected context (P07) about 4 %
+([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07),
+[ADR 0031](adr/0031-m0-order-from-measured-spend.md)).
+
 ## 3. Worked example: one turn
 
 Assumptions, priced relative to the normal input price (shape of Anthropic's

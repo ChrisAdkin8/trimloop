@@ -33,7 +33,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P10 | Compaction thrash | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |
 | P11 | Post-failure burn | M3 | Go | 0 |
 | P12 | Retry storms | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |
-| P13 | Model over-provisioning | M4 | Go | 3 |
+| P13 | Model over-provisioning | M0 sub-agents, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); M4 full | Go | 3 |
 | P14 | Thinking-budget overspend | M0 reduced, M4 full ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 3 |
 | P15 | Duplicated exploration across a team | M4 | SQL | 1 |
 | P16 | Repeated workflow (skill candidate) | M4 | Go + SQL | 1 |
@@ -291,7 +291,10 @@ contributors by kind — memory file, system prompt, tool definitions, and each
 injected kind — so the fix names the skill, plugin or MCP server.
 
 **Saving:** Hard to estimate precisely; reported as an upper bound with low
-confidence.
+confidence. Injected kinds can be priced like tool output (P04): carried
+from when they appear until the session ends or is compacted. In the
+founder's sample that came to ≈ $88 (4.3 % of spend), $36 of it the skill
+listing ([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07)).
 
 **Fix:** L1 — report the largest sections. Where a section is relevant to
 only some sessions, recommend moving it into a skill (or the harness's
@@ -348,7 +351,12 @@ them. Where the harness records compaction (`harness.compaction`): tokens
 before and after, tokens dropped, and the time each compaction took.
 
 **Detection:** From harness compaction records (M0), else from history
-fingerprints that reset while the system prompt is unchanged.
+fingerprints that reset while the system prompt is unchanged. In reduced
+fidelity (M0, [ADR 0031](adr/0031-m0-order-from-measured-spend.md)) the
+report lists compactions — manual or automatic, typical size before and
+after, and the longest wait (a median misleads: Claude Code prepares some
+compactions in advance, which then take milliseconds) — alongside P19, and
+counts sessions that grew past 500 k tokens without compacting.
 
 **Fix:** L1 — recommend splitting the task, trimming standing context (P07),
 or tackling P04 and P08 first; report what each compaction kept and cost.
@@ -399,6 +407,18 @@ it waits until outcome signals exist.
 Many harnesses already support sub-agents on cheaper models; the L1 version
 recommends that configuration.
 
+**Reduced fidelity for sub-agents (M0, [ADR 0031](adr/0031-m0-order-from-measured-spend.md)):**
+no classifier is needed to see that sub-agents inherit the main model. Report
+sub-agent spend by agent type and model, and the same turns priced on the
+next-cheaper model; recommend setting a model for exploration and search
+agents (Claude Code: the Agent tool's `model` argument or a custom agent's
+`model` field), stated as untested for quality and checked after with the
+agent type's outcome signals (ADR 0030). Agent types that continue the main
+conversation and read its cache (Claude Code's `fork`) get no suggestion,
+since another model would lose that cache. In the founder's sample, no Agent
+call set a model; sub-agents were 26 % of spend, and their Opus 5.5 and
+Fable turns would have cost $271 (13 % of all spend) less on Sonnet 5.5.
+
 ## P14 — Thinking-budget overspend
 
 **What happens:** Extended reasoning tokens are spent on trivial turns.
@@ -408,7 +428,11 @@ reduced fidelity (M0): reasoning tokens and output cost by requested effort
 level (`request.effort`), and the share spent at the highest levels.
 
 **Fix:** L1 (M0) — report spend by effort level and recommend a lower
-default or per-turn effort where the harness supports it. L3 (M4, op
+default or per-turn effort where the harness supports it. Measured in the
+founder's sample, the lever is smaller than its token share suggests: `max`
+and `xhigh` turns were 22 % of spend but their output cost $109, and running
+them at `high`'s mean output would save at most ≈ $67 (3 %)
+([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07)). L3 (M4, op
 `cap_thinking`) — cap the budget per turn class; canary-gated.
 
 **Requires:** `usage.reasoning`. **Optional:** `request.effort`.
@@ -524,14 +548,21 @@ above a threshold, default 200k.
 
 **Detection:** Per turn, from usage alone. Report the turns and sessions
 above the threshold, the largest contexts, and how fast each session grew.
+Also report where spend piles up ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)):
+the share in the costliest 1, 5 and 10 conversations (a main session with
+its sub-agents), the mean cost of a turn by context size (under 50 k, to
+200 k, to 500 k, over 500 k), and sessions past 500 k that never compacted.
+In the founder's sample the costliest five conversations made 59 % of
+spend, and a turn over 500 k cost $0.28 against $0.06 under 50 k.
 
 **Saving:** The input cost of the tokens above the threshold, at the turn's
 average input price per token. An upper bound: some context is needed.
 Overlaps P09; the two are never added.
 
-**Fix:** L1 — start a new session per task, or compact earlier. Where P04,
-P07 or P08 are detected, report them as the causes: they say *what* fills
-the context.
+**Fix:** L1 — compact when a session passes the threshold or between tasks
+(Claude Code: `/compact`; it compacts on its own only near the context
+limit), or start a new session per task. Where P04, P07 or P08 are
+detected, report them as the causes: they say *what* fills the context.
 
 **Requires:** `usage.cache_read`. **Optional:** `usage.cache_write`,
 `response.tool_calls` (to break the context down by cause).

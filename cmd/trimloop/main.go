@@ -23,10 +23,11 @@ const (
 	contextThreshold = 200_000   // input tokens per turn
 	pauseGap         = time.Hour // longer than the longest cache lifetime
 	topSessions      = 5
-	resultTarget     = 2_000 // tokens per tool result; the excess counts as P04 saving
-	topGroups        = 10    // tools and command shapes shown
-	topFixes         = 4     // kinds of noise with recommended fixes
-	minFixSaving     = 1.0   // dollars; smaller savings get no recommendation
+	uncompactedLimit = 500_000 // context tokens; sessions past it that never compacted are reported
+	resultTarget     = 2_000   // tokens per tool result; the excess counts as P04 saving
+	topGroups        = 10      // tools and command shapes shown
+	topFixes         = 4       // kinds of noise with recommended fixes
+	minFixSaving     = 1.0     // dollars; smaller savings get no recommendation
 )
 
 func main() {
@@ -78,14 +79,24 @@ func main() {
 			sessions = append(sessions, s)
 		}
 	}
+	inheritProjects(sessions)
 
 	// 4. Run the findings and print the report.
 	tools := detectors.FindToolOutput(sessions, resultTarget, topGroups)
 	f := findings{
-		context: detectors.FindContextSize(sessions, contextThreshold, topSessions),
-		pause:   detectors.FindLongPauses(sessions, pauseGap, topSessions),
-		tools:   tools,
-		fixes:   fixes.ForToolOutput(tools, topFixes, minFixSaving),
+		context:     detectors.FindContextSize(sessions, contextThreshold, topSessions),
+		pause:       detectors.FindLongPauses(sessions, pauseGap, topSessions),
+		tools:       tools,
+		fixes:       fixes.ForToolOutput(tools, topFixes, minFixSaving),
+		subAgents:   detectors.FindSubAgents(sessions, contextThreshold),
+		growth:      detectors.FindGrowth(sessions, uncompactedLimit, topSessions),
+		attribution: detectors.FindAttribution(sessions, topGroups),
+	}
+	if r, ok := fixes.ForSubAgents(f.subAgents, minFixSaving); ok {
+		f.subAgentFix = &r
+	}
+	if r, ok := fixes.ForCompaction(f.growth, contextThreshold, minFixSaving); ok {
+		f.compactFix = &r
 	}
 	if err := report(os.Stdout, st, sessions, f); err != nil {
 		log.Fatal(err)
@@ -94,10 +105,15 @@ func main() {
 
 // findings holds the results of every detector, for the report.
 type findings struct {
-	context detectors.ContextSize
-	pause   detectors.LongPause
-	tools   detectors.ToolOutput
-	fixes   []fixes.Recommendation
+	context     detectors.ContextSize
+	pause       detectors.LongPause
+	tools       detectors.ToolOutput
+	fixes       []fixes.Recommendation // for tool output
+	subAgents   detectors.SubAgents
+	subAgentFix *fixes.Recommendation // nil if none
+	growth      detectors.Growth
+	compactFix  *fixes.Recommendation // nil if none
+	attribution detectors.Attribution
 }
 
 // stats counts what was read.
@@ -166,6 +182,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
 	callAt := map[string][2]int{} // tool-use id -> turn index, call index
 	compacted := false            // a compaction since the last new turn
+	var compaction event.Compaction
 	for _, m := range d.msgs {
 		switch m.Kind {
 		case source.KindToolResults:
@@ -177,7 +194,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			continue
 		case source.KindCompaction:
-			compacted = true
+			compacted, compaction = true, m.Compaction
 			continue
 		}
 
@@ -193,14 +210,27 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Time:            m.Time,
 				First:           last.IsZero(),
 				Usage:           m.Usage,
+				Fast:            m.Fast,
+				USOnly:          m.USOnly,
+				Project:         m.Project,
+				Attribution:     m.Attribution,
 				CompactedBefore: compacted,
+			}
+			if compacted {
+				t.Compaction = compaction
+			}
+			if s.Project == "" {
+				s.Project = m.Project
+			}
+			if s.Kind == "subagent" && s.AgentType == "" {
+				s.AgentType = m.Attribution.Agent
 			}
 			if !last.IsZero() && m.Time.After(last) {
 				t.IdleBefore = m.Time.Sub(last)
 			}
 			t.Cost, t.Priced = price.Cost(m.Model, m.Usage, price.Options{Fast: m.Fast, USOnly: m.USOnly})
 			s.Turns = append(s.Turns, t)
-			compacted = false
+			compacted, compaction = false, event.Compaction{}
 			i, here = len(s.Turns)-1, true
 			if m.ID != "" {
 				turnOf[m.ID] = i
@@ -222,6 +252,31 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 		}
 	}
 	return s
+}
+
+// inheritProjects gives a subagent that logged no project, and its turns,
+// its main session's project.
+func inheritProjects(sessions []event.Session) {
+	project := map[string]string{}
+	for _, s := range sessions {
+		if s.Kind == "main" && s.Project != "" {
+			project[s.ID] = s.Project
+		}
+	}
+	for i, s := range sessions {
+		p, ok := project[s.ParentID]
+		if !ok || s.Kind != "subagent" {
+			continue
+		}
+		if s.Project == "" {
+			sessions[i].Project = p
+		}
+		for j := range s.Turns {
+			if s.Turns[j].Project == "" {
+				s.Turns[j].Project = p
+			}
+		}
+	}
 }
 
 // sessionFor names the session a log holds. A main session log is named after

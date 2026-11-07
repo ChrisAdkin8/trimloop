@@ -59,3 +59,16 @@ func TotalCost(sessions []event.Session) event.Cost {
 	}
 	return c
 }
+
+// sortBy sorts items by key, largest value first; ties go by name, so the
+// order is the same every run.
+func sortBy[T any](items []T, key func(T) (value float64, name string)) {
+	sort.Slice(items, func(i, j int) bool {
+		a, an := key(items[i])
+		b, bn := key(items[j])
+		if a != b {
+			return a > b
+		}
+		return an < bn
+	})
+}

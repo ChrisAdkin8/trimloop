@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Analysis, 2026-11-07 — its §4 proposals were adopted in [ADR 0028](adr/0028-harness-recorded-signals.md) |
+| Status | Analysis, 2026-11-07 — its §4 proposals were adopted in [ADR 0028](adr/0028-harness-recorded-signals.md); §7, a second pass measured in money, led to [ADR 0031](adr/0031-m0-order-from-measured-spend.md) |
 | Sample | One developer's machine: 598 logs (445 main sessions, 176 sub-agent logs), ~16,000 turns, $2,021 at list prices; Claude Code versions 2.1.288–2.1.318 |
 | Method | Structure-only survey (field names, counts, sizes, timings); no prompt or file content was read |
 | Builds on | [ADR 0027](adr/0027-measured-m0-findings.md) (measured P19 and P09), the M0 prototype's report, [patterns.md](patterns.md), [analyzer.md §10](analyzer.md#10-extensibility-harnesses-and-providers) |
@@ -214,6 +214,10 @@ they are not needed to explain P01 locally.
 
 ## 5. Suggested order for the next M0 work
 
+Superseded: [ADR 0029](adr/0029-m0-build-order-by-user-value.md) set the
+order, and [ADR 0031](adr/0031-m0-order-from-measured-spend.md) re-ranks it
+from §7's measurements. Kept as first written:
+
 1. **Reconciliation** with `cost-state`, including auxiliary calls (§3.1) —
    turns the prototype's estimates into verified numbers.
 2. **Context composition** by tool from `tool_result` sizes and
@@ -234,3 +238,39 @@ they are not needed to explain P01 locally.
   estimated at 4 bytes each where stated.
 - Field names and record types are as logged by Claude Code 2.1.288–2.1.318
   and may change.
+
+## 7. Second pass: measured in money (2026-11-07)
+
+After the P04 detector shipped, a second structure-only pass priced what the
+code still misses, on the same machine (598 logs, 16,314 turns, $2,057 at
+list prices). It confirms some §3 opportunities, corrects the size of
+others, and adds two. [ADR 0031](adr/0031-m0-order-from-measured-spend.md)
+re-ranks the M0 build order from it.
+
+| # | Finding | Measured | What it changes |
+|---|---|---|---|
+| 1 | **Sub-agents run on the main model.** All 166 Agent calls left `model` unset, so every sub-agent ran on Opus 5.5 (or Fable) | Sub-agents: $529 (26 %). Their Opus 5.5 turns, $471, would cost $235 on Sonnet 5.5 — 11 % of all spend, quality untested | New: a reduced-fidelity P13 for sub-agents in M0 |
+| 2 | **Sub-agents use the cache poorly.** Each starts cold and writes with the 5-minute lifetime | Writes are 50 % of sub-agent spend (39 % in main sessions); each written token is read 14 times (46 in main); 28 runs passed 200 k tokens and cost $286 | Part of finding 1; supports §3.5 |
+| 3 | **Spend is concentrated.** | Top 1 session 21 %, top 5 47 %, top 10 60 %; median session $0.25 | P19 should lead with concentration |
+| 4 | **Compaction comes late or never.** | 18 of 19 compactions automatic, at a median 538 k tokens, down to 20 k in 28 s; 6 sessions passed 500 k and never compacted ($292); a turn over 500 k costs $0.28 against $0.06 under 50 k | P19's fix can name a point to compact; P10 in reduced fidelity |
+| 5 | **The harness bills more than transcripts show** — and more than §3.1 found | On 412 sessions with `cost-state`: $1,845 against $1,770 (+4.2 %). Prices match (the harness's tokens at catalogue prices reproduce its cost). The gap is requests with no `assistant` line: ≈ $22 from 277 `away_summary` recaps that re-read the context, $3 of web-search fees (316 requests, not in the catalogue), Haiku helpers, and an unattributed rest. 14 % of spend ($287) is in sessions with no `cost-state` | Reconciliation stays near the top: it is now worth ≈ 4 %, not 0.3 % |
+| 6 | **Injected context has a measurable carried cost** | Carried like tool output (P04 method): $88 (4.3 %); `skill_listing` alone $36 (26 KB each) | P07 by kind can report dollars, not only bytes |
+| 7 | **Effort is a smaller lever than its token share suggested** | `max` and `xhigh` turns are 22 % of spend but their output costs $109; at `high`'s mean output per turn they would save ≈ $67 (3 %), an upper bound since harder tasks get higher effort | P14 moves down the order |
+| 8 | **Spend is attributed on every turn** — `attributionSkill`, `attributionPlugin`, `attributionMcpServer`, `attributionAgent`, and `cwd` | e.g. plugin `checked-plans` $56; MCP `ccd_turn` $31; by project: 22 %, 14 %, 12 %, 11 % for the top four | Cost by skill, plugin, MCP server and project needs no inference |
+| 9 | **Some planned signals are small here** | Bash errors 3.3 %; runs of 3+ all-failing turns: 2 ($0.17); identical shell commands repeated: 2 %; retries 1.4 h of 52 h API time; 75 denials | P05, P11 and P12 can wait for more developers' data |
+
+**Implemented** (ADR 0031 items 2–4): findings 1–4 and 8 are now in the
+report. The code's figures differ slightly from the table above: the
+sub-agent saving is $271 (13 %), as it also prices sub-agent turns on Fable
+and leaves out forks, which read the main session's cache; concentration is
+by conversation (a main session with its sub-agents) — top 1 24 %, top 5
+59 %, top 10 75 %; and projects are attributed per turn, with worktrees
+under `.claude/worktrees/` counted as the project they were copied from
+(32 of 422 main sessions changed folder partway). Compactions are counted
+on the turn after them, so a compaction with no later turn is not reported.
+
+Method notes: sessions de-duplicated per message id as the prototype does
+(ADR 0026); away-summary cost estimated at the preceding turn's context and
+cache-read price; injected-context tokens at 4 bytes each; the Agent tool's
+own result is usually a short "started in the background" note, so the size
+of what a sub-agent returns could not be measured from it.

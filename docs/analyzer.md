@@ -431,6 +431,7 @@ the two.
 | `harness.cost_record` | The harness's own per-session usage and cost, including calls it did not log as turns ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Claude Code transcripts |
 | `harness.injected_context` | Context the harness adds, recorded by kind with sizes | Claude Code transcripts |
 | `harness.compaction` | Compaction events with before and after token counts | Claude Code transcripts |
+| `harness.attribution` | The skill, plugin, MCP server or agent type the harness names as the cause of each turn ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)) | Claude Code transcripts |
 | `harness.retries` | Retry attempts, delays and causes | Claude Code transcripts |
 | `request.shape_hash` | Harness identifier for the system prompt and tool list as sent | Claude Code transcripts |
 | `request.effort` | Reasoning effort or budget per request | Claude Code transcripts; request body at a gateway |
@@ -527,7 +528,8 @@ skills: { kind: skill_md, paths: [".claude/skills/", "~/.claude/skills/"] }
 capabilities: [session.explicit_id, context.repo, harness.config, harness.skills,
                content.local, outcome.git, harness.cost_record, harness.injected_context,
                harness.compaction, harness.retries, request.shape_hash, request.effort,
-               session.origin, outcome.lines_changed, timing.turn_duration]
+               session.origin, outcome.lines_changed, timing.turn_duration,
+               harness.attribution]
 capabilities_by_version:
   ">=2.1.288": [request.full_body]   # api-request records seen from this version
 detect_capabilities: true            # the reader also checks each transcript and reports what it found
@@ -559,12 +561,14 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `harness.injected_context`, `content.local` |
 | P10 Compaction thrash | `harness.compaction` **or** `request.full_body` | — |
 | P12 Retry storms | `harness.retries` **or** `request.full_body` | `timing.per_turn` |
+| P13 Model over-provisioning (sub-agents, reduced) | Sub-agent sessions (the profile's `sidechains`) | `harness.attribution` (agent type) |
 | P14 Thinking-budget overspend | `usage.reasoning` | `request.effort`, `outcome.git` (turn-complexity classes, M4) |
 | P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |
 | P17 Repeated instructions | — | `content.local`, `harness.skills` |
 | P18 Hot documentation | `response.tool_calls` | `content.local`, `harness.skills` |
 
-Aggregates group by repo where `context.repo` is available. Gateway traffic
+Aggregates group by repo where `context.repo` is available; cost by skill,
+plugin and MCP server needs `harness.attribution`. Gateway traffic
 has no repo, so P06 and P07 there group by gateway key and harness instead and
 report `reduced` coverage.
 

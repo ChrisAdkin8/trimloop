@@ -183,3 +183,40 @@ func TestFileKey(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLineAttributionAndProject(t *testing.T) {
+	line := `{"type":"assistant","cwd":"/code/web/.claude/worktrees/agent-1","attributionSkill":"review",` +
+		`"attributionPlugin":"tools","attributionMcpServer":"github","attributionAgent":"general-purpose",` +
+		`"message":{"id":"m1","usage":{"output_tokens":1}}}`
+	m, ok, err := parseLine([]byte(line))
+	if err != nil || !ok {
+		t.Fatalf("got ok=%v err=%v", ok, err)
+	}
+	want := event.Attribution{Skill: "review", Plugin: "tools", MCPServer: "github", Agent: "general-purpose"}
+	if m.Attribution != want || m.Project != "web" {
+		t.Errorf("got attribution %+v project %q", m.Attribution, m.Project)
+	}
+}
+
+func TestParseLineCompactionMetadata(t *testing.T) {
+	m, _, _ := parseLine([]byte(`{"type":"system","subtype":"compact_boundary",` +
+		`"compactMetadata":{"trigger":"manual","preTokens":900000,"postTokens":20000,"durationMs":1500}}`))
+	want := event.Compaction{Before: 900_000, After: 20_000, Manual: true, Duration: 1500 * time.Millisecond}
+	if m.Compaction != want {
+		t.Errorf("got %+v, want %+v", m.Compaction, want)
+	}
+}
+
+func TestProjectOf(t *testing.T) {
+	for cwd, want := range map[string]string{
+		"":                                  "",
+		"/code/web":                         "web",
+		"/code/web/.claude/worktrees/x":     "web",
+		"/code/web/.claude/worktrees/x/sub": "web",
+		"/code/web/sub":                     "sub",
+	} {
+		if got := projectOf(cwd); got != want {
+			t.Errorf("projectOf(%q) = %q, want %q", cwd, got, want)
+		}
+	}
+}
