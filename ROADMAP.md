@@ -35,6 +35,21 @@ findings report with estimated savings. No proxy, no server.
   packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved by a
   release dry-run of the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)).
 
+**Build order** ([ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md)), by
+value to the user. Done: reader, usage de-duplication, pricing, P19 and P09.
+
+1. Context composition by tool (P04; explains P19).
+2. Reconciliation with the harness cost record, including auxiliary turns.
+3. P14 in reduced fidelity: spend by effort level.
+4. Results kept between runs: findings history, JSON output, saved offsets.
+5. Command-line options: `analyse`, `--since`, `--repo`, `--format`.
+6. P07 with injected context by kind.
+7. P02 cache-lifetime fit.
+8. P10 and P12 from harness records.
+9. P01, P03, P05, P06.
+10. Distribution: installable release, minimal conformance runner, profiles.
+11. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
+
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.
 

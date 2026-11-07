@@ -720,7 +720,8 @@ body.
 
 Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 
-1. **M0 — `trimloop analyse`:** `pkg/event`, `normalize/anthropic`,
+1. **M0 — `trimloop analyse`** (built in the order of
+   [ADR 0029](adr/0029-m0-build-order-by-user-value.md)): `pkg/event`, `normalize/anthropic`,
    `redact`, `fingerprint` (keyed) and `trimloop key init`, `price`, Claude
    Code `Reader` (turns, cost and compaction records), reconciliation with
    the harness cost record, DuckDB and memory stores, incremental re-runs,

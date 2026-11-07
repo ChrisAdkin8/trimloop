@@ -1,6 +1,6 @@
 # ADR 0027: Add P19 large context and bring P09 into M0, from measured sessions
 
-- Status: Proposed — M0 detector list extended by [ADR 0028](0028-harness-recorded-signals.md)
+- Status: Proposed — M0 detector list extended by [ADR 0028](0028-harness-recorded-signals.md); M0 order of work replaced by [ADR 0029](0029-m0-build-order-by-user-value.md)
 - Date: 2026-11-07
 - Amends: [patterns.md](../patterns.md) (P09 milestone and signal, new P19),
   M0 detector list ([ROADMAP.md](../../ROADMAP.md),
