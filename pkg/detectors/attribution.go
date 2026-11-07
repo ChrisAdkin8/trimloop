@@ -7,21 +7,21 @@ import "github.com/ChrisAdkin8/trimloop/pkg/event"
 // harness attributes to nothing are left out of the skill, plugin and MCP
 // tables.
 type Attribution struct {
-	Cost float64 // all spend, for shares
+	Cost float64 `json:"cost"` // all spend, for shares
 
-	ByProject   []Spend
-	BySkill     []Spend
-	ByPlugin    []Spend
-	ByMCPServer []Spend
+	ByProject   []Spend `json:"by_project"`
+	BySkill     []Spend `json:"by_skill"`
+	ByPlugin    []Spend `json:"by_plugin"`
+	ByMCPServer []Spend `json:"by_mcp_server"`
 }
 
 // Spend is what one project, skill, plugin or MCP server cost.
 type Spend struct {
-	Name          string
-	Cost          float64
-	Turns         int
-	Conversations int     // main sessions with their sub-agents
-	SubAgentCost  float64 // the part spent in sub-agents
+	Name          string  `json:"name"`
+	Cost          float64 `json:"cost"`
+	Turns         int     `json:"turns"`
+	Conversations int     `json:"conversations"`  // main sessions with their sub-agents
+	SubAgentCost  float64 `json:"sub_agent_cost"` // the part spent in sub-agents
 }
 
 // FindAttribution adds up spend by project, skill, plugin and MCP server,

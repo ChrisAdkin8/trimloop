@@ -11,19 +11,19 @@ import (
 // expired, so the first turn after the pause writes the whole context to the
 // cache again.
 type LongPause struct {
-	MinGap time.Duration // pauses longer than this count
+	MinGap time.Duration `json:"min_gap_ns"` // pauses longer than this count
 
-	Pauses   int     // turns that followed such a pause and wrote to the cache
-	Sessions int     // sessions with at least one such pause
-	Cost     float64 // cache-write cost of those turns
+	Pauses   int     `json:"pauses"`   // turns that followed such a pause and wrote to the cache
+	Sessions int     `json:"sessions"` // sessions with at least one such pause
+	Cost     float64 `json:"cost"`     // cache-write cost of those turns
 
 	// Saving is Cost: what those re-writes would have saved had the session
 	// been compacted, or a new one started, before carrying on. It is an
 	// upper bound: a compacted or new session still writes its smaller
 	// context.
-	Saving float64
+	Saving float64 `json:"saving"`
 
-	Top []SessionStat // sessions with the largest re-cache cost
+	Top []SessionStat `json:"top"` // sessions with the largest re-cache cost
 }
 
 // FindLongPauses reports turns that came after more than minGap idle and

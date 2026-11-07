@@ -184,7 +184,12 @@ trimloop analyse [--harness claude-code|codex|all] [--since 30d]
 3. Turns are replayed through the incremental detectors in order.
 4. Sessions and findings are written to `~/.trimloop/trimloop.duckdb`;
    aggregates run over the store.
-5. A report is rendered. No network access at any point.
+5. A report is rendered. No network access at any point. Text, HTML and
+   JSON render the same results: the HTML page is one self-contained file
+   (inline styles, charts and script; a content security policy that
+   forbids loading anything), and the JSON layout is versioned
+   (`trimloop-report/1`; adding fields keeps the version, removing or
+   changing one bumps it).
 
 Incremental re-runs: the store records each transcript's path, size and last
 offset, so a second run only reads new lines.

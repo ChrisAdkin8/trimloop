@@ -1,4 +1,4 @@
-package main
+package report
 
 import (
 	"bufio"
@@ -8,39 +8,21 @@ import (
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
-	"github.com/ChrisAdkin8/trimloop/pkg/event"
-	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
-// report prints the cost summary and the findings to out. It writes through a
+// WriteText prints the full report as plain text to out. It writes through a
 // bufio.Writer, which keeps the first write error; the error Flush returns is
 // the only one that needs checking.
-func report(out io.Writer, st stats, sessions []event.Session, f findings) error {
+func WriteText(out io.Writer, r Results) error {
 	w := bufio.NewWriter(out)
-	ctx, pause := f.context, f.pause
-	turns, unpriced := 0, 0
-	for _, s := range sessions {
-		for _, t := range s.Turns {
-			turns++
-			if !t.Priced {
-				unpriced++
-			}
-		}
-	}
-	total := detectors.TotalCost(sessions)
-	all := total.Total()
+	ctx, pause := r.Context, r.Pause
+	total := r.Cost
+	all := r.Total
 
-	fmt.Fprintf(w, "Read %d logs: %d sessions, %d turns", st.logs, len(sessions), turns)
-	if st.failed > 0 {
-		fmt.Fprintf(w, ", %d logs failed", st.failed)
-	}
-	if st.badLines > 0 {
-		fmt.Fprintf(w, ", %d lines could not be parsed", st.badLines)
-	}
-	fmt.Fprintln(w, ".")
-	fmt.Fprintf(w, "Costs are estimates at list prices (%s).", price.Version)
-	if unpriced > 0 {
-		fmt.Fprintf(w, " %d turns have no price and are left out.", unpriced)
+	readLine(w, r.Read)
+	fmt.Fprintf(w, "Costs are estimates at list prices (%s).", r.Prices)
+	if r.Read.Unpriced > 0 {
+		fmt.Fprintf(w, " %d turns have no price and are left out.", r.Read.Unpriced)
 	}
 	fmt.Fprintln(w)
 
@@ -59,7 +41,7 @@ func report(out io.Writer, st stats, sessions []event.Session, f findings) error
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
 
-	attributionSection(w, f.attribution)
+	attributionSection(w, r.Attribution)
 
 	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
 	fmt.Fprintf(w, "  %s turns in %d sessions sent more than %s tokens of context.\n",
@@ -69,7 +51,7 @@ func report(out io.Writer, st stats, sessions []event.Session, f findings) error
 		thousands(ctx.Threshold), dollars(ctx.Saving), pct(ctx.Saving, all))
 	fmt.Fprintln(w, "  Action: start a new session for each task, or compact earlier.")
 	sessionTable(w, ctx.Top, "turns over", "peak context")
-	growthSection(w, f.growth, f.compactFix, all)
+	growthSection(w, r.Growth, r.CompactFix, all)
 
 	fmt.Fprintf(w, "\nP09 LONG PAUSES (RESUME BLOAT)\n")
 	fmt.Fprintf(w, "  %d times in %d sessions, work carried on after a pause of over %s.\n",
@@ -80,8 +62,8 @@ func report(out io.Writer, st stats, sessions []event.Session, f findings) error
 	fmt.Fprintln(w, "  Action: after a long break, compact the session or start a new one before carrying on.")
 	sessionTable(w, pause.Top, "pauses", "context at resume")
 
-	toolOutputSection(w, f.tools, f.fixes, all)
-	subAgentSection(w, f.subAgents, f.subAgentFix, all)
+	toolOutputSection(w, r.Tools, r.ToolFixes, all)
+	subAgentSection(w, r.SubAgents, r.SubAgentFix, all)
 
 	fmt.Fprintln(w, "\nSavings are upper bounds: some context is needed, and a compacted or new")
 	fmt.Fprintln(w, "session still pays for what it keeps. The findings overlap, so do not add them.")
@@ -139,4 +121,16 @@ func thousands(n int) string {
 func thousands2(v float64) string {
 	cents := int(v*100 + 0.5)
 	return fmt.Sprintf("%s.%02d", thousands(cents/100), cents%100)
+}
+
+// readLine prints what was read: "Read 3 logs: 2 sessions, 10 turns."
+func readLine(w io.Writer, r Read) {
+	fmt.Fprintf(w, "Read %s logs: %s sessions, %s turns", thousands(r.Logs), thousands(r.Sessions), thousands(r.Turns))
+	if r.Failed > 0 {
+		fmt.Fprintf(w, ", %d logs failed", r.Failed)
+	}
+	if r.BadLines > 0 {
+		fmt.Fprintf(w, ", %d lines could not be parsed", r.BadLines)
+	}
+	fmt.Fprintln(w, ".")
 }

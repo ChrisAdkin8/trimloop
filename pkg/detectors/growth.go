@@ -11,51 +11,52 @@ import (
 // concentration behind P19, and P10 (compaction) in reduced fidelity from
 // the harness's compaction records (ADR 0031).
 type Growth struct {
-	Conversations int     // main sessions with their sub-agents
-	Cost          float64 // their spend
-	MedianCost    float64 // spend of the median conversation
+	Conversations int     `json:"conversations"` // main sessions with their sub-agents
+	Cost          float64 `json:"cost"`          // their spend
+	MedianCost    float64 `json:"median_cost"`   // spend of the median conversation
 
-	TopShares []TopShare         // share of spend in the top 1, 5 and 10 conversations
-	Top       []ConversationStat // the costliest conversations, largest first
+	TopShares []TopShare         `json:"top_shares"` // share of spend in the top 1, 5 and 10 conversations
+	Top       []ConversationStat `json:"top"`        // the costliest conversations, largest first
 
-	Bands []Band // turns by context size, smallest first
+	Bands []Band `json:"bands"` // turns by context size, smallest first
 
-	Compactions  int // compactions recorded
-	Manual       int // of them, asked for by the user
-	MedianBefore int // median context before a compaction, in tokens
-	MedianAfter  int // median context after
+	Compactions  int `json:"compactions"`   // compactions recorded
+	Manual       int `json:"manual"`        // of them, asked for by the user
+	MedianBefore int `json:"median_before"` // median context before a compaction, in tokens
+	MedianAfter  int `json:"median_after"`  // median context after
 	// Longest is the longest a compaction took. A median would mislead:
 	// Claude Code prepares some compactions in advance, which then take
 	// milliseconds, while the rest make the user wait.
-	Longest time.Duration
+	Longest time.Duration `json:"longest_ns"`
 
 	// Sessions (main or sub-agent) whose context passed Limit tokens and
 	// that were never compacted, and what they cost.
-	Limit           int
-	Uncompacted     int
-	UncompactedCost float64
+	Limit           int     `json:"limit"`
+	Uncompacted     int     `json:"uncompacted"`
+	UncompactedCost float64 `json:"uncompacted_cost"`
 }
 
 // TopShare is the share of all spend in the N costliest conversations.
 type TopShare struct {
-	N     int
-	Share float64 // 0 to 1
+	N     int     `json:"n"`
+	Share float64 `json:"share"` // 0 to 1
 }
 
 // ConversationStat is one conversation's spend.
 type ConversationStat struct {
-	ID      string
-	Project string // the project with most of its spend
-	Turns   int
-	Peak    int // largest context of any turn, in tokens
-	Cost    float64
+	ID      string  `json:"id"`
+	Project string  `json:"project"` // the project with most of its spend
+	Turns   int     `json:"turns"`
+	Peak    int     `json:"peak"` // largest context of any turn, in tokens
+	Cost    float64 `json:"cost"`
 }
 
 // Band is the turns whose context falls in [Min, Max) tokens.
 type Band struct {
-	Min, Max int // Max 0 means no upper bound
-	Turns    int
-	Cost     float64
+	Min   int     `json:"min"`
+	Max   int     `json:"max"` // 0 means no upper bound
+	Turns int     `json:"turns"`
+	Cost  float64 `json:"cost"`
 }
 
 // MeanCost is the average cost of a turn in the band.

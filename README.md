@@ -81,6 +81,22 @@ Decisions: [ADR 0002](docs/adr/0002-go-for-agent-and-proxy.md) (Go),
 plugin), [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)
 (plugin forwards to a sidecar). Engine design: [docs/analyzer.md](docs/analyzer.md).
 
+## Running the prototype
+
+The M0 prototype reads the Claude Code session logs on this machine
+(`~/.claude/projects`) and reports where tokens went and what to change:
+
+```bash
+go run ./cmd/trimloop/                          # full report as text in the terminal
+go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html, short summary in the terminal
+go run ./cmd/trimloop/ --format json --out r.json   # every figure, for scripts
+```
+
+The HTML page is one self-contained file: styles, charts and script are
+inline and it loads nothing from the network, so it works offline and the
+data stays on the machine. It shows project, skill and session names in
+plain text, so check it before sharing.
+
 ## Development setup
 
 Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or

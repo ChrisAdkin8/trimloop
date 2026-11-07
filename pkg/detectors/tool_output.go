@@ -11,37 +11,37 @@ import (
 // breakdown of what fills the context behind P19: its cost is part of every
 // turn's input, so it is never added to P19's saving (docs/patterns.md, P04).
 type ToolOutput struct {
-	Target int // tokens per result above which the excess counts as saving
+	Target int `json:"target"` // tokens per result above which the excess counts as saving
 
-	Calls     int     // tool results sent to the model
-	Tokens    int     // their estimated tokens, each counted once
-	Carried   float64 // carried cost of all of them
-	Saving    float64 // carried cost of the tokens above Target, an upper bound
-	Persisted int     // results the harness saved to disk, sending a preview
+	Calls     int     `json:"calls"`     // tool results sent to the model
+	Tokens    int     `json:"tokens"`    // their estimated tokens, each counted once
+	Carried   float64 `json:"carried"`   // carried cost of all of them
+	Saving    float64 `json:"saving"`    // carried cost of the tokens above Target, an upper bound
+	Persisted int     `json:"persisted"` // results the harness saved to disk, sending a preview
 
-	ByTool  []Group // by tool, MCP tools by server; largest carried cost first
-	ByShape []Group // shell commands by shape; largest carried cost first
-	ByNoise []Group // by kind of noise; largest saving first
+	ByTool  []Group `json:"by_tool"`  // by tool, MCP tools by server; largest carried cost first
+	ByShape []Group `json:"by_shape"` // shell commands by shape; largest carried cost first
+	ByNoise []Group `json:"by_noise"` // by kind of noise; largest saving first
 
-	FileViews     int     // results that showed a file
-	Rereads       int     // views of a file already viewed, unchanged, in the session
-	RereadCarried float64 // carried cost of those re-reads
+	FileViews     int     `json:"file_views"`     // results that showed a file
+	Rereads       int     `json:"rereads"`        // views of a file already viewed, unchanged, in the session
+	RereadCarried float64 `json:"reread_carried"` // carried cost of those re-reads
 }
 
 // Group is one tool, command shape or kind of noise.
 type Group struct {
-	Name     string
-	Noise    event.NoiseKind
-	Calls    int
-	Tokens   int
-	Carried  float64
-	Saving   float64
-	Filtered int // shell calls whose output was already filtered
-	Rereads  int
+	Name     string          `json:"name"`
+	Noise    event.NoiseKind `json:"noise"`
+	Calls    int             `json:"calls"`
+	Tokens   int             `json:"tokens"`
+	Carried  float64         `json:"carried"`
+	Saving   float64         `json:"saving"`
+	Filtered int             `json:"filtered"` // shell calls whose output was already filtered
+	Rereads  int             `json:"rereads"`
 
 	// Examples, for a kind of noise: the shapes and tools that cost most in
 	// it, largest first, at most three.
-	Examples []string
+	Examples []string `json:"examples"`
 }
 
 // callCost is one tool result and what carrying it cost.

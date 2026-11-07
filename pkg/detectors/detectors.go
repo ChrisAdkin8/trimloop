@@ -14,11 +14,11 @@ import (
 
 // SessionStat is one session's share of a finding.
 type SessionStat struct {
-	SessionID string
-	Turns     int     // turns in the session that the finding applies to
-	Peak      int     // largest context (input tokens) among those turns
-	Cost      float64 // what those turns cost, for the part the finding covers
-	Saving    float64 // estimated saving, an upper bound
+	SessionID string  `json:"session_id"`
+	Turns     int     `json:"turns"`  // turns in the session that the finding applies to
+	Peak      int     `json:"peak"`   // largest context (input tokens) among those turns
+	Cost      float64 `json:"cost"`   // what those turns cost, for the part the finding covers
+	Saving    float64 `json:"saving"` // estimated saving, an upper bound
 }
 
 // top returns the n sessions with the largest saving, largest first.

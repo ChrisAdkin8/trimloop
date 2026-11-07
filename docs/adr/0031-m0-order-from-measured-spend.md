@@ -74,7 +74,7 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 | 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Next; before value.md §8 step 2 |
 | 6 | **P07 with injected context by kind**, priced by carried cost | $88 (4.3 %) | |
 | 7 | **Results kept between runs** (ADR 0029 item 4) | Needed to measure any fix | |
-| 8 | **Command-line options**: `--since`, `--repo`, `--format` | Filters for item 4's groups | |
+| 8 | **Command-line options**: `--since`, `--repo`, `--format` | Filters for item 4's groups | `--format` (text, HTML, JSON) and `--out` done |
 | 9 | **P14 in reduced fidelity** | ≤ $67 (3 %) | |
 | 10 | **P02 cache-lifetime fit** | Guards a false saving (ADR 0027) | |
 | 11 | **P03, P06, P01; then P05, P10 in full, P12** | P05, P11, P12 small in this sample (errors 3.3 %, retries 1.4 h of 52 h) | |

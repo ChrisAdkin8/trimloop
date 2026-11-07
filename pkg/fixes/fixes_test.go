@@ -83,11 +83,11 @@ func TestForSubAgents(t *testing.T) {
 }
 
 func TestForCompaction(t *testing.T) {
-	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 1)
-	if !ok || r.Saving != 0 || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
+	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 7, 1)
+	if !ok || r.Saving != 7 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
-	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 1); ok {
+	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 7, 1); ok {
 		t.Error("a cost under the minimum should give no recommendation")
 	}
 	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567"} {

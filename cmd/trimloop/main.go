@@ -3,6 +3,9 @@ package main
 
 import (
 	"errors"
+	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,25 +15,25 @@ import (
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
-	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
+	"github.com/ChrisAdkin8/trimloop/internal/report"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
-	"github.com/ChrisAdkin8/trimloop/pkg/fixes"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
-// Finding settings.
-const (
-	contextThreshold = 200_000   // input tokens per turn
-	pauseGap         = time.Hour // longer than the longest cache lifetime
-	topSessions      = 5
-	uncompactedLimit = 500_000 // context tokens; sessions past it that never compacted are reported
-	resultTarget     = 2_000   // tokens per tool result; the excess counts as P04 saving
-	topGroups        = 10      // tools and command shapes shown
-	topFixes         = 4       // kinds of noise with recommended fixes
-	minFixSaving     = 1.0     // dollars; smaller savings get no recommendation
-)
-
 func main() {
+	format := flag.String("format", "text", "report format: text, html or json")
+	out := flag.String("out", "", "write the report to this file (default: standard output for text and json, "+defaultHTML+" for html)")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [--format text|html|json] [--out FILE]\n\n"+
+			"Analyses Claude Code session logs on this machine for token waste.\n\n")
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+	if flag.NArg() > 0 || (*format != "text" && *format != "html" && *format != "json") {
+		flag.Usage()
+		os.Exit(2)
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
@@ -81,39 +84,44 @@ func main() {
 	}
 	inheritProjects(sessions)
 
-	// 4. Run the findings and print the report.
-	tools := detectors.FindToolOutput(sessions, resultTarget, topGroups)
-	f := findings{
-		context:     detectors.FindContextSize(sessions, contextThreshold, topSessions),
-		pause:       detectors.FindLongPauses(sessions, pauseGap, topSessions),
-		tools:       tools,
-		fixes:       fixes.ForToolOutput(tools, topFixes, minFixSaving),
-		subAgents:   detectors.FindSubAgents(sessions, contextThreshold),
-		growth:      detectors.FindGrowth(sessions, uncompactedLimit, topSessions),
-		attribution: detectors.FindAttribution(sessions, topGroups),
-	}
-	if r, ok := fixes.ForSubAgents(f.subAgents, minFixSaving); ok {
-		f.subAgentFix = &r
-	}
-	if r, ok := fixes.ForCompaction(f.growth, contextThreshold, minFixSaving); ok {
-		f.compactFix = &r
-	}
-	if err := report(os.Stdout, st, sessions, f); err != nil {
+	// 4. Run the findings and write the report.
+	r := report.Analyse(sessions, report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines},
+		report.DefaultSettings(), time.Now())
+	if err := write(r, *format, *out); err != nil {
 		log.Fatal(err)
 	}
 }
 
-// findings holds the results of every detector, for the report.
-type findings struct {
-	context     detectors.ContextSize
-	pause       detectors.LongPause
-	tools       detectors.ToolOutput
-	fixes       []fixes.Recommendation // for tool output
-	subAgents   detectors.SubAgents
-	subAgentFix *fixes.Recommendation // nil if none
-	growth      detectors.Growth
-	compactFix  *fixes.Recommendation // nil if none
-	attribution detectors.Attribution
+// defaultHTML is where an HTML report goes when no --out is given.
+const defaultHTML = "trimloop-report.html"
+
+// write renders r in format to path, or to standard output if path is empty
+// (HTML always goes to a file). When the report goes to a file, a short
+// summary is printed to the terminal.
+func write(r report.Results, format, path string) error {
+	if format == "html" && path == "" {
+		path = defaultHTML
+	}
+	render := map[string]func(io.Writer, report.Results) error{
+		"text": report.WriteText,
+		"json": report.WriteJSON,
+		"html": report.WriteHTML,
+	}[format]
+	if path == "" {
+		return render(os.Stdout, r)
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	if err := render(f, r); err != nil {
+		_ = f.Close() // the write error is the one to report
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return report.WriteSummary(os.Stdout, r, path, 3)
 }
 
 // stats counts what was read.

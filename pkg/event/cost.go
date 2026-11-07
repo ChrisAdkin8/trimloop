@@ -3,11 +3,11 @@ package event
 // Cost is what one turn (or a sum of turns) cost, in US dollars, split by the
 // same token classes as Usage.
 type Cost struct {
-	InputUncached float64
-	CacheRead     float64
-	CacheWrite5m  float64
-	CacheWrite1h  float64
-	Output        float64
+	InputUncached float64 `json:"input_uncached"`
+	CacheRead     float64 `json:"cache_read"`
+	CacheWrite5m  float64 `json:"cache_write_5m"`
+	CacheWrite1h  float64 `json:"cache_write_1h"`
+	Output        float64 `json:"output"`
 }
 
 // Input is the cost of all input: uncached, cache reads and cache writes.

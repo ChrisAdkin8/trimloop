@@ -23,7 +23,8 @@ findings report with estimated savings. No proxy, no server.
   sub-agents in reduced fidelity ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
 - Reader also takes the harness's own cost and compaction records;
   reconciliation with them is the reader's acceptance test (ADR 0028).
-- CLI report (terminal + static HTML).
+- CLI report (terminal + static HTML). Done in the prototype: text, a
+  self-contained HTML page and JSON (`--format`, `--out`).
 - Minimal conformance runner: profile schema, capability claims against
   fixtures, golden events — so the M0 profiles pass it before being enabled.
 - Fixtures: synthetic sessions in the repository; real (redacted) sessions
@@ -48,7 +49,8 @@ skill, plugin and MCP server.
    requests, web-search fees. Needed before value.md §8 step 2.
 2. P07 with injected context by kind, priced by carried cost.
 3. Results kept between runs: findings history, JSON output, saved offsets.
-4. Command-line options: `analyse`, `--since`, `--repo`, `--format`.
+4. Command-line options: `analyse`, `--since`, `--repo` (`--format` and
+   `--out` are done).
 5. P14 in reduced fidelity: spend by effort level.
 6. P02 cache-lifetime fit.
 7. P03, P06, P01; then P05, P10 in full, P12.

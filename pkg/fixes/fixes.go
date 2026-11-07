@@ -27,24 +27,27 @@ const (
 
 // Fix is one way to act on a finding.
 type Fix struct {
-	Kind Kind
-	What string // the fix, in a sentence
-	How  string // how to apply it in Claude Code
+	Kind Kind   `json:"kind"`
+	What string `json:"what"` // the fix, in a sentence
+	How  string `json:"how"`  // how to apply it in Claude Code
 }
 
 // Recommendation is the advice for one finding.
 type Recommendation struct {
-	Pattern      string // e.g. "P04"
-	Title        string // what the noise is, e.g. "File viewing"
-	Noise        event.NoiseKind
-	Saving       float64  // the finding's estimated saving, an upper bound
-	Examples     []string // the shapes or tools that cost most
-	Primary      Fix
-	Alternatives []Fix
+	Pattern      string          `json:"pattern"` // e.g. "P04"
+	Title        string          `json:"title"`   // what the noise is, e.g. "File viewing"
+	Noise        event.NoiseKind `json:"noise"`
+	Saving       float64         `json:"saving"`   // the finding's estimated saving, an upper bound
+	Examples     []string        `json:"examples"` // the shapes or tools that cost most
+	Primary      Fix             `json:"primary"`
+	Alternatives []Fix           `json:"alternatives"`
 
 	// Check says how to tell whether the fix worked or did harm, where that
 	// needs more than another run (for example, a fix untested for quality).
-	Check string
+	Check string `json:"check"`
+
+	// Overlap says which other findings share the saving, if any.
+	Overlap string `json:"overlap,omitempty"`
 }
 
 // ForToolOutput recommends fixes for the kinds of noise in f with the

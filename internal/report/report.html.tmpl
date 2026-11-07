@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta name="referrer" content="no-referrer">
+<title>Trimloop report</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e3de;
+  --accent: #2f6f5e; --accent-soft: #d9ebe4; --warn: #b5562a; --warn-soft: #f6e3d8;
+  --bar: #2f6f5e; --bar2: #9cc8b8; --code: #f1f0ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161715; --panel: #1f201e; --text: #ecebe6; --muted: #a3a29b; --line: #34352f;
+    --accent: #7cc4a9; --accent-soft: #24392f; --warn: #f0a07a; --warn-soft: #3d2a20;
+    --bar: #7cc4a9; --bar2: #3f6b5b; --code: #2a2b27;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 19px; margin: 40px 0 12px; }
+h3 { font-size: 15px; margin: 20px 0 8px; }
+p { margin: 6px 0; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 16px 0; }
+.tile .num { font-size: 24px; font-weight: 650; }
+.tile .lbl { color: var(--muted); font-size: 13px; }
+.cards { display: grid; gap: 14px; }
+.card { border-left: 4px solid var(--accent); }
+.card h3 { margin: 0 0 4px; font-size: 17px; }
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 7px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); margin-right: 6px; vertical-align: 2px; }
+.saving { font-size: 20px; font-weight: 650; color: var(--accent); }
+.note { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 4px 8px; font-size: 13px; display: inline-block; margin: 4px 0; }
+.fix { margin-top: 10px; }
+.how { position: relative; background: var(--code); border-radius: 6px; padding: 10px 76px 10px 12px;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+details { margin-top: 8px; }
+summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]::after { content: " ↕"; opacity: .4; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.name { word-break: break-all; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.scroll { overflow-x: auto; }
+.barcell { width: 38%; min-width: 120px; }
+.bar { height: 12px; border-radius: 3px; background: var(--bar); position: relative; overflow: hidden; }
+.bar .part { position: absolute; right: 0; top: 0; bottom: 0; background: var(--bar2); }
+.legend { font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+.stack { display: flex; height: 18px; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.stack span { display: block; height: 100%; }
+footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+@media (max-width: 640px) { .barcell { display: none; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Trimloop report</h1>
+<p class="muted small">{{date .Generated}} · prices: {{.Prices}} · read {{thousands .Read.Logs}} logs, {{thousands .Read.Sessions}} sessions, {{thousands .Read.Turns}} turns{{if .Read.Failed}} · {{.Read.Failed}} logs failed{{end}}{{if .Read.BadLines}} · {{.Read.BadLines}} lines could not be parsed{{end}}{{if .Read.Unpriced}} · {{.Read.Unpriced}} turns had no price{{end}}</p>
+
+<div class="tiles">
+  <div class="panel tile"><div class="num">{{dollars .Total}}</div><div class="lbl">spend at list prices</div></div>
+  {{with .Context}}<div class="panel tile"><div class="num">{{pct .Cost $.Total}}</div><div class="lbl">of spend in turns over {{short .Threshold}} tokens</div></div>{{end}}
+  {{range .Growth.TopShares}}{{if eq .N 5}}<div class="panel tile"><div class="num">{{share .Share}}</div><div class="lbl">of spend in the 5 costliest conversations</div></div>{{end}}{{end}}
+  {{with .SubAgents}}{{if .Runs}}<div class="panel tile"><div class="num">{{pct .Cost $.Total}}</div><div class="lbl">of spend in {{thousands .Runs}} sub-agent runs</div></div>{{end}}{{end}}
+</div>
+
+<h2>What to do first</h2>
+<p class="muted small">Largest saving first. Savings are upper bounds and overlap, so don't add them up.</p>
+{{if not .First}}<p>No recommendations: nothing found was worth fixing.</p>{{end}}
+<div class="cards">
+{{range $i, $a := .First}}{{template "action" (args $a $.Total)}}{{end}}
+</div>
+{{if .More}}
+<details><summary>{{len .More}} more recommendations</summary>
+<div class="cards" style="margin-top:12px">
+{{range .More}}{{template "action" (args . $.Total)}}{{end}}
+</div>
+</details>
+{{end}}
+
+<h2>Where the money went</h2>
+<div class="panel">
+  <h3 style="margin-top:0">By token class</h3>
+  {{with .Cost}}
+  <div class="stack" role="img" aria-label="Spend by token class">
+    <span style="width: {{width .CacheRead $.Total}}%; background: var(--bar)" title="Cache reads"></span>
+    <span style="width: {{width .CacheWrite1h $.Total}}%; background: var(--bar2)" title="Cache writes, 1 hour"></span>
+    <span style="width: {{width .CacheWrite5m $.Total}}%; background: var(--warn)" title="Cache writes, 5 minutes"></span>
+    <span style="width: {{width .Output $.Total}}%; background: var(--muted)" title="Output"></span>
+  </div>
+  <p class="legend"><i style="background:var(--bar)"></i>Cache reads {{dollars .CacheRead}} ({{pct .CacheRead $.Total}})
+    <i style="background:var(--bar2)"></i>Cache writes, 1 hour {{dollars .CacheWrite1h}} ({{pct .CacheWrite1h $.Total}})
+    <i style="background:var(--warn)"></i>Cache writes, 5 min {{dollars .CacheWrite5m}} ({{pct .CacheWrite5m $.Total}})
+    <i style="background:var(--muted)"></i>Output {{dollars .Output}} ({{pct .Output $.Total}})
+    · uncached input {{dollars .InputUncached}}</p>
+  {{end}}
+
+  <h3>By project</h3>
+  <p class="legend">Bar length is spend; <i style="background:var(--bar2)"></i>the light part is sub-agents.</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Project</th><th class="n" data-sort>Cost</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Conversations</th><th class="n" data-sort>Sub-agents</th><th class="barcell"></th></tr></thead>
+    <tbody>
+    {{range .Attribution.ByProject}}<tr>
+      <td class="name">{{.Name}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Cost}}">{{pct1 .Cost $.Total}}</td>
+      <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Conversations}}">{{.Conversations}}</td>
+      <td class="n" data-v="{{.SubAgentCost}}">{{pct .SubAgentCost .Cost}}</td>
+      <td class="barcell"><div class="bar" style="width: {{width .Cost $.MaxProject}}%"><div class="part" style="width: {{width .SubAgentCost .Cost}}%"></div></div></td>
+    </tr>{{end}}
+    </tbody>
+  </table></div>
+
+  {{if or .Attribution.BySkill .Attribution.ByPlugin .Attribution.ByMCPServer}}
+  <details><summary>By skill, plugin and MCP server (as Claude Code attributes turns)</summary>
+    <p class="muted small">A turn is attributed to the skill, plugin or MCP server that Claude Code names on it; this can mean the turn followed a call to it rather than that it caused all the cost.</p>
+    {{template "spend" (args "Skill" .Attribution.BySkill $.Total)}}
+    {{template "spend" (args "Plugin" .Attribution.ByPlugin $.Total)}}
+    {{template "spend" (args "MCP server" .Attribution.ByMCPServer $.Total)}}
+  </details>
+  {{end}}
+</div>
+
+<h2>Where spend piles up <span class="badge">P19</span><span class="badge">P10</span></h2>
+<div class="panel">
+  {{with .Growth}}
+  <p>{{thousands .Conversations}} conversations (a main session with its sub-agents); the median one cost {{dollars .MedianCost}}.
+  {{range .TopShares}}The costliest {{.N}} made <b>{{share .Share}}</b> of spend. {{end}}</p>
+
+  <h3>Cost of one turn, by how much context it sends</h3>
+  <p class="muted small">Every turn re-sends the whole conversation, so turns get dearer as a session grows.</p>
+  <table>
+    <tbody>
+    {{range .Bands}}<tr>
+      <td style="width:9em">{{if .Max}}{{short .Min}} to {{short .Max}}{{else}}over {{short .Min}}{{end}}</td>
+      <td class="n" style="width:6em">{{dollars .MeanCost}}</td>
+      <td class="n muted" style="width:9em">{{thousands .Turns}} turns</td>
+      <td><div class="bar" style="width: {{width .MeanCost $.MaxBand}}%"></div></td>
+    </tr>{{end}}
+    </tbody>
+  </table>
+
+  <h3>Costliest conversations</h3>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th class="n" data-sort>Cost</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Peak context</th><th data-sort>Project</th><th data-sort>Conversation</th></tr></thead>
+    <tbody>
+    {{range .Top}}<tr><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Cost}}">{{pct1 .Cost $.Total}}</td>
+      <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Peak}}">{{thousands .Peak}}</td>
+      <td class="name">{{.Project}}</td><td class="mono name">{{.ID}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+
+  <h3>Compaction</h3>
+  <p>{{.Compactions}} compactions ({{.Manual}} asked for){{if .MedianBefore}}, typically from {{thousands .MedianBefore}} to {{thousands .MedianAfter}} tokens{{end}}{{if .Longest}}; the longest took {{duration .Longest}}{{end}}.
+  {{if .Uncompacted}}<span class="note">{{.Uncompacted}} sessions passed {{thousands .Limit}} tokens and never compacted: {{dollars .UncompactedCost}} ({{pct .UncompactedCost $.Total}} of spend).</span>{{end}}</p>
+  {{end}}
+
+  {{with .Context}}
+  <h3>Large working context</h3>
+  <p>{{thousands .Turns}} turns in {{.Sessions}} sessions sent more than {{thousands .Threshold}} tokens; their input cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend). Keeping context under {{thousands .Threshold}} tokens would have saved up to <b>{{dollars .Saving}}</b>.</p>
+  {{end}}
+  {{with .Pause}}
+  <h3>Long pauses <span class="badge">P09</span></h3>
+  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the whole context was written again: <b>{{dollars .Cost}}</b> ({{pct .Cost $.Total}} of spend). After a long break, compact or start a new session before carrying on.</p>
+  {{end}}
+
+  {{if .Sessions}}
+  <h3>Sessions with the largest savings</h3>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th class="n" data-sort>Context saving (P19)</th><th class="n" data-sort>Pause saving (P09)</th><th class="n" data-sort>Pauses</th><th class="n" data-sort>Peak context</th><th data-sort>Session</th></tr></thead>
+    <tbody>
+    {{range .Sessions}}<tr><td class="n" data-v="{{.ContextSave}}">{{dollars .ContextSave}}</td><td class="n" data-v="{{.PauseSave}}">{{dollars .PauseSave}}</td>
+      <td class="n" data-v="{{.Pauses}}">{{.Pauses}}</td><td class="n" data-v="{{.Peak}}">{{thousands .Peak}}</td><td class="mono name">{{.ID}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{end}}
+</div>
+
+<h2>What fills the context: tool output <span class="badge">P04</span></h2>
+<div class="panel">
+  {{with .Tools}}
+  <p>{{thousands .Calls}} tool results added about {{thousands .Tokens}} tokens. Each stays in the conversation and is sent again on every later turn; carried until the session ended or was compacted, they cost <b>{{dollars .Carried}}</b> ({{pct .Carried $.Total}} of spend). This is part of the large-context cost above, not extra to it.</p>
+  <p>Keeping each result under {{thousands .Target}} tokens would have saved up to {{dollars .Saving}}.
+  {{if .FileViews}}{{thousands .Rereads}} of {{thousands .FileViews}} file views ({{pct (float .Rereads) (float .FileViews)}}) re-read a file already seen, unchanged; carrying them cost {{dollars .RereadCarried}}.{{end}}
+  {{if .Persisted}}{{.Persisted}} results were too large and saved to disk.{{end}}</p>
+
+  <h3>By tool</h3>
+  <table>
+    <tbody>
+    {{range .ByTool}}<tr><td class="name" style="width:14em">{{.Name}}</td><td class="n" style="width:6em">{{dollars .Carried}}</td>
+      <td class="n muted" style="width:8em">{{thousands .Calls}} calls</td>
+      <td><div class="bar" style="width: {{width .Carried $.MaxTool}}%"></div></td></tr>{{end}}
+    </tbody>
+  </table>
+
+  {{if .ByShape}}
+  <h3>Shell commands by shape</h3>
+  <p class="muted small">A shape is a command with its file names and values removed, so <span class="mono">sed -n '1,50p' a.go</span> and <span class="mono">sed -n '9,20p' b.go</span> count together. "Filtered" is the share already piped through a filter such as head or grep.</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Shape</th><th class="n" data-sort>Carried</th><th class="n" data-sort>Calls</th><th class="n" data-sort>Tokens</th><th class="n" data-sort>Saving</th><th class="n" data-sort>Filtered</th></tr></thead>
+    <tbody>
+    {{range .ByShape}}<tr><td class="mono name">{{.Name}}</td><td class="n" data-v="{{.Carried}}">{{dollars .Carried}}</td>
+      <td class="n" data-v="{{.Calls}}">{{thousands .Calls}}</td><td class="n" data-v="{{.Tokens}}">{{thousands .Tokens}}</td>
+      <td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td><td class="n" data-v="{{.Filtered}}">{{pct (float .Filtered) (float .Calls)}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{end}}
+  {{end}}
+</div>
+
+<h2>Sub-agents <span class="badge">P13</span></h2>
+<div class="panel">
+  {{with .SubAgents}}
+  {{if .Runs}}
+  <p>{{thousands .Runs}} sub-agent runs cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend). On a cheaper model the same turns would have cost <b>{{dollars .Saving}}</b> less — untested for quality.</p>
+  <p class="muted small">Cache writes are {{share .WriteShare}} of their spend ({{share .MainWriteShare}} in main sessions), and each written token is read {{times .ReadsPerWrite}} times ({{times .MainReadsPerWrite}} in main sessions): every run starts with an empty cache.{{if .Large}} {{.Large}} runs passed {{thousands .LargeAbove}} tokens and cost {{dollars .LargeCost}}.{{end}}</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Agent type</th><th class="n" data-sort>Cost</th><th class="n" data-sort>Runs</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Saving</th><th data-sort>Model</th><th data-sort>Suggested</th><th class="barcell"></th></tr></thead>
+    <tbody>
+    {{range .ByType}}<tr><td class="name">{{.Type}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Runs}}">{{.Runs}}</td>
+      <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td>
+      <td class="mono">{{.Model}}</td><td class="mono">{{if .Alternative}}{{.Alternative}}{{else}}<span class="muted">—</span>{{end}}</td>
+      <td class="barcell"><div class="bar" style="width: {{width .Cost $.MaxAgent}}%"></div></td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{else}}<p>No sub-agent runs.</p>{{end}}
+  {{end}}
+</div>
+
+<footer>
+  <p>Costs are estimates at list prices ({{.Prices}}); tool output is sized at 4 bytes per token. Savings are upper bounds: some context is always needed, and a compacted or new session still pays for what it keeps. Findings measure the same money from different angles, so their savings are not added.</p>
+  <p>This page was written by trimloop on this machine and loads nothing from the network. It shows project, skill and session names in plain text: check before sharing it.</p>
+</footer>
+
+</main>
+
+{{define "action"}}{{$a := index . 0}}{{$total := index . 1}}
+<div class="panel card">
+  <h3><span class="badge">{{$a.Pattern}}</span>{{$a.Title}}</h3>
+  <p><span class="saving">up to {{dollars $a.Saving}}</span> <span class="muted">({{pct $a.Saving $total}} of spend){{if $a.Examples}} · mostly {{join $a.Examples ", "}}{{end}}</span></p>
+  {{if $a.Overlap}}<span class="note">{{$a.Overlap}}</span>{{end}}
+  <div class="fix">
+    <p><b>{{$a.Primary.What}}</b> <span class="muted small">({{kind $a.Primary.Kind}})</span></p>
+    <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>
+  </div>
+  {{if $a.Check}}<p class="small"><b>Check:</b> {{$a.Check}}</p>{{end}}
+  {{if $a.Alternatives}}
+  <details><summary>{{len $a.Alternatives}} other way{{if gt (len $a.Alternatives) 1}}s{{end}} to fix it</summary>
+    {{range $a.Alternatives}}
+    <div class="fix">
+      <p><b>{{.What}}</b> <span class="muted small">({{kind .Kind}})</span></p>
+      <div class="how">{{.How}}<button class="copy" type="button">Copy</button></div>
+    </div>
+    {{end}}
+  </details>
+  {{end}}
+</div>
+{{end}}
+
+{{define "spend"}}{{$rows := index . 1}}{{$total := index . 2}}{{if $rows}}
+<h3>{{index . 0}}</h3>
+<div class="scroll"><table class="sortable">
+  <thead><tr><th data-sort>Name</th><th class="n" data-sort>Cost</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Conversations</th></tr></thead>
+  <tbody>
+  {{range $rows}}<tr><td class="name">{{.Name}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Cost}}">{{pct1 .Cost $total}}</td>
+    <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Conversations}}">{{.Conversations}}</td></tr>{{end}}
+  </tbody>
+</table></div>
+{{end}}{{end}}
+
+<script>
+// Copy buttons: copy the fix text, without the button's own label.
+document.querySelectorAll('.copy').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var text = b.parentNode.firstChild.textContent.trim();
+    var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+  });
+});
+// Sortable tables: click a heading to sort; click again to reverse.
+document.querySelectorAll('table.sortable').forEach(function (table) {
+  table.querySelectorAll('th[data-sort]').forEach(function (th, col) {
+    th.addEventListener('click', function () {
+      var body = table.tBodies[0];
+      var rows = Array.prototype.slice.call(body.rows);
+      var desc = th.dataset.dir !== 'desc';
+      th.dataset.dir = desc ? 'desc' : 'asc';
+      rows.sort(function (a, b) {
+        var x = a.cells[col], y = b.cells[col];
+        var xv = x.dataset.v !== undefined ? parseFloat(x.dataset.v) : x.textContent.trim().toLowerCase();
+        var yv = y.dataset.v !== undefined ? parseFloat(y.dataset.v) : y.textContent.trim().toLowerCase();
+        var c = xv < yv ? -1 : xv > yv ? 1 : 0;
+        return desc ? -c : c;
+      });
+      rows.forEach(function (r) { body.appendChild(r); });
+    });
+  });
+});
+</script>
+</body>
+</html>

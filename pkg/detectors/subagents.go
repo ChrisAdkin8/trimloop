@@ -11,35 +11,37 @@ import (
 // the work as well is not known from the logs, so Saving is untested for
 // quality.
 type SubAgents struct {
-	Runs  int     // sub-agent sessions
-	Turns int     // their turns
-	Cost  float64 // their spend
+	Runs  int     `json:"runs"`  // sub-agent sessions
+	Turns int     `json:"turns"` // their turns
+	Cost  float64 `json:"cost"`  // their spend
 
 	// Saving is what their turns would have cost less on the cheaper model
 	// price.Cheaper suggests, counting only turns that have one.
-	Saving float64
+	Saving float64 `json:"saving"`
 
 	// Cache use, sub-agents against main sessions: cache writes as a share of
 	// spend, and how many times each written token was read again.
-	WriteShare, MainWriteShare       float64
-	ReadsPerWrite, MainReadsPerWrite float64
+	WriteShare        float64 `json:"write_share"`
+	MainWriteShare    float64 `json:"main_write_share"`
+	ReadsPerWrite     float64 `json:"reads_per_write"`
+	MainReadsPerWrite float64 `json:"main_reads_per_write"`
 
-	LargeAbove int     // context tokens above which a run counts as large
-	Large      int     // runs whose context passed LargeAbove
-	LargeCost  float64 // what those runs cost
+	LargeAbove int     `json:"large_above"` // context tokens above which a run counts as large
+	Large      int     `json:"large"`       // runs whose context passed LargeAbove
+	LargeCost  float64 `json:"large_cost"`  // what those runs cost
 
-	ByType []AgentGroup // by agent type, largest spend first
+	ByType []AgentGroup `json:"by_type"` // by agent type, largest spend first
 }
 
 // AgentGroup is the spend of one agent type.
 type AgentGroup struct {
-	Type        string
-	Runs        int
-	Turns       int
-	Cost        float64
-	Saving      float64
-	Model       string // the model that cost most in this group
-	Alternative string // the cheaper model suggested for it; "" if none
+	Type        string  `json:"type"`
+	Runs        int     `json:"runs"`
+	Turns       int     `json:"turns"`
+	Cost        float64 `json:"cost"`
+	Saving      float64 `json:"saving"`
+	Model       string  `json:"model"`       // the model that cost most in this group
+	Alternative string  `json:"alternative"` // the cheaper model suggested for it; "" if none
 }
 
 // sharesCache lists agent types that continue the main conversation and read

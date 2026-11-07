@@ -49,15 +49,17 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 // ForCompaction recommends compacting earlier when sessions grew past the
 // limit without compacting (P19's fix, with P10's records; ADR 0031), or
 // returns false if they cost less than minCost. threshold is the context
-// size, in tokens, at which to compact.
-func ForCompaction(g detectors.Growth, threshold int, minCost float64) (Recommendation, bool) {
+// size, in tokens, at which to compact; saving is P19's, which this fix
+// shares with starting new sessions.
+func ForCompaction(g detectors.Growth, threshold int, saving, minCost float64) (Recommendation, bool) {
 	if g.UncompactedCost < minCost {
 		return Recommendation{}, false
 	}
 	return Recommendation{
 		Pattern: "P19",
 		Title:   "Sessions that grew without compacting",
-		Saving:  0, // part of P19's saving; not counted twice
+		Saving:  saving,
+		Overlap: "P19's saving: shared with P09 and P04, so not to be added to them",
 		Primary: Fix{Advise,
 			fmt.Sprintf("Compact when a session passes about %s tokens, or between tasks.", thousandsInt(threshold)),
 			"Run /compact yourself (/context shows the current size). Claude Code compacts on its own only " +

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,9 +11,9 @@ import (
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
+	"github.com/ChrisAdkin8/trimloop/internal/report"
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
-	"github.com/ChrisAdkin8/trimloop/pkg/fixes"
 )
 
 var t0 = time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
@@ -226,51 +225,6 @@ func TestSessionFor(t *testing.T) {
 	}
 }
 
-func TestThousands(t *testing.T) {
-	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567", -1234: "-1,234"} {
-		if got := thousands(n); got != want {
-			t.Errorf("thousands(%d) = %q, want %q", n, got, want)
-		}
-	}
-	if got := dollars(1234.5); got != "$1,234.50" {
-		t.Errorf("dollars(1234.5) = %q, want $1,234.50", got)
-	}
-}
-
-func TestDuration(t *testing.T) {
-	for d, want := range map[time.Duration]string{
-		time.Hour: "1 hour", 2 * time.Hour: "2 hours", 90 * time.Minute: "90 minutes", 90 * time.Second: "1m30s",
-	} {
-		if got := duration(d); got != want {
-			t.Errorf("duration(%v) = %q, want %q", d, got, want)
-		}
-	}
-}
-
-func TestReportRuns(t *testing.T) {
-	var buf bytes.Buffer
-	if err := report(&buf, stats{logs: 1}, nil, findings{}); err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{"COST BY TOKEN CLASS", "WHERE THE SPEND WENT", "P19 ", "P10)", "P09 ", "P04 ", "P13 "} {
-		if !strings.Contains(buf.String(), want) {
-			t.Errorf("report has no %q", want)
-		}
-	}
-}
-
-// failingWriter fails every write, like a closed pipe or a full disk.
-type failingWriter struct{}
-
-func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
-
-func TestReportReturnsWriteError(t *testing.T) {
-	err := report(failingWriter{}, stats{logs: 1}, nil, findings{})
-	if err == nil {
-		t.Fatal("got no error from a writer that always fails")
-	}
-}
-
 // TestToolFixture reads the made-up session in testdata, with tool calls
 // logged one content block per line, a re-read, an edit, an output saved to
 // disk and a compaction, and checks what fills its context.
@@ -310,8 +264,10 @@ func TestToolFixture(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	recs := fixes.ForToolOutput(f, 4, 0)
-	if err := report(&buf, stats{logs: 1}, []event.Session{s}, findings{tools: f, fixes: recs}); err != nil {
+	settings := report.DefaultSettings()
+	settings.ResultTarget, settings.MinFixSaving = 500, 0
+	r := report.Analyse([]event.Session{s}, report.Read{Logs: 1}, settings, t0)
+	if err := report.WriteText(&buf, r); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"sed -n", "1 of 3 file views", "Fix (advise)", "CLAUDE.md"} {
@@ -332,20 +288,6 @@ func TestBuildSessionSkipsCallsOfCopiedMessages(t *testing.T) {
 	s := buildSession(d, map[string]bool{"old": true})
 	if len(s.Turns) != 1 || len(s.Turns[0].ToolCalls) != 1 || s.Turns[0].ToolCalls[0].ID != "c2" {
 		t.Errorf("got %+v, want one turn with call c2 once", s.Turns)
-	}
-}
-
-func TestPrintable(t *testing.T) {
-	for in, want := range map[string]string{
-		"sed -n":               "sed -n",
-		"evil\x1b]0;title\x07": "evil?]0;title?",
-		"a\nb\tc\x7f":          "a?b?c?",
-		"bad\xffutf8":          "bad?utf8",
-		"café":                 "café",
-	} {
-		if got := printable(in); got != want {
-			t.Errorf("printable(%q) = %q, want %q", in, got, want)
-		}
 	}
 }
 
@@ -373,22 +315,31 @@ func TestFullReportOnFixture(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sessions := []event.Session{s}
-	g := detectors.FindGrowth(sessions, 5_000, 5)
-	rec, _ := fixes.ForCompaction(g, 2_000, 0)
-	f := findings{
-		growth:      g,
-		compactFix:  &rec,
-		subAgents:   detectors.FindSubAgents(sessions, 200_000),
-		attribution: detectors.FindAttribution(sessions, 10),
-	}
+	settings := report.DefaultSettings()
+	settings.UncompactedLimit, settings.ContextThreshold, settings.MinFixSaving = 5_000, 2_000, 0
+	r := report.Analyse([]event.Session{s}, report.Read{Logs: 1}, settings, t0)
 	var buf bytes.Buffer
-	if err := report(&buf, stats{logs: 1}, sessions, f); err != nil {
+	if err := report.WriteText(&buf, r); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"repo", "1 compactions (1 asked for)", "/compact", "No sub-agent runs."} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}
+	}
+}
+
+// write sends HTML to a file and prints a summary; an unwritable path fails.
+func TestWrite(t *testing.T) {
+	r := report.Analyse(nil, report.Read{Logs: 1}, report.DefaultSettings(), t0)
+	path := filepath.Join(t.TempDir(), "r.html")
+	if err := write(r, "html", path); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), "<title>Trimloop report</title>") {
+		t.Errorf("got err %v, page %.40q", err, b)
+	}
+	if err := write(r, "json", filepath.Join(t.TempDir(), "missing", "r.json")); err == nil {
+		t.Error("got no error writing into a missing folder")
 	}
 }

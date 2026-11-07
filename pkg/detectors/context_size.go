@@ -6,19 +6,19 @@ import "github.com/ChrisAdkin8/trimloop/pkg/event"
 // context. Every turn re-sends the whole conversation, so a long session pays
 // again, on every turn, for everything it has accumulated.
 type ContextSize struct {
-	Threshold int // input tokens per turn above which a turn counts
+	Threshold int `json:"threshold"` // input tokens per turn above which a turn counts
 
-	Turns    int     // turns above the threshold
-	Sessions int     // sessions with at least one such turn
-	Cost     float64 // input cost of those turns (everything they sent)
+	Turns    int     `json:"turns"`    // turns above the threshold
+	Sessions int     `json:"sessions"` // sessions with at least one such turn
+	Cost     float64 `json:"cost"`     // input cost of those turns (everything they sent)
 
 	// Saving is the input cost of the tokens above the threshold: what those
 	// turns would have saved had context been kept to Threshold tokens (by
 	// starting a new session per task, or compacting earlier). It is an upper
 	// bound: some of that context was needed.
-	Saving float64
+	Saving float64 `json:"saving"`
 
-	Top []SessionStat // sessions with the largest saving
+	Top []SessionStat `json:"top"` // sessions with the largest saving
 }
 
 // FindContextSize reports turns whose context exceeds threshold tokens.
