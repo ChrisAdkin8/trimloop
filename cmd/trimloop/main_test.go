@@ -331,3 +331,17 @@ func TestBuildSessionSkipsCallsOfCopiedMessages(t *testing.T) {
 		t.Errorf("got %+v, want one turn with call c2 once", s.Turns)
 	}
 }
+
+func TestPrintable(t *testing.T) {
+	for in, want := range map[string]string{
+		"sed -n":               "sed -n",
+		"evil\x1b]0;title\x07": "evil?]0;title?",
+		"a\nb\tc\x7f":          "a?b?c?",
+		"bad\xffutf8":          "bad?utf8",
+		"café":                 "café",
+	} {
+		if got := printable(in); got != want {
+			t.Errorf("printable(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

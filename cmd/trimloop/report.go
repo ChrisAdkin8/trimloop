@@ -92,7 +92,7 @@ func sessionTable(w io.Writer, top []detectors.SessionStat, turnsLabel, peakLabe
 	fmt.Fprintf(w, "  Top sessions:\n")
 	fmt.Fprintf(w, "    %-10s %-18s %10s  %s\n", "saving", peakLabel, turnsLabel, "session")
 	for _, s := range top {
-		fmt.Fprintf(w, "    %-10s %-18s %10d  %s\n", dollars(s.Saving), thousands(s.Peak), s.Turns, s.SessionID)
+		fmt.Fprintf(w, "    %-10s %-18s %10d  %s\n", dollars(s.Saving), thousands(s.Peak), s.Turns, printable(s.SessionID))
 	}
 }
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -41,7 +43,7 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 	for i, r := range recs {
 		fmt.Fprintf(w, "\n  %d. %s: up to %s", i+1, r.Title, dollars(r.Saving))
 		if len(r.Examples) > 0 {
-			fmt.Fprintf(w, " (mostly %s)", strings.Join(r.Examples, ", "))
+			fmt.Fprintf(w, " (mostly %s)", printable(strings.Join(r.Examples, ", ")))
 		}
 		fmt.Fprintln(w)
 		fixLine(w, "Fix", r.Primary)
@@ -69,7 +71,7 @@ func groupTable(w io.Writer, title, nameLabel string, groups []detectors.Group, 
 		if filtered {
 			fmt.Fprintf(w, " %8.0f%%", pct(float64(g.Filtered), float64(g.Calls)))
 		}
-		fmt.Fprintf(w, "  %s\n", g.Name)
+		fmt.Fprintf(w, "  %s\n", printable(g.Name))
 	}
 }
 
@@ -99,4 +101,16 @@ func wrap(s string, width int) []string {
 		lines = append(lines, cur.String())
 	}
 	return lines
+}
+
+// printable replaces control characters in s, which comes from logs (shapes
+// are built from commands the agent wrote, tool names from the harness), so
+// that printing it cannot send escape sequences to the user's terminal.
+func printable(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == utf8.RuneError {
+			return '?'
+		}
+		return r
+	}, s)
 }
