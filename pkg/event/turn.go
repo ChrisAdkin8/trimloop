@@ -19,6 +19,14 @@ type Turn struct {
 	Usage  Usage
 	Cost   Cost
 	Priced bool // false if the price catalogue has no price for Model
+
+	// ToolCalls are the tools this turn called. Their results are sent to
+	// the model from the next turn of the session onwards.
+	ToolCalls []ToolCall
+
+	// CompactedBefore is true when the session was compacted just before
+	// this turn: earlier tool results are no longer in the context.
+	CompactedBefore bool
 }
 
 // Context is the number of input tokens the turn sent, cached or not.

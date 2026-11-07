@@ -36,9 +36,11 @@ findings report with estimated savings. No proxy, no server.
   release dry-run of the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)).
 
 **Build order** ([ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md)), by
-value to the user. Done: reader, usage de-duplication, pricing, P19 and P09.
+value to the user. Done: reader, usage de-duplication, pricing, P19 and P09,
+and item 1.
 
-1. Context composition by tool (P04; explains P19).
+1. ~~Context composition by tool (P04; explains P19).~~ Done: carried cost
+   by tool and command shape, re-reads, and fixes from the ADR 0030 ladder.
 2. Reconciliation with the harness cost record, including auxiliary turns.
 3. P14 in reduced fidelity: spend by effort level.
 4. Results kept between runs: findings history, JSON output, saved offsets.

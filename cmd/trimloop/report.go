@@ -15,8 +15,9 @@ import (
 // report prints the cost summary and the findings to out. It writes through a
 // bufio.Writer, which keeps the first write error; the error Flush returns is
 // the only one that needs checking.
-func report(out io.Writer, st stats, sessions []event.Session, ctx detectors.ContextSize, pause detectors.LongPause) error {
+func report(out io.Writer, st stats, sessions []event.Session, f findings) error {
 	w := bufio.NewWriter(out)
+	ctx, pause := f.context, f.pause
 	turns, unpriced := 0, 0
 	for _, s := range sessions {
 		for _, t := range s.Turns {
@@ -76,8 +77,10 @@ func report(out io.Writer, st stats, sessions []event.Session, ctx detectors.Con
 	fmt.Fprintln(w, "  Action: after a long break, compact the session or start a new one before carrying on.")
 	sessionTable(w, pause.Top, "pauses", "context at resume")
 
+	toolOutputSection(w, f.tools, f.fixes, all)
+
 	fmt.Fprintln(w, "\nSavings are upper bounds: some context is needed, and a compacted or new")
-	fmt.Fprintln(w, "session still pays for what it keeps. The two findings overlap, so do not add them.")
+	fmt.Fprintln(w, "session still pays for what it keeps. The findings overlap, so do not add them.")
 	return w.Flush()
 }
 

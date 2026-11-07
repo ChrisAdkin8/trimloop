@@ -14,6 +14,7 @@ import (
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
+	"github.com/ChrisAdkin8/trimloop/pkg/fixes"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
@@ -22,6 +23,10 @@ const (
 	contextThreshold = 200_000   // input tokens per turn
 	pauseGap         = time.Hour // longer than the longest cache lifetime
 	topSessions      = 5
+	resultTarget     = 2_000 // tokens per tool result; the excess counts as P04 saving
+	topGroups        = 10    // tools and command shapes shown
+	topFixes         = 4     // kinds of noise with recommended fixes
+	minFixSaving     = 1.0   // dollars; smaller savings get no recommendation
 )
 
 func main() {
@@ -75,11 +80,24 @@ func main() {
 	}
 
 	// 4. Run the findings and print the report.
-	if err := report(os.Stdout, st, sessions,
-		detectors.FindContextSize(sessions, contextThreshold, topSessions),
-		detectors.FindLongPauses(sessions, pauseGap, topSessions)); err != nil {
+	tools := detectors.FindToolOutput(sessions, resultTarget, topGroups)
+	f := findings{
+		context: detectors.FindContextSize(sessions, contextThreshold, topSessions),
+		pause:   detectors.FindLongPauses(sessions, pauseGap, topSessions),
+		tools:   tools,
+		fixes:   fixes.ForToolOutput(tools, topFixes, minFixSaving),
+	}
+	if err := report(os.Stdout, st, sessions, f); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// findings holds the results of every detector, for the report.
+type findings struct {
+	context detectors.ContextSize
+	pause   detectors.LongPause
+	tools   detectors.ToolOutput
+	fixes   []fixes.Recommendation
 }
 
 // stats counts what was read.
@@ -110,7 +128,7 @@ func readLog(r source.Reader, l source.Log) logData {
 			break
 		}
 		d.msgs = append(d.msgs, m)
-		if !m.Time.IsZero() && (d.start.IsZero() || m.Time.Before(d.start)) {
+		if m.Kind == source.KindTurn && !m.Time.IsZero() && (d.start.IsZero() || m.Time.Before(d.start)) {
 			d.start = m.Time
 		}
 	}
@@ -137,28 +155,67 @@ func oldestFirst(data []logData) {
 // Message IDs already in seen are skipped, and new ones are added to it.
 // Skipped repeats still count as activity, so the idle time before the next
 // turn is measured from the last thing that happened in this log.
+//
+// Tool calls are collected from every line of a message counted in this log,
+// and each result is attached to its call. Calls of a message counted in an
+// earlier log (copied into a resumed session) are not: their output is
+// credited to the log it first appeared in.
 func buildSession(d logData, seen map[string]bool) event.Session {
 	s := sessionFor(d.log.Path)
-	var last time.Time // latest activity so far in this log
+	var last time.Time            // latest response time so far in this log
+	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
+	callAt := map[string][2]int{} // tool-use id -> turn index, call index
+	compacted := false            // a compaction since the last new turn
 	for _, m := range d.msgs {
-		isNew := m.ID == "" || !seen[m.ID] // no id: nothing to match repeats on
-		if isNew {
+		switch m.Kind {
+		case source.KindToolResults:
+			for _, r := range m.Results {
+				if at, ok := callAt[r.CallID]; ok {
+					c := &s.Turns[at[0]].ToolCalls[at[1]]
+					c.Result, c.HasResult = r.ToolResult, true
+				}
+			}
+			continue
+		case source.KindCompaction:
+			compacted = true
+			continue
+		}
+
+		i, here := turnOf[m.ID]
+		if m.ID == "" || !seen[m.ID] { // no id: nothing to match repeats on
 			if m.ID != "" {
 				seen[m.ID] = true
 			}
 			t := event.Turn{
-				ID:    m.ID,
-				Seq:   len(s.Turns),
-				Model: m.Model,
-				Time:  m.Time,
-				First: last.IsZero(),
-				Usage: m.Usage,
+				ID:              m.ID,
+				Seq:             len(s.Turns),
+				Model:           m.Model,
+				Time:            m.Time,
+				First:           last.IsZero(),
+				Usage:           m.Usage,
+				CompactedBefore: compacted,
 			}
 			if !last.IsZero() && m.Time.After(last) {
 				t.IdleBefore = m.Time.Sub(last)
 			}
 			t.Cost, t.Priced = price.Cost(m.Model, m.Usage, price.Options{Fast: m.Fast, USOnly: m.USOnly})
 			s.Turns = append(s.Turns, t)
+			compacted = false
+			i, here = len(s.Turns)-1, true
+			if m.ID != "" {
+				turnOf[m.ID] = i
+			}
+		}
+		if here {
+			for _, c := range m.ToolCalls {
+				if c.ID != "" {
+					if _, dup := callAt[c.ID]; dup {
+						continue
+					}
+					callAt[c.ID] = [2]int{i, len(s.Turns[i].ToolCalls)}
+				}
+				s.Turns[i].ToolCalls = append(s.Turns[i].ToolCalls, c)
+			}
 		}
 		if m.Time.After(last) {
 			last = m.Time

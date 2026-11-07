@@ -16,8 +16,8 @@ import (
 )
 
 // ParseFunc turns one non-blank line into a Message. It returns ok=false for
-// a line that carries no usage (to be skipped), and an error for a line it
-// cannot parse.
+// a line the analysis does not use (to be skipped), and an error for a line
+// it cannot parse.
 type ParseFunc func(line []byte) (m source.Message, ok bool, err error)
 
 // Lines streams the messages in log, using parse for each line. It meets the

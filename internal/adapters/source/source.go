@@ -24,7 +24,8 @@ type Reader interface {
 	// Discover finds the harness's logs on disk.
 	Discover() ([]Log, error)
 
-	// Read streams the messages with usage in one log, in file order.
+	// Read streams the messages in one log, in file order: responses with
+	// usage (and the tools they call), tool results, and compactions.
 	//
 	// Contract:
 	//   - Read starts at log.Offset and moves it past each complete line it
@@ -35,7 +36,9 @@ type Reader interface {
 	//   - If the log is now shorter than log.Offset, it was replaced or cut
 	//     short; Read starts again from the beginning.
 	//   - Read yields every message line that carries usage, repeats
-	//     included. The caller counts each message id once (ADR 0026).
+	//     included. The caller counts each message id once (ADR 0026), but
+	//     collects the tool calls from every line with that id: a harness
+	//     may log one content block per line.
 	//   - A line Read cannot parse is yielded as an error wrapping ErrBadLine,
 	//     and Read carries on. Any other error ends the log.
 	Read(log *Log) iter.Seq2[Message, error]
@@ -52,16 +55,41 @@ type Log struct {
 	Offset int64
 }
 
-// Message is one message that carries usage. It stands in for event.Raw
-// until that type exists.
+// Message is one log line that matters to the analysis. It stands in for
+// event.Raw until that type exists. Kind says which fields are set.
 type Message struct {
-	ID        string    // provider message id; usage is counted once per id
+	Kind Kind
+
+	// Set for every kind.
 	SessionID string    // the harness's session id, if it logs one
 	Time      time.Time // when the line was logged; zero if not known
+
+	// KindTurn: a model response that carries usage.
+	ID        string // provider message id; usage is counted once per id
 	Model     string
 	Usage     event.Usage
-	Fast      bool // fast mode, which changes the price
-	USOnly    bool // US-only inference, which changes the price
+	Fast      bool             // fast mode, which changes the price
+	USOnly    bool             // US-only inference, which changes the price
+	ToolCalls []event.ToolCall // tools called on this line, with no results yet
+
+	// KindToolResults: the results of earlier tool calls.
+	Results []Result
+}
+
+// Kind is the kind of line a Message holds.
+type Kind int
+
+// The kinds of line.
+const (
+	KindTurn        Kind = iota // a model response with usage
+	KindToolResults             // results of tool calls, sent on the next turn
+	KindCompaction              // the session was compacted: earlier context dropped
+)
+
+// Result is one tool result, linked to its call by CallID.
+type Result struct {
+	CallID string
+	event.ToolResult
 }
 
 // ErrBadLine marks a line a Reader could not parse: either it is not valid

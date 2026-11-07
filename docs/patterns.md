@@ -161,6 +161,13 @@ $23, `cat` $19. Of 5,377 file views (Read, `cat`, `sed -n`, `head`, `tail`),
 these commands were already piped through a filter; the waste is whole-file
 views, broad searches and repeats.
 
+These figures came from a one-off script that carried output past
+compactions. The M0 detector drops output at each compaction, as the harness
+does, and measures less on the same logs: ≈ $251 carried in all (Bash $163,
+Read $62; `sed -n` $48), and 23 % of file views re-reading a file unchanged
+since it was last viewed (an edit or a compaction resets that). Ignoring
+compactions, the detector gives ≈ $449, so compaction accounts for the gap.
+
 **Kinds of noise:**
 
 | Kind | Example shapes | Recommended fix |

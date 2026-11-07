@@ -14,6 +14,7 @@ import (
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
+	"github.com/ChrisAdkin8/trimloop/pkg/fixes"
 )
 
 var t0 = time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
@@ -248,10 +249,10 @@ func TestDuration(t *testing.T) {
 
 func TestReportRuns(t *testing.T) {
 	var buf bytes.Buffer
-	if err := report(&buf, stats{logs: 1}, nil, detectors.ContextSize{}, detectors.LongPause{}); err != nil {
+	if err := report(&buf, stats{logs: 1}, nil, findings{}); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"COST BY TOKEN CLASS", "P19 ", "P09 "} {
+	for _, want := range []string{"COST BY TOKEN CLASS", "P19 ", "P09 ", "P04 "} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}
@@ -264,8 +265,69 @@ type failingWriter struct{}
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
 
 func TestReportReturnsWriteError(t *testing.T) {
-	err := report(failingWriter{}, stats{logs: 1}, nil, detectors.ContextSize{}, detectors.LongPause{})
+	err := report(failingWriter{}, stats{logs: 1}, nil, findings{})
 	if err == nil {
 		t.Fatal("got no error from a writer that always fails")
+	}
+}
+
+// TestToolFixture reads the made-up session in testdata, with tool calls
+// logged one content block per line, a re-read, an edit, an output saved to
+// disk and a compaction, and checks what fills its context.
+func TestToolFixture(t *testing.T) {
+	l := source.Log{Path: filepath.Join("..", "..", "testdata", "sessions", "tools.jsonl")}
+	s, bad, err := readSession(cc, &l, map[string]bool{})
+	if err != nil || bad != 0 {
+		t.Fatalf("got err %v, %d bad lines", err, bad)
+	}
+	if len(s.Turns) != 6 {
+		t.Fatalf("got %d turns, want 6 (one per message id)", len(s.Turns))
+	}
+	if n := len(s.Turns[0].ToolCalls); n != 1 {
+		t.Errorf("turn m1: got %d tool calls, want 1 from its second line", n)
+	}
+	if c := s.Turns[2].ToolCalls[1]; c.Shape != "go test -v" || !c.HasResult || !c.Result.Error || !c.Result.Persisted {
+		t.Errorf("go test call: got %+v", c)
+	}
+	if !s.Turns[5].CompactedBefore {
+		t.Error("the last turn should follow a compaction")
+	}
+
+	f := detectors.FindToolOutput([]event.Session{s}, 500, 10)
+	// t1 to t5 are each sent once and carried; the compaction drops them all.
+	if f.Calls != 5 || f.FileViews != 3 || f.Rereads != 1 || f.Persisted != 1 {
+		t.Errorf("got %d calls, %d views, %d re-reads, %d persisted; want 5, 3, 1, 1",
+			f.Calls, f.FileViews, f.Rereads, f.Persisted)
+	}
+	if f.Carried <= 0 || f.Saving <= 0 || f.Saving >= f.Carried {
+		t.Errorf("got carried %v, saving %v; want 0 < saving < carried", f.Carried, f.Saving)
+	}
+	if len(f.ByShape) != 2 || f.ByShape[0].Name != "sed -n" {
+		t.Errorf("by shape: got %+v", f.ByShape)
+	}
+
+	var buf bytes.Buffer
+	recs := fixes.ForToolOutput(f, 4, 0)
+	if err := report(&buf, stats{logs: 1}, []event.Session{s}, findings{tools: f, fixes: recs}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"sed -n", "1 of 3 file views", "Fix (advise)", "CLAUDE.md"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("report has no %q", want)
+		}
+	}
+}
+
+// A message copied from an earlier log (a resumed session) brings no tool
+// calls: its output was credited to the log it first appeared in.
+func TestBuildSessionSkipsCallsOfCopiedMessages(t *testing.T) {
+	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
+		{ID: "old", ToolCalls: []event.ToolCall{{ID: "c1", Tool: "Bash"}}},
+		{Kind: source.KindToolResults, Results: []source.Result{{CallID: "c1"}}},
+		{ID: "new", ToolCalls: []event.ToolCall{{ID: "c2", Tool: "Read"}, {ID: "c2", Tool: "Read"}}},
+	}}
+	s := buildSession(d, map[string]bool{"old": true})
+	if len(s.Turns) != 1 || len(s.Turns[0].ToolCalls) != 1 || s.Turns[0].ToolCalls[0].ID != "c2" {
+		t.Errorf("got %+v, want one turn with call c2 once", s.Turns)
 	}
 }
