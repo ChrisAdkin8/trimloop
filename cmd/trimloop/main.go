@@ -21,15 +21,16 @@ import (
 )
 
 func main() {
-	format := flag.String("format", "text", "report format: text, html or json")
-	out := flag.String("out", "", "write the report to this file (default: standard output for text and json, "+defaultHTML+" for html)")
+	format := flag.String("format", "summary", "report format: summary (a few lines), text (the full report), html or json")
+	out := flag.String("out", "", "write the report to this file (default: standard output, or "+defaultHTML+" for html)")
+	noTitles := flag.Bool("no-titles", false, "leave out session titles, which summarise what was asked")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [--format text|html|json] [--out FILE]\n\n"+
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [--format summary|text|html|json] [--out FILE] [--no-titles]\n\n"+
 			"Analyses Claude Code session logs on this machine for token waste.\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	if flag.NArg() > 0 || (*format != "text" && *format != "html" && *format != "json") {
+	if flag.NArg() > 0 || !validFormat[*format] {
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -85,8 +86,10 @@ func main() {
 	inheritProjects(sessions)
 
 	// 4. Run the findings and write the report.
+	settings := report.DefaultSettings()
+	settings.Titles = !*noTitles
 	r := report.Analyse(sessions, report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines},
-		report.DefaultSettings(), time.Now())
+		settings, time.Now())
 	if err := write(r, *format, *out); err != nil {
 		log.Fatal(err)
 	}
@@ -94,6 +97,11 @@ func main() {
 
 // defaultHTML is where an HTML report goes when no --out is given.
 const defaultHTML = "trimloop-report.html"
+
+var validFormat = map[string]bool{"summary": true, "text": true, "html": true, "json": true}
+
+// summary prints the short summary, pointing to the full formats.
+func summary(out io.Writer, r report.Results) error { return report.WriteSummary(out, r, "", 3) }
 
 // write renders r in format to path, or to standard output if path is empty
 // (HTML always goes to a file). When the report goes to a file, a short
@@ -103,9 +111,10 @@ func write(r report.Results, format, path string) error {
 		path = defaultHTML
 	}
 	render := map[string]func(io.Writer, report.Results) error{
-		"text": report.WriteText,
-		"json": report.WriteJSON,
-		"html": report.WriteHTML,
+		"summary": summary,
+		"text":    report.WriteText,
+		"json":    report.WriteJSON,
+		"html":    report.WriteHTML,
 	}[format]
 	if path == "" {
 		return render(os.Stdout, r)
@@ -120,6 +129,9 @@ func write(r report.Results, format, path string) error {
 	}
 	if err := f.Close(); err != nil {
 		return err
+	}
+	if format == "summary" {
+		return nil
 	}
 	return report.WriteSummary(os.Stdout, r, path, 3)
 }
@@ -191,6 +203,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	callAt := map[string][2]int{} // tool-use id -> turn index, call index
 	compacted := false            // a compaction since the last new turn
 	var compaction event.Compaction
+	customTitle := false // the user named the session: generated titles no longer replace it
 	for _, m := range d.msgs {
 		switch m.Kind {
 		case source.KindToolResults:
@@ -203,6 +216,11 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			continue
 		case source.KindCompaction:
 			compacted, compaction = true, m.Compaction
+			continue
+		case source.KindTitle:
+			if m.CustomTitle || !customTitle {
+				s.Title, customTitle = m.Title, m.CustomTitle
+			}
 			continue
 		}
 

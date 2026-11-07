@@ -92,3 +92,14 @@ func TestCheaper(t *testing.T) {
 		t.Error("the cheapest models should have no suggestion")
 	}
 }
+
+func TestDisplayName(t *testing.T) {
+	for in, want := range map[string]string{
+		"claude-opus-5-5": "Opus 5.5", "claude-sonnet-5": "Sonnet 5", "claude-fable-5-1": "Fable 5.1",
+		"claude-haiku-4-5-20251001": "Haiku 4.5", "<synthetic>": "<synthetic>", "claude-x": "claude-x", "gpt-5": "gpt-5",
+	} {
+		if got := DisplayName(in); got != want {
+			t.Errorf("DisplayName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

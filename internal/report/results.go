@@ -27,8 +27,8 @@ type Results struct {
 	Cost  event.Cost `json:"cost"`  // by token class
 	Total float64    `json:"total"` // all spend
 
-	// Actions are every recommendation, largest saving first. Savings can
-	// overlap (see each one's overlap), so they are not added up.
+	// Actions are every recommendation, largest expected saving first.
+	// Savings can overlap (see each one's overlap), so they are not added up.
 	Actions []fixes.Recommendation `json:"actions"`
 
 	Attribution detectors.Attribution  `json:"attribution"`
@@ -40,6 +40,30 @@ type Results struct {
 	SubAgents   detectors.SubAgents    `json:"p13_sub_agents"`
 	SubAgentFix *fixes.Recommendation  `json:"p13_fix,omitempty"`
 	CompactFix  *fixes.Recommendation  `json:"p19_compaction_fix,omitempty"`
+	PauseFix    *fixes.Recommendation  `json:"p09_fix,omitempty"`
+
+	Period Period `json:"period"`
+
+	// Labels name the sessions the tables show: title, project and date.
+	// Titles summarise conversations, so they are left out when
+	// Settings.Titles is false.
+	Labels map[string]Label `json:"labels"`
+}
+
+// Period is the time the logs cover.
+type Period struct {
+	From    time.Time `json:"from"`
+	To      time.Time `json:"to"`
+	Days    int       `json:"days"`
+	PerWeek float64   `json:"per_week"` // spend per week over the period
+}
+
+// Label names a session for people.
+type Label struct {
+	Title    string    `json:"title,omitempty"`
+	Project  string    `json:"project,omitempty"`
+	Start    time.Time `json:"start"`
+	SubAgent bool      `json:"sub_agent,omitempty"` // a sub-agent of the titled session
 }
 
 // Read counts what was read.
@@ -62,6 +86,8 @@ type Settings struct {
 	TopGroups        int           // tools, shapes, projects listed
 	TopFixes         int           // kinds of tool noise with fixes
 	MinFixSaving     float64       // dollars; smaller savings get no recommendation
+	CompactTo        int           // tokens a compaction is assumed to leave, when the logs have none
+	Titles           bool          // show session titles, which summarise conversations
 }
 
 // DefaultSettings are the thresholds the report uses unless told otherwise.
@@ -75,6 +101,8 @@ func DefaultSettings() Settings {
 		TopGroups:        10,
 		TopFixes:         4,
 		MinFixSaving:     1.0,
+		CompactTo:        30_000,
+		Titles:           true,
 	}
 }
 
@@ -105,17 +133,88 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	if f, ok := fixes.ForSubAgents(r.SubAgents, s.MinFixSaving); ok {
 		r.SubAgentFix = &f
 	}
-	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, r.Context.Saving, s.MinFixSaving); ok {
+	after := r.Growth.MedianAfter
+	if after == 0 {
+		after = s.CompactTo
+	}
+	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after)
+	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, upTo, likely, after, s.MinFixSaving); ok {
 		r.CompactFix = &f
 	}
+	fresh := detectors.TypicalStart(sessions)
+	if f, ok := fixes.ForPauses(r.Pause, detectors.LikelyPauseSaving(sessions, s.PauseGap, fresh), fresh, s.MinFixSaving); ok {
+		r.PauseFix = &f
+	}
 
-	if r.CompactFix != nil {
-		r.Actions = append(r.Actions, *r.CompactFix)
+	for _, f := range []*fixes.Recommendation{r.CompactFix, r.PauseFix} {
+		if f != nil {
+			r.Actions = append(r.Actions, *f)
+		}
 	}
 	if r.SubAgentFix != nil {
 		r.Actions = append(r.Actions, *r.SubAgentFix)
 	}
 	r.Actions = append(r.Actions, r.ToolFixes...)
-	sort.SliceStable(r.Actions, func(i, j int) bool { return r.Actions[i].Saving > r.Actions[j].Saving })
+	sort.SliceStable(r.Actions, func(i, j int) bool { return r.Actions[i].Expected() > r.Actions[j].Expected() })
+	r.Period = period(sessions, r.Total)
+	r.Labels = labels(sessions, r, s.Titles)
 	return r
+}
+
+// period works out the time the sessions cover and the spend per week.
+func period(sessions []event.Session, total float64) Period {
+	var p Period
+	for _, s := range sessions {
+		if t := s.Start(); !t.IsZero() && (p.From.IsZero() || t.Before(p.From)) {
+			p.From = t
+		}
+		if t := s.End(); t.After(p.To) {
+			p.To = t
+		}
+	}
+	if p.From.IsZero() {
+		return p
+	}
+	p.Days = int(p.To.Sub(p.From).Hours()/24) + 1
+	p.PerWeek = total / (float64(p.Days) / 7)
+	return p
+}
+
+// labels names every session the report's tables show. A sub-agent is named
+// after the session that started it.
+func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
+	want := map[string]bool{}
+	for _, s := range r.Context.Top {
+		want[s.SessionID] = true
+	}
+	for _, s := range r.Pause.Top {
+		want[s.SessionID] = true
+	}
+	for _, c := range r.Growth.Top {
+		want[c.ID] = true
+	}
+	byID := map[string]event.Session{}
+	for _, s := range sessions {
+		byID[s.ID] = s
+	}
+	out := map[string]Label{}
+	for id := range want {
+		s, ok := byID[id]
+		if !ok {
+			continue
+		}
+		l := Label{Project: s.Project, Start: s.Start()}
+		named := s
+		if s.Kind == "subagent" {
+			l.SubAgent = true
+			if p, ok := byID[s.ParentID]; ok {
+				named = p
+			}
+		}
+		if titles {
+			l.Title = named.Title
+		}
+		out[id] = l
+	}
+	return out
 }

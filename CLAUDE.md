@@ -2,8 +2,9 @@
 
 Trimloop is building M0 (`trimloop analyse`): the design documents are the
 spec, and a Go prototype lives in `cmd/`, `internal/` and `pkg/`. Run it with
-`go run ./cmd/trimloop/` (the package, not `main.go`; `--format html|json`
-and `--out FILE` change the output) and test with `go test ./...`. The
+`go run ./cmd/trimloop/` (the package, not `main.go`; it prints a summary,
+and `--format text|html|json`, `--out FILE` and `--no-titles` change the
+output) and test with `go test ./...`. The
 report code is in `internal/report`; all three formats render one
 `report.Results`. Before a commit, run `scripts/check.sh` (gofmt, vet,
 golangci-lint per `.golangci.yml`, race tests, govulncheck; `--offline` skips

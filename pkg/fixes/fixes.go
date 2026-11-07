@@ -8,6 +8,8 @@
 package fixes
 
 import (
+	"fmt"
+
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 )
@@ -35,10 +37,13 @@ type Fix struct {
 // Recommendation is the advice for one finding.
 type Recommendation struct {
 	Pattern      string          `json:"pattern"` // e.g. "P04"
-	Title        string          `json:"title"`   // what the noise is, e.g. "File viewing"
+	Title        string          `json:"title"`   // the action, e.g. "Read only the lines you need"
+	Finding      string          `json:"finding"` // what was found, in a sentence
 	Noise        event.NoiseKind `json:"noise"`
-	Saving       float64         `json:"saving"`   // the finding's estimated saving, an upper bound
-	Examples     []string        `json:"examples"` // the shapes or tools that cost most
+	Saving       float64         `json:"saving"`                // the finding's estimated saving, an upper bound
+	Likely       float64         `json:"likely"`                // a likelier saving for this fix; 0 if not estimated
+	LikelyNote   string          `json:"likely_note,omitempty"` // how Likely was estimated
+	Examples     []string        `json:"examples"`              // the shapes or tools that cost most
 	Primary      Fix             `json:"primary"`
 	Alternatives []Fix           `json:"alternatives"`
 
@@ -48,6 +53,15 @@ type Recommendation struct {
 
 	// Overlap says which other findings share the saving, if any.
 	Overlap string `json:"overlap,omitempty"`
+}
+
+// Expected is the saving to rank by: Likely where it was estimated, else
+// Saving.
+func (r Recommendation) Expected() float64 {
+	if r.Likely > 0 {
+		return r.Likely
+	}
+	return r.Saving
 }
 
 // ForToolOutput recommends fixes for the kinds of noise in f with the
@@ -71,8 +85,11 @@ func ForToolOutput(f detectors.ToolOutput, n int, minSaving float64) []Recommend
 			continue
 		}
 		out = append(out, Recommendation{
-			Pattern:      "P04",
-			Title:        ladder.title,
+			Pattern: "P04",
+			Title:   ladder.title,
+			Finding: fmt.Sprintf("%s stayed in the conversation and was sent again on every later turn: "+
+				"keeping it there cost %s. Results over %s tokens account for the saving.",
+				ladder.what, dollars(g.Carried), thousandsInt(f.Target)),
 			Noise:        g.Noise,
 			Saving:       g.Saving,
 			Examples:     g.Examples,
@@ -84,8 +101,9 @@ func ForToolOutput(f detectors.ToolOutput, n int, minSaving float64) []Recommend
 }
 
 type ladder struct {
-	title string
-	fixes []Fix // primary first, then at most two alternatives of other kinds
+	title string // the action
+	what  string // the output it is about, as a sentence subject
+	fixes []Fix  // primary first, then at most two alternatives of other kinds
 }
 
 // toolOutputFixes are P04's fixes by kind of noise (docs/patterns.md, P04).
@@ -93,7 +111,7 @@ type ladder struct {
 // keeps the end of a run, where errors and summaries are, and Claude Code's
 // shell output limit cuts the middle, not the end.
 var toolOutputFixes = map[event.NoiseKind]ladder{
-	event.NoiseFileView: {"File viewing", []Fix{
+	event.NoiseFileView: {"Read only the lines you need", "Output from viewing files", []Fix{
 		{Advise,
 			"Read only the lines needed, and don't re-read a file that hasn't changed.",
 			`Add to CLAUDE.md: "View files with the Read tool, using offset and limit for long files; ` +
@@ -107,7 +125,7 @@ var toolOutputFixes = map[event.NoiseKind]ladder{
 			"Survey many files in a sub-agent, which returns only a summary.",
 			`Add to CLAUDE.md: "To explore code across many files, use a sub-agent and bring back only file:line references and conclusions."`},
 	}},
-	event.NoiseSearch: {"Broad searches", []Fix{
+	event.NoiseSearch: {"Search more narrowly", "Output from searches and file listings", []Fix{
 		{Advise,
 			"Search narrowly: a path, a result limit, file names before matches.",
 			`Add to CLAUDE.md: "Search narrowly: give Grep a path and a head_limit, or use grep -l or grep -m N; ` +
@@ -119,7 +137,7 @@ var toolOutputFixes = map[event.NoiseKind]ladder{
 			"Warn on recursive searches with no limit.",
 			"Add a PreToolUse hook on Bash that warns when grep -r or ls -R runs without -l, -m or a pipe to head."},
 	}},
-	event.NoiseBuildTest: {"Build, test and install logs", []Fix{
+	event.NoiseBuildTest: {"Make builds and tests quieter", "Output from builds, tests and installs", []Fix{
 		{Source,
 			"Make builds and tests print less: no verbose flags, a summary and the failures only.",
 			"Add a script (for example scripts/test-quiet.sh) that runs the tests and prints the failing tests " +
@@ -133,7 +151,7 @@ var toolOutputFixes = map[event.NoiseKind]ladder{
 			`Set BASH_MAX_OUTPUT_LENGTH (characters) in the "env" section of .claude/settings.json. ` +
 				"Claude Code cuts the middle of longer output, so the end, with errors and summaries, stays."},
 	}},
-	event.NoiseData: {"Data dumps", []Fix{
+	event.NoiseData: {"Filter data before printing it", "Data printed by scripts, APIs and diffs", []Fix{
 		{Advise,
 			"Filter data before printing it.",
 			`Add to CLAUDE.md: "Don't print whole data structures, API responses or diffs. Select fields ` +
@@ -145,7 +163,7 @@ var toolOutputFixes = map[event.NoiseKind]ladder{
 			"Explore data in a sub-agent, which reports only the answer.",
 			`Add to CLAUDE.md: "When exploring data or logs, use a sub-agent and bring back only the findings."`},
 	}},
-	event.NoiseWeb: {"Web search and fetch", []Fix{
+	event.NoiseWeb: {"Do web research in a sub-agent", "Web search results and fetched pages", []Fix{
 		{Structure,
 			"Do web research in a sub-agent; only its summary returns to the main session.",
 			`Add to CLAUDE.md: "Do web research in a sub-agent and return a short summary with links."`},
@@ -153,7 +171,7 @@ var toolOutputFixes = map[event.NoiseKind]ladder{
 			"Fetch pages with a specific question.",
 			`Add to CLAUDE.md: "When using WebFetch, ask a specific question about the page rather than for its whole content."`},
 	}},
-	event.NoiseMCP: {"MCP tool results", []Fix{
+	event.NoiseMCP: {"Trim MCP tool results", "Output from MCP tools", []Fix{
 		{Source,
 			"Make MCP servers return less, and remove ones the project doesn't use.",
 			"Remove unused servers with claude mcp remove <name>; for the rest, use their options for summaries, " +
@@ -165,13 +183,13 @@ var toolOutputFixes = map[event.NoiseKind]ladder{
 			"Call noisy MCP tools from a sub-agent.",
 			`Add to CLAUDE.md: "Use a sub-agent for MCP tools that return large results, and bring back only what's needed."`},
 	}},
-	event.NoiseSubAgent: {"Sub-agent reports", []Fix{
+	event.NoiseSubAgent: {"Ask sub-agents for short reports", "Sub-agent reports", []Fix{
 		{Advise,
 			"Ask sub-agents for short reports.",
 			`Add to CLAUDE.md: "When starting a sub-agent, ask it to report in under 300 words, with file:line ` +
 				`references instead of quoted code."`},
 	}},
-	event.NoiseOther: {"Other command output", []Fix{
+	event.NoiseOther: {"Keep long command output short", "Other command output", []Fix{
 		{Advise,
 			"Keep long command output short.",
 			`Add to CLAUDE.md: "Pipe long command output through tail -n 80 or a filter; don't print what you won't use."`},

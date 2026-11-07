@@ -38,6 +38,7 @@ One run of a harness, from start to exit (or resume chain).
 | `harness_cost` | json? | The harness's own per-model usage and cost for the session (`harness.cost_record`); reconciled against Trimloop's totals |
 | `lines_added` / `lines_removed` | int? | From the harness record (`outcome.lines_changed`) |
 | `capture_source` | enum | `proxy`, `otel`, `transcript`, `gateway` |
+| `title` | string? | The harness's or user's title for the session. Generated titles summarise the conversation, so this is content: shown in local reports only, never stored or sent ([ADR 0032](adr/0032-readable-reports.md)) |
 
 ### Turn
 

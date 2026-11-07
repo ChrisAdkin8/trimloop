@@ -5,7 +5,11 @@
 // data that file will hold.
 package price
 
-import "github.com/ChrisAdkin8/trimloop/pkg/event"
+import (
+	"strings"
+
+	"github.com/ChrisAdkin8/trimloop/pkg/event"
+)
 
 // Version identifies the catalogue. Every cost figure should record it.
 // Source: https://platform.claude.com/docs/en/about-claude/pricing, list
@@ -111,4 +115,30 @@ var cheaper = map[string]string{
 func Cheaper(model string) (string, bool) {
 	m, ok := cheaper[model]
 	return m, ok
+}
+
+// DisplayName is a model's name as people write it: "claude-opus-5-5"
+// becomes "Opus 5.5", "claude-haiku-4-5-20251001" becomes "Haiku 4.5". Names
+// it does not recognise are returned unchanged.
+func DisplayName(model string) string {
+	rest, ok := strings.CutPrefix(model, "claude-")
+	if !ok {
+		return model
+	}
+	parts := strings.Split(rest, "-")
+	if len(parts) < 2 {
+		return model
+	}
+	var version []string
+	for _, p := range parts[1:] {
+		if len(p) > 2 { // a date stamp such as 20251001
+			break
+		}
+		version = append(version, p)
+	}
+	if len(version) == 0 {
+		return model
+	}
+	family := strings.ToUpper(parts[0][:1]) + parts[0][1:]
+	return family + " " + strings.Join(version, ".")
 }

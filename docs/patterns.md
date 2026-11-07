@@ -339,7 +339,11 @@ not breaks, and the advice must allow for them
 
 **Fix:** L1 — report the cost of cold resumes and recommend continuing within
 the cache lifetime or starting fresh. (No automatic fix: rewriting a resumed
-request has no safe, defined operation.)
+request has no safe, defined operation.) The M0 report recommends starting a new session after a break of
+over an hour (or compacting *before* the break, while the cache is warm:
+compacting after it re-sends the whole conversation), with a likely saving
+from pricing each post-pause turn as a new session's first request
+([ADR 0032](adr/0032-readable-reports.md)).
 
 ## P10 — Compaction thrash
 
@@ -561,7 +565,10 @@ Overlaps P09; the two are never added.
 
 **Fix:** L1 — compact when a session passes the threshold or between tasks
 (Claude Code: `/compact`; it compacts on its own only near the context
-limit), or start a new session per task. Where P04, P07 or P08 are
+limit), or start a new session per task. The report estimates a likely
+saving for compacting by replaying each session as if compacted to the
+typical post-compaction size whenever it passed the threshold, including
+each compaction's cost ([ADR 0032](adr/0032-readable-reports.md)). Where P04, P07 or P08 are
 detected, report them as the causes: they say *what* fills the context.
 
 **Requires:** `usage.cache_read`. **Optional:** `usage.cache_write`,

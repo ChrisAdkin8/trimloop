@@ -20,6 +20,7 @@ func WriteText(out io.Writer, r Results) error {
 	all := r.Total
 
 	readLine(w, r.Read)
+	periodLine(w, r)
 	fmt.Fprintf(w, "Costs are estimates at list prices (%s).", r.Prices)
 	if r.Read.Unpriced > 0 {
 		fmt.Fprintf(w, " %d turns have no price and are left out.", r.Read.Unpriced)
@@ -103,6 +104,18 @@ func pct(part, whole float64) float64 {
 }
 
 func dollars(v float64) string { return "$" + thousands2(v) }
+
+// money is dollars for reading at a glance: whole dollars from $10 up,
+// cents below.
+func money(v float64) string {
+	if v == 0 {
+		return "$0"
+	}
+	if v >= 10 {
+		return "$" + thousands(int(v+0.5))
+	}
+	return dollars(v)
+}
 
 // thousands formats n with comma separators: 1234567 -> "1,234,567".
 func thousands(n int) string {

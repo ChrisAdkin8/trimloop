@@ -29,6 +29,11 @@ type record struct {
 	AttributionMcpServer string `json:"attributionMcpServer"`
 	AttributionAgent     string `json:"attributionAgent"`
 
+	// ai-title and custom-title lines. An AI title is written from the
+	// conversation, so it is derived from content: shown locally only.
+	AITitle     string `json:"aiTitle"`
+	CustomTitle string `json:"customTitle"`
+
 	// compact_boundary lines.
 	CompactMetadata *struct {
 		PreTokens  int    `json:"preTokens"`
@@ -133,6 +138,11 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			return source.Message{}, false, nil
 		}
 		return source.Message{Kind: source.KindToolResults, SessionID: rec.SessionID, Time: ts, Results: results}, true, nil
+
+	case rec.Type == "ai-title" && rec.AITitle != "":
+		return source.Message{Kind: source.KindTitle, SessionID: rec.SessionID, Title: rec.AITitle}, true, nil
+	case rec.Type == "custom-title" && rec.CustomTitle != "":
+		return source.Message{Kind: source.KindTitle, SessionID: rec.SessionID, Title: rec.CustomTitle, CustomTitle: true}, true, nil
 
 	case rec.Type == "system" && rec.Subtype == "compact_boundary":
 		m := source.Message{Kind: source.KindCompaction, SessionID: rec.SessionID, Time: ts}

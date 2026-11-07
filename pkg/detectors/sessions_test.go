@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -127,5 +128,72 @@ func TestFindAttribution(t *testing.T) {
 	}
 	if got := FindAttribution(sessions, 1); len(got.ByProject) != 1 {
 		t.Errorf("topN: got %d projects, want 1", len(got.ByProject))
+	}
+}
+
+func TestLikelyCompactionSaving(t *testing.T) {
+	// $1 per 1,000 input tokens; no model, so compactions cost nothing here.
+	turn := func(ctx int) event.Turn {
+		return event.Turn{Usage: event.Usage{CacheRead: ctx}, Cost: event.Cost{CacheRead: float64(ctx) / 1000}, Priced: true}
+	}
+	s := event.Session{Turns: []event.Turn{turn(100_000), turn(200_000), turn(300_000), turn(400_000)}}
+	// At 200k the replay compacts to 50k (150k removed, $150 saved); at 300k
+	// it is at 150k, not over (another $150); at 400k it is at 250k and
+	// compacts again (350k removed, $350).
+	got, upTo := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000)
+	if !near(got, 650) || !near(upTo, 150+250+350) {
+		t.Errorf("got %v up to %v, want 650 up to 750", got, upTo)
+	}
+	// A real compaction resets the replay.
+	s.Turns[2].CompactedBefore = true
+	s.Turns[2].Usage.CacheRead, s.Turns[2].Cost.CacheRead = 40_000, 40
+	s.Turns[3].Usage.CacheRead, s.Turns[3].Cost.CacheRead = 60_000, 60
+	if got, _ := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000); !near(got, 150) {
+		t.Errorf("after a real compaction: got %v, want 150", got)
+	}
+	if got, _ := LikelyCompactionSaving([]event.Session{s}, 50_000, 60_000); got != 0 {
+		t.Error("compacting to more than the threshold saves nothing")
+	}
+}
+
+func TestLikelyCompactionCountsTheCompaction(t *testing.T) {
+	// One compaction, then 50 turns that each send all but 50k tokens fewer.
+	big := opusTurn(400_000)
+	turns := make([]event.Turn, 50)
+	for i := range turns {
+		turns[i] = big
+	}
+	saving, upTo := LikelyCompactionSaving([]event.Session{{Turns: turns}}, 200_000, 50_000)
+	ctx := float64(big.Context())
+	gross := 50 * big.Cost.Input() * (ctx - 50_000) / ctx
+	if saving <= 0 || saving >= gross || math.Abs(upTo-gross) > 1e-6 {
+		t.Errorf("got %v up to %v; want between 0 and %v, up to %v (the compaction's own cost comes off)", saving, upTo, gross, gross)
+	}
+	// A single turn does not repay the compaction: no saving, never negative.
+	if got, _ := LikelyCompactionSaving([]event.Session{{Turns: turns[:1]}}, 200_000, 50_000); got != 0 {
+		t.Errorf("one turn: got %v, want 0", got)
+	}
+}
+
+func TestLikelyPauseSaving(t *testing.T) {
+	paused := event.Turn{Usage: event.Usage{CacheWrite1h: 100_000}, Cost: event.Cost{CacheWrite1h: 10},
+		Priced: true, IdleBefore: 2 * time.Hour}
+	short := paused
+	short.IdleBefore = time.Minute
+	s := event.Session{Turns: []event.Turn{{First: true, Priced: true}, paused, short}}
+	if got := LikelyPauseSaving([]event.Session{s}, time.Hour, 20_000); !near(got, 8) {
+		t.Errorf("got %v, want 8 (80%% of the $10 re-write)", got)
+	}
+}
+
+func TestTypicalStart(t *testing.T) {
+	sessions := []event.Session{
+		{Kind: "main", Turns: []event.Turn{{Usage: event.Usage{CacheRead: 10}}}},
+		{Kind: "main", Turns: []event.Turn{{Usage: event.Usage{CacheRead: 30}}}},
+		{Kind: "main", Turns: []event.Turn{{Usage: event.Usage{CacheRead: 20}}}},
+		{Kind: "subagent", Turns: []event.Turn{{Usage: event.Usage{CacheRead: 999}}}},
+	}
+	if got := TypicalStart(sessions); got != 20 {
+		t.Errorf("got %d, want 20", got)
 	}
 }

@@ -80,6 +80,11 @@ type Message struct {
 
 	// KindCompaction: what the compaction did, as far as it was recorded.
 	Compaction event.Compaction
+
+	// KindTitle: the title, and whether the user set it (it then wins over
+	// titles the harness generates).
+	Title       string
+	CustomTitle bool
 }
 
 // Kind is the kind of line a Message holds.
@@ -90,6 +95,7 @@ const (
 	KindTurn        Kind = iota // a model response with usage
 	KindToolResults             // results of tool calls, sent on the next turn
 	KindCompaction              // the session was compacted: earlier context dropped
+	KindTitle                   // the session's title, written by the harness or the user
 )
 
 // Result is one tool result, linked to its call by CallID.

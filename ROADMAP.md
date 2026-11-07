@@ -23,8 +23,10 @@ findings report with estimated savings. No proxy, no server.
   sub-agents in reduced fidelity ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
 - Reader also takes the harness's own cost and compaction records;
   reconciliation with them is the reader's acceptance test (ADR 0028).
-- CLI report (terminal + static HTML). Done in the prototype: text, a
-  self-contained HTML page and JSON (`--format`, `--out`).
+- CLI report (terminal + static HTML). Done in the prototype: a summary, the
+  full text, a self-contained HTML page and JSON (`--format`, `--out`,
+  `--no-titles`), with sessions named by title and likely savings beside the
+  upper bounds ([ADR 0032](docs/adr/0032-readable-reports.md)).
 - Minimal conformance runner: profile schema, capability claims against
   fixtures, golden events — so the M0 profiles pass it before being enabled.
 - Fixtures: synthetic sessions in the repository; real (redacted) sessions

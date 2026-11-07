@@ -16,9 +16,9 @@ import (
 var htmlSource string
 
 var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
-	"dollars":   dollars,
+	"dollars":   money,
 	"thousands": thousands,
-	"short":     short,
+	"short":     approx,
 	"pct":       func(part, whole float64) string { return fmt.Sprintf("%.0f%%", pct(part, whole)) },
 	"pct1":      func(part, whole float64) string { return fmt.Sprintf("%.1f%%", pct(part, whole)) },
 	"share":     func(x float64) string { return fmt.Sprintf("%.0f%%", 100*x) },
@@ -32,6 +32,10 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 		return fmt.Sprintf("%.1f", max(0.5, 100*v/maxv))
 	},
 	"date":     func(t time.Time) string { return t.Format("2 January 2006, 15:04 UTC") },
+	"day":      func(t time.Time) string { return t.Local().Format("2 Jan 2006") },
+	"server":   serverName,
+	"agent":    agentName,
+	"model":    modelName,
 	"duration": func(d time.Duration) string { return duration(d.Round(time.Second)) },
 	"join":     strings.Join,
 	"add":      func(a, b int) int { return a + b },
@@ -69,6 +73,12 @@ type sessionRow struct {
 	PauseSave   float64 // P09
 	Pauses      int
 }
+
+// Name returns the label for a session id, with the id as a last resort.
+func (v view) Name(id string) Label { return v.Labels[id] }
+
+// Untitled is how a session with no title is shown.
+const Untitled = "Untitled session"
 
 func newView(r Results) view {
 	v := view{Results: r}
@@ -111,4 +121,16 @@ func newView(r Results) view {
 		v.MaxAgent = max(v.MaxAgent, g.Cost)
 	}
 	return v
+}
+
+// approx writes a token count briefly: 50000 -> "50k", 967437 -> "967k",
+// 13259634 -> "13.3M".
+func approx(n int) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1e6)
+	case n >= 1_000:
+		return fmt.Sprintf("%dk", (n+500)/1000)
+	}
+	return fmt.Sprint(n)
 }

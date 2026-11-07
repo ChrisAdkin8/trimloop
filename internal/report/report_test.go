@@ -127,7 +127,7 @@ func TestHTML(t *testing.T) {
 	}
 	page := buf.String()
 	for _, want := range []string{"<title>Trimloop report</title>", "What to do first", "Where the money went",
-		"Where spend piles up", "Sub-agents", "general-purpose", "&lt;script&gt;alert(1)&lt;/script&gt;",
+		"Long sessions", "Sub-agents", "Words used in this report", "general-purpose", "&lt;script&gt;alert(1)&lt;/script&gt;",
 		"default-src 'none'"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page has no %q", want)
@@ -148,7 +148,7 @@ func TestHTMLWithNoSessions(t *testing.T) {
 	if err := WriteHTML(&buf, Analyse(nil, Read{}, DefaultSettings(), t0)); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(buf.String(), "No recommendations") {
+	if !strings.Contains(buf.String(), "Nothing found was worth changing") {
 		t.Error("an empty report should say there is nothing to do")
 	}
 }
@@ -160,10 +160,84 @@ func TestSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "Full report: out.html") || strings.Count(out, "\n  2. ") != 0 {
+	if !strings.Contains(out, "Full report: out.html") || strings.Count(out, "\n  2. ") != 0 || !strings.Contains(out, "Spent $110 ") {
 		t.Errorf("got %q", out)
 	}
 	if len(r.Actions) > 0 && !strings.Contains(out, "1. ") {
 		t.Errorf("summary has no first action: %q", out)
+	}
+}
+
+func TestApprox(t *testing.T) {
+	for n, want := range map[int]string{0: "0", 999: "999", 50_000: "50k", 967_437: "967k", 13_259_634: "13.3M"} {
+		if got := approx(n); got != want {
+			t.Errorf("approx(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
+func TestNames(t *testing.T) {
+	for in, want := range map[string]string{
+		"1a59c906-04da-521d-bda7-7f71b9f9e01c": "unnamed connector (1a59c906…)",
+		"ccd_turn":                             "Claude app: task list and wrap-up",
+		"ccd_other":                            "Claude app (ccd_other)",
+		"plugin:terraform:terraform":           "terraform (from plugin terraform)",
+		"github":                               "github",
+	} {
+		if got := serverName(in); got != want {
+			t.Errorf("serverName(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if agentName("unknown") != "type not recorded" || agentName("Plan") != "Plan" || modelName("claude-opus-5-5") != "Opus 5.5" {
+		t.Error("agent or model names wrong")
+	}
+}
+
+// Sessions in the tables are named by title and date, and titles can be
+// left out.
+func TestLabels(t *testing.T) {
+	sessions := sample()
+	sessions[0].Title = "Fix the scoring"
+	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	if l := r.Labels["m1"]; l.Title != "Fix the scoring" || l.SubAgent {
+		t.Errorf("main: got %+v", l)
+	}
+	settings := DefaultSettings()
+	settings.Titles = false
+	if l := Analyse(sessions, Read{}, settings, t0).Labels["m1"]; l.Title != "" {
+		t.Errorf("titles off: got %+v", l)
+	}
+	var buf bytes.Buffer
+	if err := WriteHTML(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "Fix the scoring") {
+		t.Error("page does not show the session title")
+	}
+}
+
+func TestPeriod(t *testing.T) {
+	s := []event.Session{{Turns: []event.Turn{{Time: t0, Cost: event.Cost{Output: 7}}, {Time: t0.Add(13 * 24 * time.Hour)}}}}
+	p := Analyse(s, Read{}, DefaultSettings(), t0).Period
+	if p.Days != 14 || !p.From.Equal(t0) || p.PerWeek != 3.5 {
+		t.Errorf("got %+v, want 14 days at $3.50 a week", p)
+	}
+}
+
+func TestSummaryWithoutFile(t *testing.T) {
+	var buf bytes.Buffer
+	if err := WriteSummary(&buf, Analyse(sample(), Read{}, DefaultSettings(), t0), "", 3); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "--format html") {
+		t.Errorf("summary does not say how to get the full report: %q", buf.String())
+	}
+}
+
+func TestMoney(t *testing.T) {
+	for v, want := range map[float64]string{0: "$0", 9.994: "$9.99", 10: "$10", 1234.5: "$1,235"} {
+		if got := money(v); got != want {
+			t.Errorf("money(%v) = %q, want %q", v, got, want)
+		}
 	}
 }

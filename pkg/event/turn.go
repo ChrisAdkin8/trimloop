@@ -74,6 +74,32 @@ type Session struct {
 	Project string
 	// AgentType is a subagent's type, e.g. "general-purpose"; "" if unknown.
 	AgentType string
+
+	// Title is the session's title: one the user set, else the latest the
+	// harness generated; "" if none. Generated titles summarise the
+	// conversation, so they come from content and are shown locally only.
+	Title string
+}
+
+// Start and End are the times of the session's first and last turns, zero
+// if no turn has a time.
+func (s Session) Start() time.Time {
+	for _, t := range s.Turns {
+		if !t.Time.IsZero() {
+			return t.Time
+		}
+	}
+	return time.Time{}
+}
+
+// End is the time of the session's last turn that has one.
+func (s Session) End() time.Time {
+	for i := len(s.Turns) - 1; i >= 0; i-- {
+		if !s.Turns[i].Time.IsZero() {
+			return s.Turns[i].Time
+		}
+	}
+	return time.Time{}
 }
 
 // Conversation is the ID of the main session a session belongs to: its own

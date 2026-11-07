@@ -74,7 +74,7 @@ func TestForSubAgents(t *testing.T) {
 	if !ok || r.Pattern != "P13" || r.Saving != 50 || len(r.Examples) != 1 || r.Examples[0] != "general-purpose" {
 		t.Fatalf("got %+v ok=%v", r, ok)
 	}
-	if !strings.Contains(r.Primary.What, "claude-sonnet-5-5") || r.Check == "" {
+	if !strings.Contains(r.Primary.What, "Sonnet 5.5") || r.Check == "" || r.Expected() != 50 {
 		t.Errorf("fix: got %+v", r)
 	}
 	if _, ok := ForSubAgents(detectors.SubAgents{Saving: 0.5}, 1); ok {
@@ -83,16 +83,37 @@ func TestForSubAgents(t *testing.T) {
 }
 
 func TestForCompaction(t *testing.T) {
-	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 7, 1)
-	if !ok || r.Saving != 7 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
+	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 7, 3, 30_000, 1)
+	if !ok || r.Saving != 7 || r.Likely != 3 || r.Expected() != 3 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
-	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 7, 1); ok {
+	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 7, 3, 30_000, 1); ok {
 		t.Error("a cost under the minimum should give no recommendation")
 	}
 	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567"} {
 		if got := thousandsInt(n); got != want {
 			t.Errorf("thousandsInt(%d) = %q, want %q", n, got, want)
 		}
+	}
+}
+
+func TestForPauses(t *testing.T) {
+	r, ok := ForPauses(detectors.LongPause{Pauses: 3, Saving: 20}, 15, 30_000, 1)
+	if !ok || r.Pattern != "P09" || r.Likely != 15 || !strings.Contains(r.LikelyNote, "30,000") || !strings.Contains(r.Finding, "3 times") {
+		t.Errorf("got %+v ok=%v", r, ok)
+	}
+	if _, ok := ForPauses(detectors.LongPause{Saving: 0.5}, 0, 0, 1); ok {
+		t.Error("a saving under the minimum should give no recommendation")
+	}
+	if dollars(1234.5) != "$1,235" {
+		t.Errorf("dollars: got %q", dollars(1234.5))
+	}
+}
+
+func TestToolOutputFinding(t *testing.T) {
+	f := detectors.ToolOutput{Target: 2000, ByNoise: []detectors.Group{{Noise: event.NoiseFileView, Saving: 40, Carried: 100}}}
+	r := ForToolOutput(f, 1, 1)[0]
+	if r.Title != "Read only the lines you need" || !strings.Contains(r.Finding, "$100") || !strings.Contains(r.Finding, "2,000") {
+		t.Errorf("got %+v", r)
 	}
 }

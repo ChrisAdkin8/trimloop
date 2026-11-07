@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
+	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
 // ForSubAgents recommends running sub-agents on a cheaper model (P13 in
@@ -19,7 +20,7 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 	for _, g := range f.ByType {
 		if g.Alternative != "" && g.Saving > 0 {
 			if alt == "" {
-				alt = g.Alternative
+				alt = price.DisplayName(g.Alternative)
 			}
 			if len(examples) < 3 {
 				examples = append(examples, g.Type)
@@ -27,8 +28,10 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 		}
 	}
 	return Recommendation{
-		Pattern:  "P13",
-		Title:    "Sub-agents on the main model",
+		Pattern: "P13",
+		Title:   "Run sub-agents on a cheaper model",
+		Finding: fmt.Sprintf("Sub-agents (helpers Claude starts for side tasks) cost %s, and every one ran on "+
+			"the same model as the main session. The saving assumes all of them moved to %s.", dollars(f.Cost), alt),
 		Saving:   f.Saving,
 		Examples: examples,
 		Primary: Fix{Structure,
@@ -49,17 +52,24 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 // ForCompaction recommends compacting earlier when sessions grew past the
 // limit without compacting (P19's fix, with P10's records; ADR 0031), or
 // returns false if they cost less than minCost. threshold is the context
-// size, in tokens, at which to compact; saving is P19's, which this fix
-// shares with starting new sessions.
-func ForCompaction(g detectors.Growth, threshold int, saving, minCost float64) (Recommendation, bool) {
+// size, in tokens, at which to compact; likely and upTo come from
+// detectors.LikelyCompactionSaving, and after is the size it assumed.
+func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
 	if g.UncompactedCost < minCost {
 		return Recommendation{}, false
 	}
 	return Recommendation{
 		Pattern: "P19",
-		Title:   "Sessions that grew without compacting",
-		Saving:  saving,
-		Overlap: "P19's saving: shared with P09 and P04, so not to be added to them",
+		Title:   "Compact long sessions earlier",
+		Finding: fmt.Sprintf("Every turn sends the whole conversation again, so long sessions get dearer each turn. "+
+			"%d sessions passed %s tokens without compacting; Claude Code compacts on its own only near the limit.",
+			g.Uncompacted, thousandsInt(g.Limit)),
+		Saving: upTo,
+		Likely: likely,
+		LikelyNote: fmt.Sprintf("Replays each session as if compacted to %s tokens whenever it passed %s, "+
+			"including the cost of each compaction, and assumes it then went on the same way. "+
+			"Re-reading files after a compaction would lower the saving.", thousandsInt(after), thousandsInt(threshold)),
+		Overlap: "Shares money with the long-pause and tool-output fixes: do not add them",
 		Primary: Fix{Advise,
 			fmt.Sprintf("Compact when a session passes about %s tokens, or between tasks.", thousandsInt(threshold)),
 			"Run /compact yourself (/context shows the current size). Claude Code compacts on its own only " +
@@ -68,6 +78,33 @@ func ForCompaction(g detectors.Growth, threshold int, saving, minCost float64) (
 			{Structure,
 				"Start a new session for each task.",
 				"Use /clear between tasks, carrying over a short note of where things stand."},
+		},
+	}, true
+}
+
+// ForPauses recommends starting fresh after long breaks (P09), or returns
+// false if the cost is under minSaving. likely is the replayed estimate
+// (detectors.LikelyPauseSaving) and fresh the new-session size it assumed.
+func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float64) (Recommendation, bool) {
+	if p.Saving < minSaving {
+		return Recommendation{}, false
+	}
+	return Recommendation{
+		Pattern: "P09",
+		Title:   "Start fresh after a long break",
+		Finding: fmt.Sprintf("%d times, work carried on after more than an hour away. The saved copy of the "+
+			"conversation (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses),
+		Saving:     p.Saving,
+		Likely:     likely,
+		LikelyNote: fmt.Sprintf("As if each of those turns had started a new session of about %s tokens.", thousandsInt(fresh)),
+		Overlap:    "Shares money with the compaction fix: do not add them",
+		Primary: Fix{Advise,
+			"After a break of over an hour, start a new session with a short note instead of carrying on.",
+			"Before the break, ask Claude for a short note of where things stand; afterwards, /clear and paste it in."},
+		Alternatives: []Fix{
+			{Structure,
+				"Compact before a long break, while the cache is still warm.",
+				"Run /compact before stepping away; compacting after the break re-sends the whole conversation."},
 		},
 	}, true
 }
@@ -84,3 +121,6 @@ func thousandsInt(n int) string {
 	}
 	return string(out)
 }
+
+// dollars formats v as dollars with commas and no cents: "$1,235".
+func dollars(v float64) string { return "$" + thousandsInt(int(v+0.5)) }

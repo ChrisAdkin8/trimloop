@@ -87,15 +87,18 @@ The M0 prototype reads the Claude Code session logs on this machine
 (`~/.claude/projects`) and reports where tokens went and what to change:
 
 ```bash
-go run ./cmd/trimloop/                          # full report as text in the terminal
-go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html, short summary in the terminal
+go run ./cmd/trimloop/                          # short summary: spend, period, top three actions
+go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html
+go run ./cmd/trimloop/ --format text            # the full report as text
 go run ./cmd/trimloop/ --format json --out r.json   # every figure, for scripts
 ```
 
 The HTML page is one self-contained file: styles, charts and script are
 inline and it loads nothing from the network, so it works offline and the
-data stays on the machine. It shows project, skill and session names in
-plain text, so check it before sharing.
+data stays on the machine. It names sessions by the titles Claude Code
+gives them, which summarise what you asked, and shows project and skill
+names: check it before sharing, or add `--no-titles`
+([ADR 0032](docs/adr/0032-readable-reports.md)).
 
 ## Development setup
 
