@@ -191,7 +191,8 @@ Rules:
 
 - Usage is counted **once per provider response** (response or message id).
   Harness logs that repeat it — Claude Code writes the same usage block on
-  every line of a multi-block message — are de-duplicated.
+  every line of a multi-block message — are de-duplicated, across all logs a
+  run reads, not per log ([ADR 0026](adr/0026-usage-dedup-across-logs.md)).
 - For streamed responses, only the final usage is used.
 - The Anthropic row was confirmed against usage blocks in local Claude Code
   transcripts (2026-11-05). The OpenAI and Gemini rows are from provider

@@ -107,9 +107,9 @@ type Source interface {
 // Discover and Read are separate so that a re-run reads only new lines
 // (Log.Offset) and the user can choose which harness to read (--harness).
 type Reader interface {
-    Name() string                                                  // "claude-code"
-    Discover(ctx context.Context) ([]Log, error)                   // find logs on disk
-    Read(ctx context.Context, log Log) iter.Seq2[event.Raw, error] // stream one log
+    Name() string                                                   // "claude-code"
+    Discover(ctx context.Context) ([]Log, error)                    // find logs on disk
+    Read(ctx context.Context, log *Log) iter.Seq2[event.Raw, error] // stream one log; advances log.Offset
 }
 
 type Log struct {
@@ -118,10 +118,14 @@ type Log struct {
 }
 
 // Reader contract:
+// - Read starts at log.Offset and moves it past each complete line it reads.
+//   The caller saves the new offset only after saving what was read.
 // - Read stops before a final line with no newline (still being written);
 //   that line is read on the next run.
-// - Message ids already counted are stored per log, so usage repeated across
-//   lines (or across runs) is counted once.
+// - If the log is now shorter than log.Offset, it was replaced or cut short;
+//   Read starts again from the beginning.
+// - Read yields every line that carries usage, repeats included. The caller
+//   counts each message id once across all logs and runs (ADR 0026).
 
 // A Detector is an incremental state machine over one session.
 // Batch mode replays a session's turns in order; streaming mode calls
