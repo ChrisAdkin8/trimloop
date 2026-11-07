@@ -27,7 +27,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P06 | Unused tool definitions | M0 | SQL | 1 |
 | P07 | Bloated standing context | M0 | SQL | 1 |
 | P08 | Stale context | M3 | Go | 3 |
-| P09 | Resume bloat | M3 | Go | 1 |
+| P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
 | P10 | Compaction thrash | M3 | Go | 1 |
 | P11 | Post-failure burn | M3 | Go | 0 |
 | P12 | Retry storms | M3 | Go | 1 |
@@ -37,6 +37,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P16 | Repeated workflow (skill candidate) | M4 | Go + SQL | 1 |
 | P17 | Repeated instructions | M4 | SQL | 1 |
 | P18 | Hot documentation | M4 | SQL | 1 |
+| P19 | Large working context | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
 
 ---
 
@@ -224,11 +225,22 @@ with a marker; behaviour-changing and harness-specific, opt-in, canary-gated
 
 ## P09 — Resume bloat
 
-**What happens:** A resumed session re-sends the full history with a cold
-cache, or in a form that does not match the earlier cached prefix.
+**What happens:** A session is picked up again after the cache has expired —
+by a resume, or simply by carrying on after a long break — and re-sends its
+full history with a cold cache, or in a form that does not match the earlier
+cached prefix.
 
-**Signals:** First turn after a resume shows a large cache write; prefix
-fingerprints differ from the pre-resume turn despite identical content.
+**Signals:** A turn after idle longer than the longest cache lifetime the
+provider offers (Anthropic: 1 hour) shows a cache write. At full fidelity:
+prefix fingerprints differ from the pre-resume turn despite identical
+content.
+
+**Detection (M0, reduced fidelity):** Idle time is measured from the last
+activity in the session's log. Saving: the cache-write cost of those turns,
+an upper bound (a compacted or new session still writes its smaller
+context). A main session also goes idle while a subagent runs; such gaps are
+not breaks, and the advice must allow for them
+([ADR 0027](adr/0027-measured-m0-findings.md)).
 
 **Fix:** L1 — report the cost of cold resumes and recommend continuing within
 the cache lifetime or starting fresh. (No automatic fix: rewriting a resumed
@@ -387,3 +399,28 @@ summary. Every recommendation is measured before and after.
 
 **Requires:** `response.tool_calls`. **Optional:** `content.local` (to draft
 summaries), `harness.skills`.
+
+## P19 — Large working context
+
+**What happens:** A session keeps going until its context is very large.
+Every turn re-sends the whole conversation, so each later turn pays again,
+at cache-read price or worse, for everything accumulated so far. In the
+founder's sessions, turns over 200k tokens were 57% of spend
+([ADR 0027](adr/0027-measured-m0-findings.md)).
+
+**Signals:** A turn's input tokens (uncached, cache read and cache write)
+above a threshold, default 200k.
+
+**Detection:** Per turn, from usage alone. Report the turns and sessions
+above the threshold, the largest contexts, and how fast each session grew.
+
+**Saving:** The input cost of the tokens above the threshold, at the turn's
+average input price per token. An upper bound: some context is needed.
+Overlaps P09; the two are never added.
+
+**Fix:** L1 — start a new session per task, or compact earlier. Where P04,
+P07 or P08 are detected, report them as the causes: they say *what* fills
+the context.
+
+**Requires:** `usage.cache_read`. **Optional:** `usage.cache_write`,
+`response.tool_calls` (to break the context down by cause).

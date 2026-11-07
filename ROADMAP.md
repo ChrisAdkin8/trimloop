@@ -18,7 +18,7 @@ findings report with estimated savings. No proxy, no server.
   references ([ADR 0017](docs/adr/0017-content-addressed-segments.md)).
 - Normaliser: segmenting, redaction, fingerprinting, pricing.
 - DuckDB store.
-- Detectors P01–P07.
+- Detectors P01–P07, P09 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md)).
 - CLI report (terminal + static HTML).
 - Minimal conformance runner: profile schema, capability claims against
   fixtures, golden events — so the M0 profiles pass it before being enabled.

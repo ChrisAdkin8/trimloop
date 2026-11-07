@@ -46,6 +46,14 @@ Other patterns (P03, P06, P09, P10, P12, P14) add to these but are
 expected to be smaller individually. The ranking is a starting hypothesis; M0
 will re-rank by measured waste.
 
+**First measurement (2026-11-07, one developer):** on the founder's Claude
+Code sessions the order was different. Large working context (P19) and
+re-caching after long pauses (P09) were the largest levers, with likely
+savings of up to about 31% and 17% of spend; cache churn (P01) was about
+1.5% and P02 below zero. One heavy user of a 1M-context model is not
+representative, so the table above is re-ranked only after §8 step 2. Details
+and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
+
 ## 3. Worked example: one turn
 
 Assumptions, priced relative to the normal input price (shape of Anthropic's

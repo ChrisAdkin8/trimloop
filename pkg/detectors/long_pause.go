@@ -6,9 +6,10 @@ import (
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 )
 
-// LongPause is the finding for sessions picked up again after a pause longer
-// than the cache lives. The cached context has expired, so the first turn
-// after the pause writes the whole context to the cache again.
+// LongPause is P09, resume bloat, in reduced fidelity: sessions picked up
+// again after a pause longer than the cache lives. The cached context has
+// expired, so the first turn after the pause writes the whole context to the
+// cache again.
 type LongPause struct {
 	MinGap time.Duration // pauses longer than this count
 

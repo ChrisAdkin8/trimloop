@@ -54,7 +54,7 @@ func report(w io.Writer, st stats, sessions []event.Session, ctx detectors.Conte
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
 
-	fmt.Fprintf(w, "\nFINDING 1: VERY LARGE CONTEXT\n")
+	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
 	fmt.Fprintf(w, "  %d turns in %d sessions sent more than %s tokens of context.\n",
 		ctx.Turns, ctx.Sessions, thousands(ctx.Threshold))
 	fmt.Fprintf(w, "  Their input cost %s (%.0f%% of all spend).\n", dollars(ctx.Cost), pct(ctx.Cost, all))
@@ -63,7 +63,7 @@ func report(w io.Writer, st stats, sessions []event.Session, ctx detectors.Conte
 	fmt.Fprintln(w, "  Action: start a new session for each task, or compact earlier.")
 	sessionTable(w, ctx.Top, "turns over", "peak context")
 
-	fmt.Fprintf(w, "\nFINDING 2: LONG PAUSES\n")
+	fmt.Fprintf(w, "\nP09 LONG PAUSES (RESUME BLOAT)\n")
 	fmt.Fprintf(w, "  %d times in %d sessions, work carried on after a pause of over %s.\n",
 		pause.Pauses, pause.Sessions, duration(pause.MinGap))
 	fmt.Fprintf(w, "  The cache had expired, so the whole context was written again: %s (%.0f%% of all spend).\n",

@@ -708,7 +708,8 @@ Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 1. **M0 — `trimloop analyse`:** `pkg/event`, `normalize/anthropic`,
    `redact`, `fingerprint` (keyed) and `trimloop key init`, `price`, Claude
    Code `Reader`, DuckDB and memory stores, incremental re-runs, detectors
-   P01–P05 (Go) and P06–P07 (aggregates), text and HTML reports, a minimal
+   P01–P05, P09 and P19 (Go) and P06–P07 (aggregates), text and HTML
+   reports, a minimal
    conformance runner (schema, capability claims, golden events), release
    pipeline dry-run.
 2. **M1 — sidecar:** plugin overhead benchmark first; then ingest API,

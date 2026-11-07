@@ -248,7 +248,7 @@ func TestDuration(t *testing.T) {
 func TestReportRuns(t *testing.T) {
 	var buf bytes.Buffer
 	report(&buf, stats{logs: 1}, nil, detectors.ContextSize{}, detectors.LongPause{})
-	for _, want := range []string{"COST BY TOKEN CLASS", "FINDING 1", "FINDING 2"} {
+	for _, want := range []string{"COST BY TOKEN CLASS", "P19 ", "P09 "} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}

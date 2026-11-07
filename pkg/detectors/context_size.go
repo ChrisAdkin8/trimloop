@@ -2,9 +2,9 @@ package detectors
 
 import "github.com/ChrisAdkin8/trimloop/pkg/event"
 
-// ContextSize is the finding for turns that send a very large context. Every
-// turn re-sends the whole conversation, so a long session pays again, on every
-// turn, for everything it has accumulated.
+// ContextSize is P19, large working context: turns that send a very large
+// context. Every turn re-sends the whole conversation, so a long session pays
+// again, on every turn, for everything it has accumulated.
 type ContextSize struct {
 	Threshold int // input tokens per turn above which a turn counts
 
