@@ -105,6 +105,7 @@ is safe: anything already at the minimum version is left alone.
 | [docs/design.md](docs/design.md) | Architecture, components, deployment, security |
 | [docs/analyzer.md](docs/analyzer.md) | Analyzer engine: standalone CLI, gateway sidecar, embeddable library; harness and provider profiles |
 | [docs/value.md](docs/value.md) | Value case: levers ranked by expected saving, worked example, value model, limits, validation plan |
+| [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain: unused signals, measured opportunities, and gaps in the design they expose |
 | [docs/packaging.md](docs/packaging.md) | Artefacts, channels, versioning, release pipeline, supply-chain signing |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/data-model.md](docs/data-model.md) | Normalised event model and storage |
