@@ -57,6 +57,12 @@ requests never appear as `assistant` lines (4,886 `ai-title` lines record
 only the result). 13.9 M uncached tokens, 0.3 % of cost, invisible to a
 transcript reader.
 
+Implemented ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)):
+every main session with a record is compared with its logs and sub-agents;
+on 412 sessions the harness recorded $52 (3 %) more. The gap is
+concentrated in sessions with many away-from-desk summaries and
+compactions; the median session differs by 0.8 %.
+
 What to do:
 
 - Read `cost-state` and report **unobserved spend** per session: what the

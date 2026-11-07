@@ -220,3 +220,58 @@ func TestProjectOf(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLineAttachments(t *testing.T) {
+	skill := `{"type":"attachment","sessionId":"s1","attachment":{"type":"skill_listing"},"renderedRole":"system",` +
+		`"rendered":[{"content":"abcdef"},{"content":[{"type":"text","text":"x"}]}]}`
+	m, ok, err := parseLine([]byte(skill))
+	if err != nil || !ok || m.Kind != source.KindInjected || len(m.Injected) != 1 ||
+		m.Injected[0].Kind != "skill_listing" || m.Injected[0].Bytes != 6+len(`[{"type":"text","text":"x"}]`) {
+		t.Errorf("skill listing: got %+v ok=%v err=%v", m, ok, err)
+	}
+
+	memory := `{"type":"attachment","attachment":{"type":"instructions","files":[` +
+		`{"path":"/home/me/code/app/CLAUDE.md","type":"Project","content":"12345"},{"path":"/home/me/.claude/CLAUDE.md","type":"User","content":"12"}]},` +
+		`"rendered":[{"content":"1234567"}]}`
+	m, _, _ = parseLine([]byte(memory))
+	want := []event.Injected{{Kind: "memory_file", Name: "Project CLAUDE.md", Bytes: 5}, {Kind: "memory_file", Name: "User CLAUDE.md", Bytes: 2}}
+	if !reflect.DeepEqual(m.Injected, want) {
+		t.Errorf("memory files: got %+v", m.Injected)
+	}
+
+	if _, ok, _ := parseLine([]byte(`{"type":"attachment","attachment":{"type":"date"},"rendered":null}`)); ok {
+		t.Error("an attachment that added nothing should be skipped")
+	}
+}
+
+func TestParseLineSnapshot(t *testing.T) {
+	for name, line := range map[string]string{
+		"top level": `{"type":"attachment","attachment":{"type":"prompt_snapshot","systemPrompt":["abc","de"],` +
+			`"tools":[{"name":"Bash","description":"run","schema":{"a":1}},{"name":"mcp__gh__issue","description":"","schema":{}}]}}`,
+		"nested": `{"type":"attachment","attachment":{"type":"prompt_snapshot","snapshot":{"systemPrompt":["abc","de"],` +
+			`"tools":[{"name":"Bash","description":"run","schema":{"a":1}},{"name":"mcp__gh__issue","description":"","schema":{}}]}}}`,
+	} {
+		m, ok, err := parseLine([]byte(line))
+		if err != nil || !ok || m.Kind != source.KindStanding {
+			t.Fatalf("%s: got %+v ok=%v err=%v", name, m, ok, err)
+		}
+		want := &event.Standing{SystemBytes: 5, Tools: []event.ToolDef{{Name: "Bash", Bytes: 4 + 3 + 7}, {Name: "mcp__gh__issue", Bytes: 14 + 2}}}
+		if !reflect.DeepEqual(m.Standing, want) {
+			t.Errorf("%s: got %+v", name, m.Standing)
+		}
+	}
+}
+
+func TestParseLineCostRecord(t *testing.T) {
+	line := `{"type":"cost-state","sessionId":"s1","timestamp":"2026-11-01T10:00:00Z","startTime":1730000000,"totalCostUSD":1.5,` +
+		`"modelUsage":{"claude-haiku-5-5":{"inputTokens":10,"outputTokens":2,"cacheReadInputTokens":3,"cacheCreationInputTokens":4,"costUSD":0.5,"webSearchRequests":7}}}`
+	m, ok, err := parseLine([]byte(line))
+	if err != nil || !ok || m.Kind != source.KindCostRecord || m.RunID != "1730000000" || m.Record.Cost != 1.5 ||
+		!m.Record.At.Equal(time.Date(2026, 11, 1, 10, 0, 0, 0, time.UTC)) {
+		t.Fatalf("got %+v ok=%v err=%v", m, ok, err)
+	}
+	want := event.ModelRecord{Cost: 0.5, InputUncached: 10, CacheRead: 3, CacheWrite: 4, Output: 2, WebSearches: 7}
+	if m.Record.ByModel["claude-haiku-5-5"] != want {
+		t.Errorf("got %+v", m.Record.ByModel)
+	}
+}

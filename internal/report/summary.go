@@ -15,6 +15,10 @@ func WriteSummary(out io.Writer, r Results, path string, actions int) error {
 	w := bufio.NewWriter(out)
 	readLine(w, r.Read)
 	periodLine(w, r)
+	if c := r.Reconciliation; c.Sessions > 0 && c.Gap > 0 {
+		fmt.Fprintf(w, "Claude Code's own records show %s (%.0f%%) more, for background requests the logs do not show.\n",
+			money(c.Gap), pct(c.Gap, c.Ours))
+	}
 	if len(r.Actions) > 0 {
 		fmt.Fprintln(w, "\nWhat to do first (these savings overlap, so do not add them):")
 		for i, a := range r.Actions[:min(actions, len(r.Actions))] {

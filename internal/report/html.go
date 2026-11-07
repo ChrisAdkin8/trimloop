@@ -31,11 +31,19 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 		}
 		return fmt.Sprintf("%.1f", max(0.5, 100*v/maxv))
 	},
-	"date":     func(t time.Time) string { return t.Format("2 January 2006, 15:04 UTC") },
-	"day":      func(t time.Time) string { return t.Local().Format("2 Jan 2006") },
+	"date": func(t time.Time) string { return t.Format("2 January 2006, 15:04 UTC") },
+	"day":  func(t time.Time) string { return t.Local().Format("2 Jan 2006") },
+	// weekStart turns "2026-11-02" into "2 Nov 2026".
+	"weekStart": func(w string) string {
+		if t, err := time.Parse("2006-01-02", w); err == nil {
+			return t.Format("2 Jan 2006")
+		}
+		return w
+	},
 	"server":   serverName,
 	"agent":    agentName,
 	"model":    modelName,
+	"ctxname":  contextName,
 	"duration": func(d time.Duration) string { return duration(d.Round(time.Second)) },
 	"join":     strings.Join,
 	"add":      func(a, b int) int { return a + b },
@@ -62,7 +70,13 @@ type view struct {
 
 	Sessions []sessionRow // P19 and P09's top sessions, each once
 
-	MaxProject, MaxBand, MaxTool, MaxAgent float64
+	MaxProject, MaxBand, MaxTool, MaxAgent, MaxWeek, MaxPart float64
+
+	ThisWeek string // the week the report was written in, which is not over
+
+	// StandingGap is true when the system prompt and tools were recorded
+	// for noticeably fewer than all turns.
+	StandingGap bool
 }
 
 // sessionRow joins one session's P19 and P09 figures.
@@ -120,6 +134,14 @@ func newView(r Results) view {
 	for _, g := range r.SubAgents.ByType {
 		v.MaxAgent = max(v.MaxAgent, g.Cost)
 	}
+	for _, w := range r.Weeks {
+		v.MaxWeek = max(v.MaxWeek, w.Spend)
+	}
+	for _, p := range r.Standing.Parts {
+		v.MaxPart = max(v.MaxPart, p.Cost)
+	}
+	v.ThisWeek = detectors.WeekOf(r.Generated.Local())
+	v.StandingGap = r.Standing.Turns > 0 && float64(r.Standing.Covered) < 0.99*float64(r.Standing.Turns)
 	return v
 }
 

@@ -34,6 +34,16 @@ type record struct {
 	AITitle     string `json:"aiTitle"`
 	CustomTitle string `json:"customTitle"`
 
+	// attachment lines: text the harness adds to the conversation, and
+	// snapshots of the system prompt and tool list.
+	Attachment *attachment     `json:"attachment"`
+	Rendered   json.RawMessage `json:"rendered"` // null when nothing was added to the conversation
+
+	// cost-state lines: the harness's running cost record for one run.
+	StartTime    json.RawMessage       `json:"startTime"`
+	TotalCostUSD *float64              `json:"totalCostUSD"`
+	ModelUsage   map[string]modelUsage `json:"modelUsage"`
+
 	// compact_boundary lines.
 	CompactMetadata *struct {
 		PreTokens  int    `json:"preTokens"`
@@ -76,6 +86,39 @@ type input struct {
 	Command      string `json:"command"`       // Bash
 	FilePath     string `json:"file_path"`     // Read, Edit, Write
 	NotebookPath string `json:"notebook_path"` // NotebookEdit
+}
+
+// attachment is the part of an attachment line Read uses. A prompt snapshot
+// keeps its fields either inside "snapshot" or at the top level.
+type attachment struct {
+	Type     string    `json:"type"`
+	Files    []memFile `json:"files"` // instructions: the memory files
+	Snapshot *snapshot `json:"snapshot"`
+	snapshot           // prompt_snapshot fields at the top level
+}
+
+type memFile struct {
+	Path    string `json:"path"`
+	Type    string `json:"type"` // e.g. "Project", "User"
+	Content string `json:"content"`
+}
+
+type snapshot struct {
+	SystemPrompt []string `json:"systemPrompt"`
+	Tools        []struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Schema      json.RawMessage `json:"schema"`
+	} `json:"tools"`
+}
+
+type modelUsage struct {
+	InputTokens              int     `json:"inputTokens"`
+	OutputTokens             int     `json:"outputTokens"`
+	CacheReadInputTokens     int     `json:"cacheReadInputTokens"`
+	CacheCreationInputTokens int     `json:"cacheCreationInputTokens"`
+	CostUSD                  float64 `json:"costUSD"`
+	WebSearchRequests        int     `json:"webSearchRequests"`
 }
 
 // persistedTag starts a result whose full output Claude Code saved to disk
@@ -143,6 +186,20 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return source.Message{Kind: source.KindTitle, SessionID: rec.SessionID, Title: rec.AITitle}, true, nil
 	case rec.Type == "custom-title" && rec.CustomTitle != "":
 		return source.Message{Kind: source.KindTitle, SessionID: rec.SessionID, Title: rec.CustomTitle, CustomTitle: true}, true, nil
+
+	case rec.Type == "attachment" && rec.Attachment != nil:
+		return parseAttachment(rec, ts)
+
+	case rec.Type == "cost-state" && rec.TotalCostUSD != nil:
+		m := source.Message{Kind: source.KindCostRecord, SessionID: rec.SessionID, Time: ts,
+			RunID: string(rec.StartTime), Record: event.HarnessRecord{Cost: *rec.TotalCostUSD, ByModel: map[string]event.ModelRecord{}, At: ts}}
+		for model, u := range rec.ModelUsage {
+			m.Record.ByModel[model] = event.ModelRecord{
+				Cost: u.CostUSD, InputUncached: u.InputTokens, CacheRead: u.CacheReadInputTokens,
+				CacheWrite: u.CacheCreationInputTokens, Output: u.OutputTokens, WebSearches: u.WebSearchRequests,
+			}
+		}
+		return m, true, nil
 
 	case rec.Type == "system" && rec.Subtype == "compact_boundary":
 		m := source.Message{Kind: source.KindCompaction, SessionID: rec.SessionID, Time: ts}
@@ -279,4 +336,73 @@ func projectOf(cwd string) string {
 		cwd = cwd[:i]
 	}
 	return filepath.Base(cwd)
+}
+
+// parseAttachment reads an attachment line: a snapshot of the system prompt
+// and tool list, or text the harness added to the conversation. Only sizes
+// and memory-file names are kept, never the text.
+func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
+	a := rec.Attachment
+	if a.Type == "prompt_snapshot" {
+		snap := a.snapshot
+		if a.Snapshot != nil {
+			snap = *a.Snapshot
+		}
+		st := &event.Standing{}
+		for _, p := range snap.SystemPrompt {
+			st.SystemBytes += len(p)
+		}
+		for _, t := range snap.Tools {
+			st.Tools = append(st.Tools, event.ToolDef{Name: t.Name, Bytes: len(t.Name) + len(t.Description) + len(t.Schema)})
+		}
+		if st.Bytes() == 0 {
+			return source.Message{}, false, nil
+		}
+		return source.Message{Kind: source.KindStanding, SessionID: rec.SessionID, Time: ts, Standing: st}, true, nil
+	}
+
+	size := renderedSize(rec.Rendered)
+	if size == 0 {
+		return source.Message{}, false, nil // not added to the conversation
+	}
+	var pieces []event.Injected
+	if a.Type == "instructions" && len(a.Files) > 0 {
+		for _, f := range a.Files {
+			pieces = append(pieces, event.Injected{Kind: "memory_file", Name: memoryName(f), Bytes: len(f.Content)})
+		}
+	} else {
+		pieces = []event.Injected{{Kind: a.Type, Bytes: size}}
+	}
+	return source.Message{Kind: source.KindInjected, SessionID: rec.SessionID, Time: ts, Injected: pieces}, true, nil
+}
+
+// renderedSize is the size of the text an attachment added: the content of
+// each rendered block, or 0 if nothing was rendered.
+func renderedSize(raw json.RawMessage) int {
+	var blocks []struct {
+		Content json.RawMessage `json:"content"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &blocks) != nil {
+		return 0
+	}
+	n := 0
+	for _, b := range blocks {
+		var s string
+		if json.Unmarshal(b.Content, &s) == nil {
+			n += len(s)
+		} else {
+			n += len(b.Content)
+		}
+	}
+	return n
+}
+
+// memoryName names a memory file by its kind and file name, e.g.
+// "Project CLAUDE.md", without the folders above it.
+func memoryName(f memFile) string {
+	name := filepath.Base(f.Path)
+	if f.Type != "" {
+		return f.Type + " " + name
+	}
+	return name
 }

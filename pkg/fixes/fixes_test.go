@@ -117,3 +117,23 @@ func TestToolOutputFinding(t *testing.T) {
 		t.Errorf("got %+v", r)
 	}
 }
+
+func TestForStandingContext(t *testing.T) {
+	f := detectors.StandingContext{Parts: []detectors.ContextPart{
+		{Name: "skill_listing", Source: detectors.SourceSkills, Cost: 30},
+		{Name: "mcp__github", Source: detectors.SourceMCP, Cost: 8},
+		{Name: "mcp_instructions_delta", Source: detectors.SourceMCP, Cost: 4},
+		{Name: "System prompt", Source: detectors.SourceHarness, Cost: 50},
+		{Name: "Project CLAUDE.md", Source: detectors.SourceMemory, Cost: 0.5},
+	}}
+	recs := ForStandingContext(f, 1)
+	if len(recs) != 2 {
+		t.Fatalf("got %d recommendations, want 2 (none for the harness's own, memory under the minimum)", len(recs))
+	}
+	if recs[0].Pattern != "P07" || recs[0].Saving != 30 || !strings.Contains(recs[0].Finding, "$30") {
+		t.Errorf("first: got %+v", recs[0])
+	}
+	if recs[1].Saving != 12 || recs[1].Examples[0] != "github" {
+		t.Errorf("MCP: got %+v", recs[1])
+	}
+}

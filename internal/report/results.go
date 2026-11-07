@@ -42,6 +42,14 @@ type Results struct {
 	CompactFix  *fixes.Recommendation  `json:"p19_compaction_fix,omitempty"`
 	PauseFix    *fixes.Recommendation  `json:"p09_fix,omitempty"`
 
+	Reconciliation detectors.Reconciliation  `json:"reconciliation"`
+	Standing       detectors.StandingContext `json:"p07_standing_context"`
+	StandingFixes  []fixes.Recommendation    `json:"p07_fixes"`
+
+	// Weeks are the figures week by week, oldest first, including weeks
+	// kept from earlier runs (see package history).
+	Weeks []detectors.Week `json:"weeks"`
+
 	Period Period `json:"period"`
 
 	// Labels name the sessions the tables show: title, project and date.
@@ -78,16 +86,17 @@ type Read struct {
 
 // Settings are the thresholds the findings use.
 type Settings struct {
-	ContextThreshold int           // P19: input tokens per turn
-	PauseGap         time.Duration // P09: longer than the longest cache lifetime
-	UncompactedLimit int           // sessions past this many tokens that never compacted
-	ResultTarget     int           // P04: tokens per tool result; the excess is saving
-	TopSessions      int           // sessions listed per finding
-	TopGroups        int           // tools, shapes, projects listed
-	TopFixes         int           // kinds of tool noise with fixes
-	MinFixSaving     float64       // dollars; smaller savings get no recommendation
-	CompactTo        int           // tokens a compaction is assumed to leave, when the logs have none
-	Titles           bool          // show session titles, which summarise conversations
+	ContextThreshold int            // P19: input tokens per turn
+	PauseGap         time.Duration  // P09: longer than the longest cache lifetime
+	UncompactedLimit int            // sessions past this many tokens that never compacted
+	ResultTarget     int            // P04: tokens per tool result; the excess is saving
+	TopSessions      int            // sessions listed per finding
+	TopGroups        int            // tools, shapes, projects listed
+	TopFixes         int            // kinds of tool noise with fixes
+	MinFixSaving     float64        // dollars; smaller savings get no recommendation
+	CompactTo        int            // tokens a compaction is assumed to leave, when the logs have none
+	Titles           bool           // show session titles, which summarise conversations
+	Location         *time.Location // for week boundaries
 }
 
 // DefaultSettings are the thresholds the report uses unless told otherwise.
@@ -103,6 +112,7 @@ func DefaultSettings() Settings {
 		MinFixSaving:     1.0,
 		CompactTo:        30_000,
 		Titles:           true,
+		Location:         time.Local,
 	}
 }
 
@@ -145,6 +155,16 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	if f, ok := fixes.ForPauses(r.Pause, detectors.LikelyPauseSaving(sessions, s.PauseGap, fresh), fresh, s.MinFixSaving); ok {
 		r.PauseFix = &f
 	}
+
+	r.Reconciliation = detectors.FindReconciliation(sessions)
+	r.Standing = detectors.FindStandingContext(sessions)
+	r.StandingFixes = fixes.ForStandingContext(r.Standing, s.MinFixSaving)
+	r.Actions = append(r.Actions, r.StandingFixes...)
+	loc := s.Location
+	if loc == nil {
+		loc = time.UTC
+	}
+	r.Weeks = detectors.FindWeekly(sessions, s.ContextThreshold, s.PauseGap, loc)
 
 	for _, f := range []*fixes.Recommendation{r.CompactFix, r.PauseFix} {
 		if f != nil {

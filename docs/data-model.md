@@ -181,6 +181,25 @@ exact change is rendered on a developer machine (design §6.2).
 | `measured_saving` | decimal? (after/before comparison) |
 | `side_effects` | json? (re-runs, turns per session, tool errors, extra reads: before and after) |
 
+### Week (history file)
+
+Figures per calendar week, kept between runs in `~/.trimloop/history.json`
+so a fix can be compared before and after once the harness has deleted the
+logs ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)).
+Numbers only: no names, titles, paths or session ids.
+
+| Field | Type | Notes |
+|---|---|---|
+| `week` | date | The Monday the week starts, local time |
+| `spend` / `turns` | number / int | |
+| `large_context` | number | Input cost of turns over the P19 threshold |
+| `sub_agents` | number | Spend in sub-agents |
+| `pause_rewrite` | number | Cache re-writes after long pauses (P09) |
+| `tool_output` | number | Carried cost of tool output added that week (P04) |
+| `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
+| `compactions` | int | |
+| `prices` | string | Price catalogue version the figures used |
+
 ## Usage normalisation
 
 Every provider reports tokens differently. The normaliser maps each response's

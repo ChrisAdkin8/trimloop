@@ -3,6 +3,7 @@ package detectors
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 )
@@ -49,6 +50,7 @@ type callCost struct {
 	call    event.ToolCall
 	carried float64
 	reread  bool
+	at      time.Time // when the result was first sent; zero if not known
 }
 
 // FindToolOutput works out the carried cost of every tool result and groups
@@ -166,7 +168,7 @@ func carry(s event.Session) []callCost {
 			if !c.HasResult {
 				continue
 			}
-			cc := callCost{call: c, carried: float64(c.Result.Tokens()) * arrival}
+			cc := callCost{call: c, carried: float64(c.Result.Tokens()) * arrival, at: t.Time}
 			switch {
 			case c.File == "":
 			case c.FileOp == event.FileView:

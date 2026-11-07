@@ -33,6 +33,14 @@ type Turn struct {
 	// the model from the next turn of the session onwards.
 	ToolCalls []ToolCall
 
+	// Injected is the text the harness added since the previous turn; it is
+	// first sent on this turn.
+	Injected []Injected
+
+	// Standing is the system prompt and tool definitions this turn sent, as
+	// last recorded; nil if the harness recorded none.
+	Standing *Standing
+
 	// CompactedBefore is true when the session was compacted just before
 	// this turn: earlier tool results are no longer in the context.
 	// Compaction describes it, as far as the harness recorded it.
@@ -74,6 +82,10 @@ type Session struct {
 	Project string
 	// AgentType is a subagent's type, e.g. "general-purpose"; "" if unknown.
 	AgentType string
+
+	// Harness is the harness's own record of the session's usage and cost,
+	// covering the main session and its subagents; nil if there is none.
+	Harness *HarnessRecord
 
 	// Title is the session's title: one the user set, else the latest the
 	// harness generated; "" if none. Generated titles summarise the

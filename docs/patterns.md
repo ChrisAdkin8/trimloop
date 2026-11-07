@@ -288,7 +288,13 @@ kind is sized separately.
 
 **Detection:** Per repo: standing tokens ÷ total input tokens; list the largest
 contributors by kind — memory file, system prompt, tool definitions, and each
-injected kind — so the fix names the skill, plugin or MCP server.
+injected kind — so the fix names the skill, plugin or MCP server. In M0
+([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) the system
+prompt and tool definitions are priced on every turn (cache-read price, or
+the write price when new or changed), tool definitions grouped by MCP
+server; injected text is carried like P04's tool output. In the founder's
+sample: $221 (11 % of spend) — built-in tool definitions $102, the skill
+listing $36, MCP servers $18, memory files $4.
 
 **Saving:** Hard to estimate precisely; reported as an upper bound with low
 confidence. Injected kinds can be priced like tool output (P04): carried

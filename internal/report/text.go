@@ -42,6 +42,8 @@ func WriteText(out io.Writer, r Results) error {
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
 
+	reconcileSection(w, r.Reconciliation, all)
+	weeksSection(w, r.Weeks)
 	attributionSection(w, r.Attribution)
 
 	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
@@ -65,6 +67,14 @@ func WriteText(out io.Writer, r Results) error {
 
 	toolOutputSection(w, r.Tools, r.ToolFixes, all)
 	subAgentSection(w, r.SubAgents, r.SubAgentFix, all)
+	standingSection(w, r.Standing, all)
+	if len(r.StandingFixes) > 0 {
+		fmt.Fprintln(w, "\n  Recommended fixes:")
+		for _, f := range r.StandingFixes {
+			fmt.Fprintf(w, "\n  %s: up to %s\n", f.Title, money(f.Saving))
+			printFixes(w, f)
+		}
+	}
 
 	fmt.Fprintln(w, "\nSavings are upper bounds: some context is needed, and a compacted or new")
 	fmt.Fprintln(w, "session still pays for what it keeps. The findings overlap, so do not add them.")

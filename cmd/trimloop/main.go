@@ -15,6 +15,7 @@ import (
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
+	"github.com/ChrisAdkin8/trimloop/internal/history"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
@@ -24,8 +25,10 @@ func main() {
 	format := flag.String("format", "summary", "report format: summary (a few lines), text (the full report), html or json")
 	out := flag.String("out", "", "write the report to this file (default: standard output, or "+defaultHTML+" for html)")
 	noTitles := flag.Bool("no-titles", false, "leave out session titles, which summarise what was asked")
+	historyPath := flag.String("history", "", "file that keeps weekly figures between runs (default ~/.trimloop/history.json)")
+	noHistory := flag.Bool("no-history", false, "do not read or update the history file")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [--format summary|text|html|json] [--out FILE] [--no-titles]\n\n"+
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [--format summary|text|html|json] [--out FILE] [--no-titles] [--history FILE | --no-history]\n\n"+
 			"Analyses Claude Code session logs on this machine for token waste.\n\n")
 		flag.PrintDefaults()
 	}
@@ -90,8 +93,30 @@ func main() {
 	settings.Titles = !*noTitles
 	r := report.Analyse(sessions, report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines},
 		settings, time.Now())
+	if !*noHistory {
+		path := *historyPath
+		if path == "" {
+			path = filepath.Join(home, ".trimloop", "history.json")
+		}
+		keepHistory(&r, path)
+	}
 	if err := write(r, *format, *out); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// keepHistory merges this run's weekly figures into the history file at path
+// and gives the report every week kept there. A history that cannot be read
+// or written is reported and skipped: the report still runs.
+func keepHistory(r *report.Results, path string) {
+	h, err := history.Load(path)
+	if err != nil {
+		log.Printf("history not used: %v", err)
+		return
+	}
+	r.Weeks = history.Merge(&h, r.Weeks, r.Prices)
+	if err := history.Save(path, h); err != nil {
+		log.Printf("history not saved: %v", err)
 	}
 }
 
@@ -203,7 +228,10 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	callAt := map[string][2]int{} // tool-use id -> turn index, call index
 	compacted := false            // a compaction since the last new turn
 	var compaction event.Compaction
-	customTitle := false // the user named the session: generated titles no longer replace it
+	customTitle := false                     // the user named the session: generated titles no longer replace it
+	var injected []event.Injected            // added since the last new turn
+	var standing *event.Standing             // the latest system prompt and tool list
+	runs := map[string]event.HarnessRecord{} // the harness's latest record per run
 	for _, m := range d.msgs {
 		switch m.Kind {
 		case source.KindToolResults:
@@ -216,6 +244,23 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			continue
 		case source.KindCompaction:
 			compacted, compaction = true, m.Compaction
+			continue
+		case source.KindInjected:
+			injected = append(injected, m.Injected...)
+			continue
+		case source.KindStanding:
+			st := m.Standing
+			if len(st.Tools) == 0 && standing != nil {
+				// A record without the tool list leaves it out rather than
+				// saying there are no tools: keep the last one seen.
+				st = &event.Standing{SystemBytes: st.SystemBytes, Tools: standing.Tools}
+			}
+			standing = st
+			continue
+		case source.KindCostRecord:
+			if prev, ok := runs[m.RunID]; !ok || m.Record.Cost >= prev.Cost {
+				runs[m.RunID] = m.Record // a run's records are running totals
+			}
 			continue
 		case source.KindTitle:
 			if m.CustomTitle || !customTitle {
@@ -241,7 +286,10 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Project:         m.Project,
 				Attribution:     m.Attribution,
 				CompactedBefore: compacted,
+				Injected:        injected,
+				Standing:        standing,
 			}
+			injected = nil
 			if compacted {
 				t.Compaction = compaction
 			}
@@ -277,7 +325,27 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			last = m.Time
 		}
 	}
+	s.Harness = sumRuns(runs)
 	return s
+}
+
+// sumRuns adds up the harness's records for each run of a session, or
+// returns nil if there are none.
+func sumRuns(runs map[string]event.HarnessRecord) *event.HarnessRecord {
+	if len(runs) == 0 {
+		return nil
+	}
+	total := &event.HarnessRecord{ByModel: map[string]event.ModelRecord{}}
+	for _, r := range runs {
+		total.Cost += r.Cost
+		if r.At.After(total.At) {
+			total.At = r.At
+		}
+		for model, m := range r.ByModel {
+			total.ByModel[model] = total.ByModel[model].Add(m)
+		}
+	}
+	return total
 }
 
 // inheritProjects gives a subagent that logged no project, and its turns,

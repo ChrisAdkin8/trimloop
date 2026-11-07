@@ -71,9 +71,9 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 | 2 | **Sub-agent economics and P13 reduced fidelity** (Decision 1) | ≈ $271 (13 %) | Done |
 | 3 | **P19 concentration and compaction point; P10 reduced** (Decision 2) | Top 5 conversations 59 %; $292 in never-compacted sessions past 500 k | Done |
 | 4 | **Attribution** by project, skill, plugin and MCP server (Decision 3) | Top project 32 % of spend | Done |
-| 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Next; before value.md §8 step 2 |
-| 6 | **P07 with injected context by kind**, priced by carried cost | $88 (4.3 %) | |
-| 7 | **Results kept between runs** (ADR 0029 item 4) | Needed to measure any fix | |
+| 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Done ([ADR 0033](0033-reconciliation-history-standing-context.md)): 3 % on 412 sessions |
+| 6 | **P07 with injected context by kind**, priced by carried cost | $88 (4.3 %) | Done (ADR 0033), with the system prompt and tool definitions: $221 (11 %) |
+| 7 | **Results kept between runs** (ADR 0029 item 4) | Needed to measure any fix | Weekly figures kept (ADR 0033); saved offsets to do |
 | 8 | **Command-line options**: `--since`, `--repo`, `--format` | Filters for item 4's groups | `--format` (text, HTML, JSON) and `--out` done |
 | 9 | **P14 in reduced fidelity** | ≤ $67 (3 %) | |
 | 10 | **P02 cache-lifetime fit** | Guards a false saving (ADR 0027) | |

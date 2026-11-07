@@ -343,3 +343,46 @@ func TestWrite(t *testing.T) {
 		t.Error("got no error writing into a missing folder")
 	}
 }
+
+// Injected text arrives with the next turn; the latest system prompt and
+// tool list apply to every later turn; each run's latest cost record counts.
+func TestBuildSessionContextAndRecords(t *testing.T) {
+	st := &event.Standing{SystemBytes: 100}
+	rec := func(run string, cost float64, at time.Duration) source.Message {
+		return source.Message{Kind: source.KindCostRecord, RunID: run, Record: event.HarnessRecord{Cost: cost,
+			ByModel: map[string]event.ModelRecord{"m": {Cost: cost}}, At: t0.Add(at)}}
+	}
+	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
+		{Kind: source.KindStanding, Standing: st},
+		{Kind: source.KindInjected, Injected: []event.Injected{{Kind: "skill_listing", Bytes: 40}}},
+		{ID: "a"},
+		rec("r1", 1, time.Minute),
+		rec("r1", 3, 2*time.Minute), // running total for the same run
+		{ID: "b"},
+		rec("r2", 2, time.Hour), // a second run (resumed)
+	}}
+	s := buildSession(d, map[string]bool{})
+	if len(s.Turns) != 2 || len(s.Turns[0].Injected) != 1 || len(s.Turns[1].Injected) != 0 {
+		t.Fatalf("injected: got %+v", s.Turns)
+	}
+	if s.Turns[0].Standing != st || s.Turns[1].Standing != st {
+		t.Error("both turns should carry the recorded system prompt")
+	}
+	if s.Harness == nil || s.Harness.Cost != 5 || s.Harness.ByModel["m"].Cost != 5 || !s.Harness.At.Equal(t0.Add(time.Hour)) {
+		t.Errorf("harness record: got %+v", s.Harness)
+	}
+}
+
+// A record of the system prompt without a tool list keeps the last tool list.
+func TestBuildSessionKeepsToolsWhenUnrecorded(t *testing.T) {
+	tools := []event.ToolDef{{Name: "Bash", Bytes: 9}}
+	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
+		{Kind: source.KindStanding, Standing: &event.Standing{SystemBytes: 1, Tools: tools}},
+		{Kind: source.KindStanding, Standing: &event.Standing{SystemBytes: 2}},
+		{ID: "a"},
+	}}
+	st := buildSession(d, map[string]bool{}).Turns[0].Standing
+	if st.SystemBytes != 2 || len(st.Tools) != 1 {
+		t.Errorf("got %+v, want the new system prompt with the earlier tools", st)
+	}
+}

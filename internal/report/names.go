@@ -45,3 +45,34 @@ func agentName(t string) string {
 
 // modelName is a model's name as people write it.
 func modelName(m string) string { return price.DisplayName(m) }
+
+// injectedNames describes the kinds of text Claude Code adds.
+var injectedNames = map[string]string{
+	"skill_listing":           "List of available skills",
+	"invoked_skills":          "Skills that were used",
+	"mcp_instructions_delta":  "MCP server instructions",
+	"total_tokens_reminder":   "Token-count reminders",
+	"queued_command":          "Messages you typed while Claude worked",
+	"deferred_tools_delta":    "Notes on tools loaded when needed",
+	"agent_listing_delta":     "List of available sub-agents",
+	"environment":             "Environment details (folder, date, system)",
+	"edited_text_file":        "Notices of files changed outside Claude",
+	"hook_additional_context": "Text added by hooks",
+	"file":                    "Files you attached",
+	"sandbox_instructions":    "Sandbox rules",
+	"session_context":         "Session details",
+	"date":                    "Today's date",
+	"model":                   "Model details",
+	"budget_usd":              "Budget reminders",
+}
+
+// contextName describes a source of standing or injected context.
+func contextName(name string) string {
+	if d, ok := injectedNames[name]; ok {
+		return d
+	}
+	if rest, ok := strings.CutPrefix(name, "mcp__"); ok {
+		return "MCP server " + serverName(rest) + ": tool definitions"
+	}
+	return strings.ReplaceAll(name, "_", " ")
+}

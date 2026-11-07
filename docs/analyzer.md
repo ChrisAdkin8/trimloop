@@ -434,7 +434,7 @@ the two.
 | `outcome.git` | Git outcomes linkable to sessions | Local shapes only |
 | `timing.per_turn` | Request and response timestamps | All |
 | `timing.turn_duration` | Wall-clock duration per turn | Harness records; proxy, gateway |
-| `harness.cost_record` | The harness's own per-session usage and cost, including calls it did not log as turns ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Claude Code transcripts |
+| `harness.cost_record` | The harness's own per-session usage and cost, including calls it did not log as turns ([ADR 0028](adr/0028-harness-recorded-signals.md); compared as in [ADR 0033](adr/0033-reconciliation-history-standing-context.md)) | Claude Code transcripts |
 | `harness.injected_context` | Context the harness adds, recorded by kind with sizes | Claude Code transcripts |
 | `harness.compaction` | Compaction events with before and after token counts | Claude Code transcripts |
 | `harness.attribution` | The skill, plugin, MCP server or agent type the harness names as the cause of each turn ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)) | Claude Code transcripts |

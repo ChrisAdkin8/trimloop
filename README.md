@@ -100,6 +100,12 @@ gives them, which summarise what you asked, and shows project and skill
 names: check it before sharing, or add `--no-titles`
 ([ADR 0032](docs/adr/0032-readable-reports.md)).
 
+Each run also keeps week-by-week figures (numbers only) in
+`~/.trimloop/history.json`, so you can compare before and after a change
+even once Claude Code has deleted the old logs. `--history FILE` moves the
+file; `--no-history` neither reads nor writes it
+([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
+
 ## Development setup
 
 Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or

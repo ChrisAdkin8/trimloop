@@ -45,19 +45,19 @@ Done: reader, usage de-duplication, pricing, P19 and P09; P04 (context
 composition by tool and command shape, with fixes from the ADR 0030
 ladder); sub-agent economics and P13 in reduced fidelity; P19 concentration
 and compaction point, with P10 from compaction records; spend by project,
-skill, plugin and MCP server.
+skill, plugin and MCP server; reconciliation with the harness cost record;
+P07 priced by carried cost, including the system prompt and tool
+definitions; weekly figures kept between runs
+([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
 
-1. Reconciliation with the harness cost record: auxiliary and summary
-   requests, web-search fees. Needed before value.md §8 step 2.
-2. P07 with injected context by kind, priced by carried cost.
-3. Results kept between runs: findings history, JSON output, saved offsets.
-4. Command-line options: `analyse`, `--since`, `--repo` (`--format` and
+1. Saved offsets, so a re-run reads only new lines.
+2. Command-line options: `analyse`, `--since`, `--repo` (`--format` and
    `--out` are done).
-5. P14 in reduced fidelity: spend by effort level.
-6. P02 cache-lifetime fit.
-7. P03, P06, P01; then P05, P10 in full, P12.
-8. Distribution: installable release, minimal conformance runner, profiles.
-9. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
+3. P14 in reduced fidelity: spend by effort level.
+4. P02 cache-lifetime fit.
+5. P03, P06, P01; then P05, P10 in full, P12.
+6. Distribution: installable release, minimal conformance runner, profiles.
+7. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.

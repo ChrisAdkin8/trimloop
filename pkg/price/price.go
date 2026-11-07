@@ -142,3 +142,7 @@ func DisplayName(model string) string {
 	family := strings.ToUpper(parts[0][:1]) + parts[0][1:]
 	return family + " " + strings.Join(version, ".")
 }
+
+// WebSearch is the price of one server-side web search request, in US
+// dollars ($10 per 1,000 searches), charged on top of the tokens.
+const WebSearch = 0.01

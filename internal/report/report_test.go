@@ -127,7 +127,7 @@ func TestHTML(t *testing.T) {
 	}
 	page := buf.String()
 	for _, want := range []string{"<title>Trimloop report</title>", "What to do first", "Where the money went",
-		"Long sessions", "Sub-agents", "Words used in this report", "general-purpose", "&lt;script&gt;alert(1)&lt;/script&gt;",
+		"Long sessions", "Sub-agents", "Words used in this report", "What every request carries", "general-purpose", "&lt;script&gt;alert(1)&lt;/script&gt;",
 		"default-src 'none'"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("page has no %q", want)
@@ -238,6 +238,42 @@ func TestMoney(t *testing.T) {
 	for v, want := range map[float64]string{0: "$0", 9.994: "$9.99", 10: "$10", 1234.5: "$1,235"} {
 		if got := money(v); got != want {
 			t.Errorf("money(%v) = %q, want %q", v, got, want)
+		}
+	}
+}
+
+func TestTextHasNewSections(t *testing.T) {
+	sessions := sample()
+	sessions[0].Harness = &event.HarnessRecord{Cost: 105, ByModel: map[string]event.ModelRecord{"claude-opus-5-5": {Cost: 105}}}
+	sessions[0].Turns[0].Time = t0
+	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	var buf bytes.Buffer
+	if err := WriteText(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"CHECKED AGAINST CLAUDE CODE'S OWN RECORDS", "WEEK BY WEEK", "P07 WHAT EVERY REQUEST CARRIES"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("text has no %q", want)
+		}
+	}
+	var page bytes.Buffer
+	if err := WriteHTML(&page, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Checking the totals", "Week by week", "(so far)"} {
+		if !strings.Contains(page.String(), want) {
+			t.Errorf("page has no %q", want)
+		}
+	}
+}
+
+func TestContextName(t *testing.T) {
+	for in, want := range map[string]string{
+		"skill_listing": "List of available skills", "mcp__github": "MCP server github: tool definitions",
+		"Project CLAUDE.md": "Project CLAUDE.md", "some_new_kind": "some new kind",
+	} {
+		if got := contextName(in); got != want {
+			t.Errorf("contextName(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

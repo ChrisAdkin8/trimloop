@@ -85,6 +85,18 @@ type Message struct {
 	// titles the harness generates).
 	Title       string
 	CustomTitle bool
+
+	// KindInjected: the pieces of text added.
+	Injected []event.Injected
+
+	// KindStanding: the fixed start of later requests.
+	Standing *event.Standing
+
+	// KindCostRecord: the record so far for one run of the harness. Runs
+	// are told apart by RunID; within a run, later records include earlier
+	// ones.
+	RunID  string
+	Record event.HarnessRecord
 }
 
 // Kind is the kind of line a Message holds.
@@ -96,6 +108,9 @@ const (
 	KindToolResults             // results of tool calls, sent on the next turn
 	KindCompaction              // the session was compacted: earlier context dropped
 	KindTitle                   // the session's title, written by the harness or the user
+	KindInjected                // text the harness added to the conversation
+	KindStanding                // the system prompt and tool definitions, as recorded
+	KindCostRecord              // the harness's running record of the session's cost
 )
 
 // Result is one tool result, linked to its call by CallID.
