@@ -17,8 +17,10 @@ import (
 // and the most that fix could save.
 //
 // It replays each session: from a simulated compaction on, every turn sends
-// the tokens the compaction removed fewer, priced at that turn's average
-// input price. Each simulated compaction costs a summary request (reading
+// the tokens the compaction removed fewer, priced at what history cost on
+// that turn (historyRate: a cache read, or a write when the cache was
+// rebuilt). The turn still writes its own new tokens, so those are not
+// counted as saved. Each simulated compaction costs a summary request (reading
 // at tokens, writing about after tokens) and re-caching the summary. Real
 // compactions in the log reset the replay. It assumes the session then went
 // on the same way; re-reading files after a compaction would lower the
@@ -45,8 +47,9 @@ func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, up
 				likely -= compactionCost(t, at, after)
 			}
 			if cut := min(removed, ctx-after); cut > 0 {
-				likely += t.Cost.Input() * float64(cut) / float64(ctx)
-				upTo += t.Cost.Input() * float64(ctx-after) / float64(ctx)
+				rate := historyRate(t)
+				likely += float64(cut) * rate
+				upTo += float64(ctx-after) * rate
 			}
 		}
 	}

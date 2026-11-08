@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Analysis, 2026-11-07 — its §4 proposals were adopted in [ADR 0028](adr/0028-harness-recorded-signals.md); §7, a second pass measured in money, led to [ADR 0031](adr/0031-m0-order-from-measured-spend.md) |
-| Sample | One developer's machine: 598 logs (445 main sessions, 176 sub-agent logs), ~16,000 turns, $2,021 at list prices; Claude Code versions 2.1.288–2.1.318 |
+| Sample | One developer's machine: 598 logs (422 main sessions, 176 sub-agent logs), ~16,000 turns, $2,021 at list prices; Claude Code versions 2.1.288–2.1.318 |
 | Method | Structure-only survey (field names, counts, sizes, timings); no prompt or file content was read |
 | Builds on | [ADR 0027](adr/0027-measured-m0-findings.md) (measured P19 and P09), the M0 prototype's report, [patterns.md](patterns.md), [analyzer.md §10](analyzer.md#10-extensibility-harnesses-and-providers) |
 
@@ -280,3 +280,22 @@ Method notes: sessions de-duplicated per message id as the prototype does
 cache-read price; injected-context tokens at 4 bytes each; the Agent tool's
 own result is usually a short "started in the background" note, so the size
 of what a sub-agent returns could not be measured from it.
+
+## 8. Measured figures at a glance
+
+The same developer's logs were measured several times as the code grew.
+Totals differ because the logs grew and the oldest were deleted, and some
+methods changed. This table is the reference; other documents quote it.
+
+| Figure | Value | When | Method |
+|---|---|---|---|
+| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,116 | 2026-11-06 → 11-08 | Usage counted once per message id (ADR 0026); the logs kept growing |
+| Spend in turns over 200k tokens (P19) | 57–58 % | 11-06 → 11-08 | Input cost of those turns |
+| P19 saving, keeping turns under 200k | 31 % → **19 %** | 11-06 → 11-08 | First priced at the turn's average input price; corrected to price the removed history at the cache-read price (or write price when the cache was rebuilt) |
+| Compact earlier, likely saving | $820–840 → **$457** (up to $681) | 11-07 → 11-08 | Replay of compacting at 200k; corrected as above |
+| Re-writes after a break of over an hour (P09) | 17 % ($353–368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
+| Tool output (P04) | 2.2 % above 2k tokens per result; **12 %** carried in all | 11-06; 11-07 | 2.2 % is the saving from capping each result at 2k tokens; 12 % is the cost of carrying all tool output |
+| What every request carries (P07) | 4.3 % injected text → **11 %** with system prompt and tool definitions | 11-07 | Carried like tool output (ADR 0033) |
+| Sub-agents on a cheaper model (P13) | $235 → **$271–274** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out |
+| Claude Code's records above the logs | 4.2 % → 3 % → **2.1 %** | 11-07 → 11-08 | First on the latest record per session; then on every run, leaving out sessions still running |
+

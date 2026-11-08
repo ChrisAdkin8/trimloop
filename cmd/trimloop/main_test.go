@@ -336,6 +336,9 @@ func TestWrite(t *testing.T) {
 	if err := write(r, "html", path); err != nil {
 		t.Fatal(err)
 	}
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("report file mode: got %v, %v; want 0600", info.Mode().Perm(), err)
+	}
 	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), "<title>Trimloop report</title>") {
 		t.Errorf("got err %v, page %.40q", err, b)
 	}
@@ -384,5 +387,35 @@ func TestBuildSessionKeepsToolsWhenUnrecorded(t *testing.T) {
 	st := buildSession(d, map[string]bool{}).Turns[0].Standing
 	if st.SystemBytes != 2 || len(st.Tools) != 1 {
 		t.Errorf("got %+v, want the new system prompt with the earlier tools", st)
+	}
+}
+
+// A resumed log starts at the same moment as the original (it copies the
+// original's messages): the one that ended first is the original.
+func TestOldestFirstTieGoesToTheOneThatEndedFirst(t *testing.T) {
+	data := []logData{
+		{log: source.Log{Path: "a-resumed"}, start: t0, end: t0.Add(5 * time.Hour)},
+		{log: source.Log{Path: "z-original"}, start: t0, end: t0.Add(time.Hour)},
+	}
+	oldestFirst(data)
+	if data[0].log.Path != "z-original" {
+		t.Errorf("got %s first, want the original", data[0].log.Path)
+	}
+}
+
+// Injected text and compaction markers copied into a resumed log are counted
+// once; replies the harness made up are not turns.
+func TestBuildSessionCountsCopiedLinesOnce(t *testing.T) {
+	seen := map[string]bool{}
+	skills := source.Message{Kind: source.KindInjected, LineID: "u1", Injected: []event.Injected{{Kind: "skill_listing", Bytes: 40}}}
+	compact := source.Message{Kind: source.KindCompaction, LineID: "u2"}
+	first := buildSession(logData{log: source.Log{Path: "/p/a.jsonl"}, msgs: []source.Message{skills, compact, {ID: "a"}}}, seen)
+	if len(first.Turns[0].Injected) != 1 || !first.Turns[0].CompactedBefore {
+		t.Fatalf("original: got %+v", first.Turns[0])
+	}
+	second := buildSession(logData{log: source.Log{Path: "/p/b.jsonl"}, msgs: []source.Message{skills, compact, {ID: "b"},
+		{ID: "c", Model: "<synthetic>"}}}, seen)
+	if len(second.Turns) != 1 || len(second.Turns[0].Injected) != 0 || second.Turns[0].CompactedBefore {
+		t.Errorf("resumed: got %+v, want one turn with nothing copied counted again", second.Turns)
 	}
 }

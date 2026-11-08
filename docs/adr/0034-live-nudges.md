@@ -1,13 +1,14 @@
 # ADR 0034: Live nudges in Claude Code
 
-- Status: Proposed
+- Status: Accepted — built in the M0 prototype
 - Date: 2026-11-08
 - Amends: [ROADMAP.md](../../ROADMAP.md) (M0 scope), [packaging.md §3](../packaging.md#3-the-trimloop-binary) (commands)
 
 ## Context
 
 The two largest savings in the founder's logs are habits: compacting long
-sessions earlier (likely about $820 over 44 days) and starting fresh after
+sessions earlier (likely about $820 over 44 days; corrected on 2026-11-08 to
+about $460, see [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance)) and starting fresh after
 a long break (about $340). A report read days later does not change a habit
 at the moment it matters. Claude Code can run a command for its status line
 and commands at hook events, passing each a small JSON document that names

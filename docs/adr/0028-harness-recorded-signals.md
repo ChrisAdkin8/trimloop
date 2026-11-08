@@ -1,6 +1,6 @@
 # ADR 0028: Use the signals harnesses record — accounting, injected context, effort, retries, outcomes
 
-- Status: Proposed
+- Status: Accepted — partly built (cost records, compaction, injected context, attribution) — amended by [ADR 0033](0033-reconciliation-history-standing-context.md)
 - Date: 2026-11-07
 - Amends: [analyzer.md §10](../analyzer.md#10-extensibility-harnesses-and-providers) (capabilities), [data-model.md](../data-model.md) (Turn, Session, usage normalisation, price catalogue, labels), [design.md §6.3](../design.md#63-outcome-signals), [patterns.md](../patterns.md) (P07 scope; P10, P12, P14 milestones), [ROADMAP.md](../../ROADMAP.md) M0, [ADR 0027](0027-measured-m0-findings.md) (M0 detector list)
 

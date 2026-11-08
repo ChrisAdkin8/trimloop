@@ -165,7 +165,7 @@ func TestLikelyCompactionCountsTheCompaction(t *testing.T) {
 	}
 	saving, upTo := LikelyCompactionSaving([]event.Session{{Turns: turns}}, 200_000, 50_000)
 	ctx := float64(big.Context())
-	gross := 50 * big.Cost.Input() * (ctx - 50_000) / ctx
+	gross := 50 * (ctx - 50_000) * historyRate(big) // history is priced as a cache read
 	if saving <= 0 || saving >= gross || math.Abs(upTo-gross) > 1e-6 {
 		t.Errorf("got %v up to %v; want between 0 and %v, up to %v (the compaction's own cost comes off)", saving, upTo, gross, gross)
 	}
@@ -195,5 +195,23 @@ func TestTypicalStart(t *testing.T) {
 	}
 	if got := TypicalStart(sessions); got != 20 {
 		t.Errorf("got %d, want 20", got)
+	}
+}
+
+// Removed history is priced as history (a cache read), not at the turn's
+// average input price, which includes writing the turn's new tokens.
+func TestLikelyCompactionPricesHistoryNotNewTokens(t *testing.T) {
+	// Each turn reads 300k from the cache ($1 per million) and writes 100k
+	// new tokens ($10 per million): average input price is $3.25 per million.
+	turn := event.Turn{Usage: event.Usage{CacheRead: 300_000, CacheWrite1h: 100_000},
+		Cost: event.Cost{CacheRead: 0.3, CacheWrite1h: 1}, Priced: true}
+	s := event.Session{Turns: []event.Turn{turn, turn}}
+	got, _ := LikelyCompactionSaving([]event.Session{s}, 350_000, 50_000)
+	if want := 2 * 350_000 / 1e6; !near(got, want) { // 350k removed each turn, at $1 per million
+		t.Errorf("got %v, want %v", got, want)
+	}
+	f := FindContextSize([]event.Session{s}, 300_000, 1)
+	if want := 2 * 100_000 / 1e6; !near(f.Saving, want) {
+		t.Errorf("P19 saving: got %v, want %v", f.Saving, want)
 	}
 }

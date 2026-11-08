@@ -268,3 +268,69 @@ func TestWriteSettings(t *testing.T) {
 		t.Error("got no error writing into a missing folder")
 	}
 }
+
+// Settings files in unexpected shapes are refused, never crashed on or
+// silently changed; other values keep their exact text; backups never
+// overwrite each other; nothing is written when nothing is missing.
+func TestWriteSettingsSafety(t *testing.T) {
+	dir := t.TempDir()
+	for _, body := range []string{"null", "[1]", `{"hooks":[1]}`, `{"hooks":{"Stop":"x"}}`} {
+		p := filepath.Join(dir, "bad.json")
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := WriteSettings(p, "/bin/trimloop", false); err == nil {
+			t.Errorf("%s: got no error", body)
+		}
+		if b, _ := os.ReadFile(p); string(b) != body {
+			t.Errorf("%s: file changed to %s", body, b)
+		}
+	}
+
+	// A hook list holding something unexpected is kept as it is, with
+	// trimloop's hook added after it.
+	odd := filepath.Join(dir, "odd.json")
+	if err := os.WriteFile(odd, []byte(`{"hooks":{"Stop":["x"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteSettings(odd, "/bin/trimloop", false); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(odd); !strings.Contains(string(b), `"x"`) || !strings.Contains(string(b), "hook stop") {
+		t.Errorf("odd hook list: got %s", b)
+	}
+
+	p := filepath.Join(dir, "settings.json")
+	orig := `{"big":12345678901234567890,"hooks":{"PostToolUse":[{"hooks":[{"type":"command","command":"a && b < c > d"}]}]}}`
+	if err := os.WriteFile(p, []byte(orig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	b1, err := WriteSettings(p, "/bin/trimloop", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(p)
+	if !strings.Contains(string(got), "12345678901234567890") || !strings.Contains(string(got), `a && b < c > d`) {
+		t.Errorf("values changed: %s", got)
+	}
+	if b2, err := WriteSettings(p, "/bin/trimloop", false); err != nil || b2 != "" {
+		t.Errorf("second run should change nothing: backup %q, %v", b2, err)
+	}
+	// Force a second backup in the same second: it must not replace the first.
+	if err := os.WriteFile(p, []byte(orig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	b3, err := WriteSettings(p, "/bin/trimloop", false)
+	if err != nil || b3 == b1 {
+		t.Errorf("backups: first %q, second %q (%v)", b1, b3, err)
+	}
+	if first, _ := os.ReadFile(b1); string(first) != orig {
+		t.Error("the first backup was overwritten")
+	}
+}
+
+func TestMoneyNegative(t *testing.T) {
+	if money(-4.1) != "-$4.10" || money(-12) != "-$12" {
+		t.Errorf("got %q and %q", money(-4.1), money(-12))
+	}
+}

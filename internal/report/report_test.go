@@ -235,7 +235,7 @@ func TestSummaryWithoutFile(t *testing.T) {
 }
 
 func TestMoney(t *testing.T) {
-	for v, want := range map[float64]string{0: "$0", 9.994: "$9.99", 10: "$10", 1234.5: "$1,235"} {
+	for v, want := range map[float64]string{-6.08: "-$6.08", -1234.5: "-$1,235", 0: "$0", 9.994: "$9.99", 10: "$10", 1234.5: "$1,235"} {
 		if got := money(v); got != want {
 			t.Errorf("money(%v) = %q, want %q", v, got, want)
 		}
@@ -320,5 +320,11 @@ func near(a, b float64) bool { return a-b < 1e-9 && b-a < 1e-9 }
 func TestCostRange(t *testing.T) {
 	if costRange(nil) != "" || costRange([]float64{0.061, 0.0612}) != "$0.06" || costRange([]float64{0.15, 0.28}) != "$0.15–$0.28" {
 		t.Error("costRange is wrong")
+	}
+}
+
+func TestDollarsNegative(t *testing.T) {
+	if got := dollars(-6.08); got != "-$6.08" {
+		t.Errorf("dollars(-6.08) = %q", got)
 	}
 }

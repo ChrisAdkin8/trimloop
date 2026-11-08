@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Last updated | 2026-11-05 |
+| Last updated | 2026-11-08 |
 | Scope | Whole system, MVP through auto-fix |
 
 ## 1. Goals and non-goals
@@ -222,7 +222,10 @@ aggregates over the store ([ADR 0010](adr/0010-go-detectors-sql-aggregates.md),
 [analyzer.md §7](analyzer.md#7-detector-execution)). The full catalogue is in
 [patterns.md](patterns.md); their expected value is ranked in
 [value.md](value.md#2-the-levers-ranked-by-expected-value). The highest-value
-ones for the MVP:
+ones for the MVP, as first expected (measurement then put P19 large context,
+P09 resume bloat and P13 sub-agents first; the
+[ROADMAP build order](../ROADMAP.md#m0--transcript-analyser-mvp) has the
+measured order):
 
 - **Cache-prefix churn**: which segment broke the cached prefix, and how often.
 - **Cache TTL expiry**: idle gaps longer than the cache lifetime, forcing
@@ -293,8 +296,8 @@ an absolute quality score.
 
 ## 7. Actuators (fixing things)
 
-Every actuator has a **safety level**. A team policy sets the maximum level
-allowed; the default is 1.
+Every actuator has a **safety level**, L0 to L3 (the "Level" column below). A
+team policy sets the maximum level allowed; the default is L1.
 
 | Level | Type | Examples | Gate |
 |---|---|---|---|

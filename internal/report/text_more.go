@@ -16,8 +16,15 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	}
 	fmt.Fprintf(w, "  For %d sessions with a record, Claude Code recorded %s and the logs show %s:\n",
 		c.Sessions, money(c.Harness), money(c.Ours))
-	fmt.Fprintf(w, "  %s (%.1f%%) was spent on background requests the logs do not show,\n", money(c.Gap), pct(c.Gap, c.Ours))
-	fmt.Fprintln(w, "  such as session titles, summaries after a break and web searches.")
+	if c.Gap >= 0 {
+		fmt.Fprintf(w, "  %s (%.1f%%) was spent on background requests the logs do not show,\n", money(c.Gap), pct(c.Gap, c.Ours))
+		fmt.Fprintln(w, "  such as session titles, summaries after a break and web searches.")
+	} else {
+		fmt.Fprintf(w, "  the logs show %s more than the records; some records may predate the session's end.\n", money(-c.Gap))
+	}
+	if c.Unpriced > 0 {
+		fmt.Fprintf(w, "  %d sessions used a model with no known price and are left out.\n", c.Unpriced)
+	}
 	if c.WebSearches > 0 {
 		fmt.Fprintf(w, "  %d web searches cost about %s on top of their tokens.\n", c.WebSearches, money(c.WebSearchCost))
 	}

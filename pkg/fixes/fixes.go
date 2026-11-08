@@ -55,14 +55,10 @@ type Recommendation struct {
 	Overlap string `json:"overlap,omitempty"`
 }
 
-// Expected is the saving to rank by: Likely where it was estimated, else
-// Saving.
-func (r Recommendation) Expected() float64 {
-	if r.Likely > 0 {
-		return r.Likely
-	}
-	return r.Saving
-}
+// Expected is the saving to rank by. Only some recommendations have a
+// likely estimate, so ranking uses the upper bound, the one figure every
+// recommendation has; mixing the two would compare unlike things.
+func (r Recommendation) Expected() float64 { return r.Saving }
 
 // ForToolOutput recommends fixes for the kinds of noise in f with the
 // largest savings, at most n, skipping any with a saving under minSaving.

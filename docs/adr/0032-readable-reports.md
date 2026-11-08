@@ -1,6 +1,6 @@
 # ADR 0032: Readable reports — session titles, likely savings, plain language
 
-- Status: Proposed
+- Status: Accepted — built in the M0 prototype
 - Date: 2026-11-07
 - Amends: [ADR 0004](0004-local-first-hashes-only.md) (what a local report may show), [ADR 0030](0030-how-fixes-are-chosen.md) §2 (ranking)
 

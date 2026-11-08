@@ -21,6 +21,7 @@ type record struct {
 	Type      string `json:"type"`
 	Subtype   string `json:"subtype"` // system lines: "compact_boundary", ...
 	SessionID string `json:"sessionId"`
+	UUID      string `json:"uuid"` // the line's own id; copied lines keep it
 	Cwd       string `json:"cwd"`
 
 	// Assistant lines: what the harness says caused the turn.
@@ -202,7 +203,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return m, true, nil
 
 	case rec.Type == "system" && rec.Subtype == "compact_boundary":
-		m := source.Message{Kind: source.KindCompaction, SessionID: rec.SessionID, Time: ts}
+		m := source.Message{Kind: source.KindCompaction, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID}
 		if c := rec.CompactMetadata; c != nil {
 			m.Compaction = event.Compaction{
 				Before:   c.PreTokens,
@@ -373,7 +374,7 @@ func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 	} else {
 		pieces = []event.Injected{{Kind: a.Type, Bytes: size}}
 	}
-	return source.Message{Kind: source.KindInjected, SessionID: rec.SessionID, Time: ts, Injected: pieces}, true, nil
+	return source.Message{Kind: source.KindInjected, SessionID: rec.SessionID, Time: ts, Injected: pieces, LineID: rec.UUID}, true, nil
 }
 
 // renderedSize is the size of the text an attachment added: the content of

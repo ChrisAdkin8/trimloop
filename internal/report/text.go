@@ -113,11 +113,19 @@ func pct(part, whole float64) float64 {
 	return 100 * part / whole
 }
 
-func dollars(v float64) string { return "$" + thousands2(v) }
+func dollars(v float64) string {
+	if v < 0 {
+		return "-" + dollars(-v)
+	}
+	return "$" + thousands2(v)
+}
 
 // money is dollars for reading at a glance: whole dollars from $10 up,
 // cents below.
 func money(v float64) string {
+	if v < 0 {
+		return "-" + money(-v)
+	}
 	if v == 0 {
 		return "$0"
 	}

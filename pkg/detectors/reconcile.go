@@ -28,6 +28,11 @@ type Reconciliation struct {
 	Unrecorded     int     `json:"unrecorded"`
 	UnrecordedCost float64 `json:"unrecorded_cost"`
 
+	// Unpriced counts sessions with turns the price catalogue has no price
+	// for. The logs would show those as free, so the whole of them would
+	// look like unobserved spend; they are left out of the comparison.
+	Unpriced int `json:"unpriced"`
+
 	WebSearches   int        `json:"web_searches"`    // in the compared sessions
 	WebSearchCost float64    `json:"web_search_cost"` // at the catalogue's per-request price
 	ByModel       []ModelGap `json:"by_model"`        // largest gap first
@@ -56,6 +61,7 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 	var f Reconciliation
 	ours := map[string]float64{}
 	last := map[string]time.Time{} // latest turn of each conversation
+	unpriced := map[string]bool{}  // conversations with a turn that has no price
 	oursModel := map[string]map[string]*ModelGap{}
 	for _, s := range sessions {
 		id := s.Conversation()
@@ -66,6 +72,9 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 			last[id] = e
 		}
 		for _, t := range s.Turns {
+			if !t.Priced {
+				unpriced[id] = true
+			}
 			ours[id] += t.Cost.Total()
 			g := oursModel[id][t.Model]
 			if g == nil {
@@ -86,6 +95,10 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 		if s.Harness == nil {
 			f.Unrecorded++
 			f.UnrecordedCost += mine
+			continue
+		}
+		if unpriced[s.ID] {
+			f.Unpriced++
 			continue
 		}
 		if at := s.Harness.At; !at.IsZero() && last[s.ID].Sub(at) > staleAfter {

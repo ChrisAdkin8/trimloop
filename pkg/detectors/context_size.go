@@ -12,7 +12,7 @@ type ContextSize struct {
 	Sessions int     `json:"sessions"` // sessions with at least one such turn
 	Cost     float64 `json:"cost"`     // input cost of those turns (everything they sent)
 
-	// Saving is the input cost of the tokens above the threshold: what those
+	// Saving is the cost of the tokens above the threshold: what those
 	// turns would have saved had context been kept to Threshold tokens (by
 	// starting a new session per task, or compacting earlier). It is an upper
 	// bound: some of that context was needed.
@@ -31,8 +31,12 @@ func FindContextSize(sessions []event.Session, threshold, topN int) ContextSize 
 			if ctx <= threshold || !t.Priced {
 				continue
 			}
-			// Price the excess at this turn's average input price per token.
-			saving := t.Cost.Input() * float64(ctx-threshold) / float64(ctx)
+			// The tokens above the threshold are old history, so price them at
+			// what history cost on this turn: a cache read, or a cache write
+			// when the cache had to be rebuilt. The turn's average input price
+			// would also count writing its new tokens, which a smaller context
+			// still pays.
+			saving := float64(ctx-threshold) * historyRate(t)
 
 			f.Turns++
 			f.Cost += t.Cost.Input()

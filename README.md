@@ -4,7 +4,11 @@
 > agents and the models they call, finds the patterns that waste tokens, and
 > fixes them — safely.
 
-**Status:** design phase. No code yet. Start with [docs/design.md](docs/design.md).
+**Status:** M0 prototype. It analyses the Claude Code session logs on your
+machine and gives live nudges inside Claude Code; everything else (gateway
+plugin, team collector, automatic fixes) is design. To try it, see
+[Running the prototype](#running-the-prototype); for what is built, see
+[Current state](#current-state).
 
 ## The problem
 
@@ -40,8 +44,9 @@ Trimloop is designed to do all four.
   guesses against them; on a self-hosted collector the same holds for anyone
   without the key ([ADR 0011](docs/adr/0011-keyed-fingerprints.md),
   [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
-- **Observe before acting.** Every optimisation ships report-only first, then
-  shadow, then canary, then on. Each is measured and reversible.
+- **Observe before acting.** Recommendations come first; changes Trimloop
+  would make to requests itself (planned, levels 2 and 3) ship report-only,
+  then shadow, then canary, then on. Each is measured and reversible.
 - **Quality is a constraint, not an afterthought.** A saving that makes the
   agent worse is not a saving. Trimloop tracks outcome signals alongside cost.
 - **Harness- and provider-neutral.** One event model for every harness,
@@ -83,7 +88,7 @@ plugin), [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)
 
 ## Running the prototype
 
-The M0 prototype reads the Claude Code session logs on this machine
+You need only Go 1.27 or later. The prototype reads the Claude Code session logs on this machine
 (`~/.claude/projects`) and reports where tokens went and what to change:
 
 ```bash
@@ -121,7 +126,48 @@ go build -o ~/.local/bin/trimloop ./cmd/trimloop
 ~/.local/bin/trimloop setup --write ~/.claude/settings.json   # or add them (a backup is made)
 ```
 
+### Files it writes
+
+Everything stays on your machine, readable by you only (mode 0600):
+
+| File | What it holds |
+|---|---|
+| The report you ask for (`--out`, or `trimloop-report.html`) | Figures, project names and session titles |
+| `~/.trimloop/history.json` | Weekly figures only: no names, titles or paths |
+| `~/.trimloop/live/<session>.json` | Which nudges a session has been shown |
+| `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
+
+`trimloop setup --write` also edits the Claude Code settings file you name,
+after saving a backup next to it.
+
+## Current state
+
+What exists today, and where:
+
+| Package | What it does |
+|---|---|
+| `cmd/trimloop` | The command: reads logs, builds sessions, runs the report or a live command |
+| `internal/adapters/source` | Log readers: `claudecode` (Claude Code transcripts), `jsonl` (shared line reader) |
+| `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price catalogue, usage normalisation |
+| `pkg/detectors` | Findings: P19, P09, P04, P07, P13 (sub-agents), growth and compaction, attribution, reconciliation, weekly figures |
+| `pkg/cmdshape` | Shell commands reduced to shapes, without values |
+| `pkg/fixes` | Recommendations, with the fix ladder of ADR 0030 |
+| `internal/report` | Results, rendered as summary, text, HTML and JSON |
+| `internal/history` | Weekly figures kept between runs |
+| `internal/live` | Status line, hooks and `setup` for Claude Code |
+
+Not built yet: the store (DuckDB), other harnesses, the gateway plugin and
+sidecar (M1), the team collector (M2) and automatic fixes (M3 onwards). The
+[ROADMAP](ROADMAP.md) has the order; [docs/adr/README.md](docs/adr/README.md)
+lists every decision with whether it is built.
+
+There is no licence yet: all rights reserved. Please report security
+problems to the maintainer privately rather than in an issue.
+
 ## Development setup
+
+The prototype needs only Go. The script below installs everything the
+planned stack needs:
 
 Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or
 Debian/Ubuntu):
@@ -131,7 +177,7 @@ scripts/bootstrap.sh --check   # see what is missing; changes nothing; exit 1 if
 scripts/bootstrap.sh           # install what is missing (asks first)
 ```
 
-It installs Go (≥ 1.25) and a C toolchain for the DuckDB driver; `buf`,
+It installs Go (≥ 1.27) and a C toolchain for the DuckDB driver; `buf`,
 `protoc-gen-go`, `protoc-gen-go-grpc`, `golangci-lint` and `govulncheck`;
 `uv` with Python 3.12 for the LiteLLM plugin; Node.js (≥ 22) for the web UI;
 and the DuckDB CLI. `--with-collector` also checks Docker for the team
@@ -159,7 +205,7 @@ exits 1 if there are any. The linters are set in [.golangci.yml](.golangci.yml).
 | [docs/packaging.md](docs/packaging.md) | Artefacts, channels, versioning, release pipeline, supply-chain signing |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/data-model.md](docs/data-model.md) | Normalised event model and storage |
-| [docs/adr/](docs/adr/) | Architecture decision records |
+| [docs/adr/](docs/adr/README.md) | Architecture decision records, with an index of what is built |
 | [ROADMAP.md](ROADMAP.md) | Milestones from offline analyser to auto-fix |
 
 ## Name

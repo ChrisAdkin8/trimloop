@@ -14,6 +14,10 @@ import (
 // a megabyte covers even a large tool result written after it.
 const tailBytes = 1 << 20
 
+// Synthetic is the model name Claude Code logs for a reply it made up itself,
+// for example after an API error. It has no real usage, so it is not a turn.
+const Synthetic = "<synthetic>"
+
 // ErrNoResponse means the end of the log holds no reply with usage.
 var ErrNoResponse = errors.New("no reply with usage near the end of the log")
 
@@ -56,7 +60,7 @@ func LastResponse(path string) (source.Message, error) {
 			buf = nil
 		}
 		m, ok, err := parseLine(bytes.TrimSpace(line))
-		if err == nil && ok && m.Kind == source.KindTurn {
+		if err == nil && ok && m.Kind == source.KindTurn && m.Model != Synthetic {
 			return m, nil
 		}
 	}

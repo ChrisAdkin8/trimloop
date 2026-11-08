@@ -15,7 +15,7 @@ func WriteSummary(out io.Writer, r Results, path string, actions int) error {
 	w := bufio.NewWriter(out)
 	readLine(w, r.Read)
 	periodLine(w, r)
-	if c := r.Reconciliation; c.Sessions > 0 && c.Gap > 0 {
+	if c := r.Reconciliation; c.Sessions > 0 && c.Gap > 0.005*c.Ours {
 		fmt.Fprintf(w, "Claude Code's own records show %s (%.0f%%) more, for background requests the logs do not show.\n",
 			money(c.Gap), pct(c.Gap, c.Ours))
 	}

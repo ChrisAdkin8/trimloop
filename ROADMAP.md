@@ -34,10 +34,13 @@ findings report with estimated savings. No proxy, no server.
   tests.
 - Local store protected by file permissions; encryption deferred until
   full-content capture ([ADR 0015](docs/adr/0015-defer-local-store-encryption.md)).
-- Aggregate runner for the cross-session detectors (P06, P07).
-- Release pipeline: signed binary on GitHub Releases, `.deb` / `.rpm`
-  packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved by a
-  release dry-run of the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)).
+- Aggregate runner for the cross-session detectors (P06). P07 is built as a
+  per-session Go detector ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
+- Release: an installable release first (ADR 0029 item 10); the signed
+  pipeline — signed binary on GitHub Releases, `.deb` / `.rpm` packages and a
+  Homebrew tap ([packaging.md](docs/packaging.md)), proved by a dry-run of
+  the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)) —
+  can follow within M0 or in M1.
 
 **Build order** ([ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md),
 re-ranked from measured spend by [ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
@@ -53,11 +56,12 @@ live nudges in Claude Code — status line, after-reply and before-send hooks,
 and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)).
 
 1. Saved offsets, so a re-run reads only new lines.
-2. Command-line options: `analyse`, `--since`, `--repo` (`--format` and
+2. Command-line options: `--since`, `--repo` (`analyse`, `--format` and
    `--out` are done).
 3. P14 in reduced fidelity: spend by effort level.
 4. P02 cache-lifetime fit.
-5. P03, P06, P01; then P05, P10 in full, P12.
+5. P03, P06, P01; then P05, and P10 and P12 in reduced fidelity from
+   harness records (their full fidelity stays in M3).
 6. Distribution: installable release, minimal conformance runner, profiles.
 7. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 

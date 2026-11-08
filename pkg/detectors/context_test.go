@@ -24,9 +24,11 @@ func TestFindReconciliation(t *testing.T) {
 		{ID: "b", Kind: "main", Harness: record(1, at, 0), Turns: []event.Turn{turn("opus", 9, at.Add(time.Hour))}},
 		// No record.
 		{ID: "c", Kind: "main", Turns: []event.Turn{turn("opus", 4, at)}},
+		// A turn with no price: the logs would show it as free.
+		{ID: "d", Kind: "main", Harness: record(30, at.Add(time.Hour), 0), Turns: []event.Turn{{Model: "new-model", Time: at}}},
 	}
 	f := FindReconciliation(sessions)
-	if f.Sessions != 1 || f.Harness != 12 || f.Ours != 10 || f.Gap != 2 {
+	if f.Sessions != 1 || f.Harness != 12 || f.Ours != 10 || f.Gap != 2 || f.Unpriced != 1 {
 		t.Errorf("compared: got %+v", f)
 	}
 	if f.Behind != 1 || f.BehindCost != 9 || f.Unrecorded != 1 || f.UnrecordedCost != 4 {

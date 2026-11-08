@@ -1,6 +1,6 @@
 # ADR 0033: Reconciliation, weekly history, and pricing standing context
 
-- Status: Proposed
+- Status: Accepted — built in the M0 prototype
 - Date: 2026-11-07
 - Amends: [ADR 0028](0028-harness-recorded-signals.md) (how reconciliation is done), [ADR 0029](0029-m0-build-order-by-user-value.md) item 4 (results kept between runs), [patterns.md P07](../patterns.md#p07--bloated-standing-and-injected-context)
 

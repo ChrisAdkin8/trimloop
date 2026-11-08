@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Last updated | 2026-11-05 |
+| Last updated | 2026-11-08 |
 | Decision | [ADR 0008](adr/0008-packaging-and-distribution.md) |
 | Related | [analyzer.md](analyzer.md) (shapes and repo layout), [design.md §9](design.md#9-deployment-modes) (deployment modes) |
 

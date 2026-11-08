@@ -25,7 +25,9 @@ type Reader interface {
 	Discover() ([]Log, error)
 
 	// Read streams the messages in one log, in file order: responses with
-	// usage (and the tools they call), tool results, and compactions.
+	// usage (and the tools they call), tool results, compactions, titles,
+	// text the harness added, records of the system prompt and tool list,
+	// and the harness's own cost records. See Kind.
 	//
 	// Contract:
 	//   - Read starts at log.Offset and moves it past each complete line it
@@ -63,7 +65,11 @@ type Message struct {
 	// Set for every kind.
 	SessionID string    // the harness's session id, if it logs one
 	Time      time.Time // when the line was logged; zero if not known
-	Project   string    // name of the project folder the line was logged in; "" if not known
+	// LineID identifies the log line itself, where the harness gives one. A
+	// resumed or forked session copies earlier lines with their ids, so the
+	// caller counts injected text and compactions once per LineID.
+	LineID  string
+	Project string // name of the project folder the line was logged in; "" if not known
 
 	// KindTurn: a model response that carries usage.
 	ID        string // provider message id; usage is counted once per id

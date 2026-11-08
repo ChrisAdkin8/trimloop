@@ -27,7 +27,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P04 | Oversized and noisy tool output | M0 | Go | 3 |
 | P05 | Tool-call loops | M0 | Go | 0 |
 | P06 | Unused tool definitions | M0 | SQL | 1 |
-| P07 | Bloated standing and injected context | M0 | SQL | 1 |
+| P07 | Bloated standing and injected context | M0 | Go ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) | 1 |
 | P08 | Stale context | M3 | Go | 3 |
 | P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
 | P10 | Compaction thrash | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |

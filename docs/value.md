@@ -2,12 +2,14 @@
 
 | | |
 |---|---|
-| Status | Hypothesis — not yet measured |
-| Last updated | 2026-11-05 |
+| Status | Partly measured: §2 notes what M0 measured on one developer's logs; the rest is a hypothesis |
+| Last updated | 2026-11-08 |
 | Validated by | M0 (`trimloop analyse`) on real sessions — see [§8](#8-validation-plan) |
 
 Why Trimloop should save money and time, how much, and where the value runs
-out. All figures are theoretical until M0 produces measured numbers.
+out. Figures in §§3–7 are theoretical; §2 notes what M0 has measured, and
+[log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance) lists every
+measured figure with its date and method.
 
 ## 1. Why the waste exists
 
@@ -37,7 +39,7 @@ more than it needs to.
 | Rank | Lever | Patterns | Why this rank |
 |---|---|---|---|
 | 1 | **Fix broken caching** | P01 cache-prefix churn, P02 cache TTL expiry | Applies to almost every turn; moving the cache-hit rate from ~70 % to ~95 % roughly halves the cost of a turn (§3) |
-| 2 | **Trim bloated or stale context** | P04 oversized tool output, P07 bloated standing context, P08 stale context | Shrinks the base that every later turn pays for; research reports 40–60 % input-token reductions (§4) |
+| 2 | **Trim bloated or stale context** | P04 oversized tool output, P07 bloated standing context, P08 stale context, P19 large working context | Shrinks the base that every later turn pays for; research reports 40–60 % input-token reductions (§4) |
 | 3 | **Stop loops and wasted runs** | P05 tool-call loops, P11 post-failure burn | Rarer, but each occurrence wastes a whole run's tokens and the developer's time |
 | 4 | **Use cheaper models for easy steps** | P13 model over-provisioning | Large per-turn saving, but needs outcome data and carries the most quality risk |
 | 5 | **Reuse repeated work** | P15 duplicated exploration, P16 repeated workflow, P17 repeated instructions, P18 hot documentation | Saves developer time as well as tokens, via skills, summaries and documentation retrieval ([ADR 0007](adr/0007-recommend-skills-and-doc-retrieval.md)). Savings show up as fewer turns per task, which takes longer to measure, so it ranks last |
@@ -49,7 +51,8 @@ will re-rank by measured waste.
 **First measurement (2026-11-07, one developer):** on the founder's Claude
 Code sessions the order was different. Large working context (P19) and
 re-caching after long pauses (P09) were the largest levers, with likely
-savings of up to about 31% and 17% of spend; cache churn (P01) was about
+savings of up to about 31% and 17% of spend (31% priced removed history at
+the turn's average input price; at the cache-read price it is about 19%); cache churn (P01) was about
 1.5% and P02 below zero. One heavy user of a 1M-context model is not
 representative, so the table above is re-ranked only after §8 step 2. Details
 and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
@@ -57,7 +60,8 @@ and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
 A second pass on the same logs priced lever 4 without outcome data:
 sub-agents inherited the main model, and running them on a cheaper one
 would have saved about 13 % of spend, quality untested; noisy tool output
-(P04) carried about 12 % and injected context (P07) about 4 %
+(P04) carried about 12 %, and what every request carries (P07: system
+prompt, tool definitions and injected text) about 11 %
 ([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07),
 [ADR 0031](adr/0031-m0-order-from-measured-spend.md)).
 

@@ -12,6 +12,7 @@ package cmdshape
 
 import (
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -206,6 +207,9 @@ func shapeOf(pipe []pipePart) Shape {
 		}
 		break
 	}
+	if strings.ContainsAny(prog[:min(1, len(prog))], "$`(") {
+		prog = "(computed command)" // never show what a substitution contains
+	}
 	s.Program = prog
 
 	switch {
@@ -245,25 +249,34 @@ func interpreterSub(args []string, heredoc bool) string {
 	return ""
 }
 
-// subcommand returns the first one or two non-option words, skipping options
-// that take a value (git -C dir).
+// subcommand returns the first one or two subcommand words. A shape must
+// never carry a value (a token, a profile, a path), so it keeps only words
+// that look like subcommands: an option before the subcommand is taken to
+// have a value, unless it is a known on/off flag or written --opt=value, and
+// a word that is not a plain lower-case word ends the subcommand.
 func subcommand(prog string, args []string) string {
 	var sub []string
 	for i := 0; i < len(args) && len(sub) < subcommands[prog]; i++ {
 		a := args[i]
 		if strings.HasPrefix(a, "-") {
-			if slices.Contains(globalValueOpts[prog], a) {
-				i++
-			}
 			if len(sub) > 0 {
 				break // options after the subcommand end it
 			}
+			if !strings.Contains(a, "=") && !slices.Contains(globalFlags[prog], a) {
+				i++ // skip its value
+			}
 			continue
+		}
+		if !subWord.MatchString(a) {
+			break
 		}
 		sub = append(sub, a)
 	}
 	return strings.Join(sub, " ")
 }
+
+// subWord is what a subcommand looks like: "test", "pr", "ls-files".
+var subWord = regexp.MustCompile(`^[a-z][a-z0-9-]{0,23}$`)
 
 // sizeFlags returns the flags in args that change how much prog prints, in
 // the order of the program's flag list.
@@ -299,7 +312,10 @@ func sizeFlags(prog string, args []string) []string {
 			if !hasVal && i+1 < len(args) {
 				val = args[i+1]
 			}
-			value = name + " " + val
+			value = name
+			if subWord.MatchString(val) { // "-o yaml", but not a template or path
+				value += " " + val
+			}
 		}
 	}
 	var out []string

@@ -312,3 +312,26 @@ func TestLastResponseLargeLog(t *testing.T) {
 		t.Errorf("got %+v, %v", m, err)
 	}
 }
+
+// A made-up reply after an API error has no usage and is not the last reply.
+func TestLastResponseSkipsSynthetic(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.jsonl")
+	writeFile(t, p, ""+
+		`{"type":"assistant","message":{"id":"m1","model":"claude-opus-5-5","usage":{"cache_read_input_tokens":300000}}}`+"\n"+
+		`{"type":"assistant","message":{"id":"m2","model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0}}}`+"\n")
+	m, err := LastResponse(p)
+	if err != nil || m.ID != "m1" {
+		t.Errorf("got %+v, %v; want m1", m, err)
+	}
+}
+
+func TestParseLineKeepsLineID(t *testing.T) {
+	m, _, _ := parseLine([]byte(`{"type":"system","subtype":"compact_boundary","uuid":"u1"}`))
+	if m.LineID != "u1" {
+		t.Errorf("compaction: got %q", m.LineID)
+	}
+	m, _, _ = parseLine([]byte(`{"type":"attachment","uuid":"u2","attachment":{"type":"skill_listing"},"rendered":[{"content":"x"}]}`))
+	if m.LineID != "u2" {
+		t.Errorf("attachment: got %q", m.LineID)
+	}
+}

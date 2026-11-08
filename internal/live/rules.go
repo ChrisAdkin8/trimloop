@@ -167,6 +167,9 @@ func tokens(n int) string {
 }
 
 func money(v float64) string {
+	if v < 0 {
+		return "-" + money(-v)
+	}
 	if v >= 10 {
 		return fmt.Sprintf("$%.0f", v)
 	}

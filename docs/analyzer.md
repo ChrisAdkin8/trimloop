@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Last updated | 2026-11-05 |
+| Last updated | 2026-11-08 |
 | Scope | The analysis engine: standalone CLI, gateway sidecar, embeddable library |
 | Related | [design.md](design.md), [patterns.md](patterns.md), [data-model.md](data-model.md), ADRs [0002](adr/0002-go-for-agent-and-proxy.md), [0005](adr/0005-thin-python-plugin-for-litellm.md), [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md) |
 
@@ -171,6 +171,14 @@ team/key alias, cwd/repo when known).
 ## 5. The three shapes
 
 ### 5.1 Standalone: `trimloop analyse`
+
+**Today (M0 prototype):** `trimloop [analyse] [--format summary|text|html|json]
+[--out FILE] [--no-titles] [--history FILE | --no-history]`, plus
+`trimloop setup`, `statusline` and `hook` for live nudges
+([ADR 0034](adr/0034-live-nudges.md)). There is no store yet: each run reads
+every log again, and only weekly figures are kept between runs
+([ADR 0033](adr/0033-reconciliation-history-standing-context.md)). The rest of
+this section is the target design.
 
 ```text
 trimloop analyse [--harness claude-code|codex|all] [--since 30d]
@@ -658,6 +666,10 @@ already use (Datadog, Grafana, etc.).
 
 ## 12. Repository layout
 
+The target layout. The M0 prototype's packages differ (for example
+`pkg/detectors`, `pkg/fixes`, `internal/report`, `internal/live`); the
+README's [Current state](../README.md#current-state) lists them.
+
 ```text
 cmd/trimloop/               CLI: analyse, serve, proxy, report, explain, conformance,
                             update-catalogue, key, recommendations (M2),
@@ -730,21 +742,16 @@ body.
 
 Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 
-1. **M0 — `trimloop analyse`** (built in the order of
-   [ADR 0029](adr/0029-m0-build-order-by-user-value.md)): `pkg/event`, `normalize/anthropic`,
-   `redact`, `fingerprint` (keyed) and `trimloop key init`, `price`, Claude
-   Code `Reader` (turns, cost and compaction records), reconciliation with
-   the harness cost record, DuckDB and memory stores, incremental re-runs,
-   detectors P01–P05, P09, P10, P12, P14 and P19 (Go) and P06–P07
-   (aggregates), text and HTML
-   reports, a minimal
-   conformance runner (schema, capability claims, golden events), release
-   pipeline dry-run.
+1. **M0 — `trimloop analyse`**: what is done and the order of the rest are
+   kept in one place, the [ROADMAP build order](../ROADMAP.md#m0--transcript-analyser-mvp)
+   ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)). Built so far
+   includes text, HTML and JSON reports
+   ([ADR 0032](adr/0032-readable-reports.md)) and live nudges in Claude Code
+   ([ADR 0034](adr/0034-live-nudges.md)).
 2. **M1 — sidecar:** plugin overhead benchmark first; then ingest API,
    `normalize/litellm` envelope, `sessionize` with reorder window, merging and
    history edits, `trimloop serve` with the findings API and page, webhook
-   sink, LiteLLM plugin (observe only), Codex `Reader`, JSON report,
-   conformance kit.
+   sink, LiteLLM plugin (observe only), Codex `Reader`, conformance kit.
 3. **M2 — team collector:** ClickHouse and Postgres stores, upload sink, OTel
    sink, OTLP receiver, recommendations.
 4. **M3 — automatic fixes:** `decide`, ops, policy, plugin pre-call hook

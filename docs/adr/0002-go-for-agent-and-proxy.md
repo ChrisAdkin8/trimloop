@@ -1,6 +1,6 @@
 # ADR 0002: Go for the agent, proxy and CLI
 
-- Status: Proposed — build and platform claims amended by [ADR 0008](0008-packaging-and-distribution.md)
+- Status: Accepted — built (the prototype is Go) — build and platform claims amended by [ADR 0008](0008-packaging-and-distribution.md)
 - Date: 2026-11-05
 
 ## Context

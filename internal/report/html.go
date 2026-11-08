@@ -51,6 +51,7 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 	"w":        func(x float64) string { return fmt.Sprintf("%.1f", max(0, x)) },
 	"p0":       func(x float64) string { return fmt.Sprintf("%.0f%%", x) },
 	"float":    func(n int) float64 { return float64(n) },
+	"neg":      func(x float64) float64 { return -x },
 	// args packs values for a sub-template, which reads them with index.
 	"args": func(v ...any) []any { return v },
 }).Parse(htmlSource))

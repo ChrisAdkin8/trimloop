@@ -127,4 +127,9 @@ func thousandsInt(n int) string {
 }
 
 // dollars formats v as dollars with commas and no cents: "$1,235".
-func dollars(v float64) string { return "$" + thousandsInt(int(v+0.5)) }
+func dollars(v float64) string {
+	if v < 0 {
+		return "-" + dollars(-v)
+	}
+	return "$" + thousandsInt(int(v+0.5))
+}

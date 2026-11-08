@@ -53,13 +53,21 @@ var subcommands = map[string]int{
 	"claude": 1, "golangci-lint": 1, "mvn": 1, "gradle": 1,
 }
 
-// globalValueOpts are options before the subcommand that take a value.
-var globalValueOpts = map[string][]string{
-	"git":     {"-C", "-c", "--git-dir", "--work-tree"},
-	"docker":  {"-H", "--context"},
-	"kubectl": {"-n", "--namespace", "--context"},
-	"gh":      {"-R", "--repo"},
-	"go":      {"-C"},
+// globalFlags are on/off options that can come before a subcommand. Any
+// other option there is taken to have a value, which is skipped.
+var globalFlags = map[string][]string{
+	"git":       {"--no-pager", "--paginate", "-P", "-p", "--bare", "--no-replace-objects", "--literal-pathspecs"},
+	"docker":    {"--debug", "-D", "--tls"},
+	"npm":       {"-g", "--global", "-s", "--silent", "-q", "--quiet", "-y", "--yes"},
+	"pnpm":      {"-g", "--global", "-s", "--silent", "-r", "--recursive"},
+	"yarn":      {"-s", "--silent"},
+	"cargo":     {"-q", "--quiet", "-v", "--verbose", "--frozen", "--locked", "--offline"},
+	"uv":        {"-q", "--quiet", "-v", "--verbose", "--no-cache", "--offline"},
+	"brew":      {"-q", "--quiet", "-v", "--verbose", "-d", "--debug"},
+	"pip":       {"-q", "--quiet", "-v", "--verbose"},
+	"pip3":      {"-q", "--quiet", "-v", "--verbose"},
+	"helm":      {"--debug"},
+	"terraform": {"-no-color"},
 }
 
 // bundles lists programs whose single-letter flags can be combined: grep -rn.

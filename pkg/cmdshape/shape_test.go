@@ -45,9 +45,18 @@ func TestParse(t *testing.T) {
 		{cmd: "python3 - <<'EOF'\nimport json\nprint(1)\nEOF", shape: "python3 inline", noise: event.NoiseData},
 		{cmd: `python3 -c 'print(1)' | jq .`, shape: "python3 inline", filtered: true, noise: event.NoiseData},
 		{cmd: `python3 scripts/survey.py`, shape: "python3 script", noise: event.NoiseData},
-		{cmd: `gh api repos/x/y/pulls --jq '.[].title'`, shape: "gh api repos/x/y/pulls --jq", noise: event.NoiseData},
+		{cmd: `gh api repos/x/y/pulls --jq '.[].title'`, shape: "gh api --jq", noise: event.NoiseData},
 		{cmd: `kubectl get pods -o yaml`, shape: "kubectl get -o yaml", noise: event.NoiseData},
 		{cmd: `git diff --stat`, shape: "git diff --stat", noise: event.NoiseData},
+
+		// Values never reach the shape: tokens, profiles, paths, substitutions
+		{cmd: `kubectl --token sk-abc123 get secrets`, shape: "kubectl get", noise: event.NoiseData},
+		{cmd: `aws --profile acme-prod s3 ls`, shape: "aws s3 ls", noise: event.NoiseData},
+		{cmd: `gh api repos/acme/secret-repo/issues`, shape: "gh api", noise: event.NoiseData},
+		{cmd: `$(security find-generic-password -s acme-token) | head`, shape: "(computed command)", filtered: true, noise: event.NoiseOther},
+		{cmd: `kubectl get pods -o jsonpath='{.items[*].metadata.name}'`, shape: "kubectl get -o", noise: event.NoiseData},
+		{cmd: `git --no-pager log --oneline`, shape: "git log --oneline", noise: event.NoiseData},
+		{cmd: `npm -g install typescript`, shape: "npm install", noise: event.NoiseBuildTest},
 
 		// Loops, groups, comments and other odd input
 		{cmd: `for f in a b; do cat "$f"; done`, shape: "cat", file: "$f", noise: event.NoiseFileView},

@@ -84,7 +84,7 @@ func TestForSubAgents(t *testing.T) {
 
 func TestForCompaction(t *testing.T) {
 	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 7, 3, 30_000, 1)
-	if !ok || r.Saving != 7 || r.Likely != 3 || r.Expected() != 3 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
+	if !ok || r.Saving != 7 || r.Likely != 3 || r.Expected() != 7 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
 	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 7, 3, 30_000, 1); ok {

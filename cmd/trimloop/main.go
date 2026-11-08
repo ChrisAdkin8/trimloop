@@ -222,7 +222,9 @@ func write(r report.Results, format, path string) error {
 	if path == "" {
 		return render(os.Stdout, r)
 	}
-	f, err := os.Create(path)
+	// Readable by the owner only: a report names projects and shows session
+	// titles, which summarise what was asked.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -249,6 +251,7 @@ type logData struct {
 	log   source.Log
 	msgs  []source.Message // in file order, repeats included
 	start time.Time        // earliest message time; zero if none has a time
+	end   time.Time        // latest message time
 	bad   int              // lines that could not be parsed
 	err   error            // set if reading stopped early
 }
@@ -267,6 +270,9 @@ func readLog(r source.Reader, l source.Log) logData {
 			break
 		}
 		d.msgs = append(d.msgs, m)
+		if m.Kind == source.KindTurn && m.Time.After(d.end) {
+			d.end = m.Time
+		}
 		if m.Kind == source.KindTurn && !m.Time.IsZero() && (d.start.IsZero() || m.Time.Before(d.start)) {
 			d.start = m.Time
 		}
@@ -275,8 +281,10 @@ func readLog(r source.Reader, l source.Log) logData {
 }
 
 // oldestFirst sorts logs by their earliest message, so a message copied into
-// a later log is credited to the log it was first written in. Logs with no
-// times go last; ties keep path order, so the result is the same every run.
+// a later log is credited to the log it was first written in. A resumed log
+// copies the original's messages with their times, so the two can start at
+// the same moment: the one that ended first is then the original. Logs with
+// no times go last; remaining ties keep path order, so every run agrees.
 func oldestFirst(data []logData) {
 	sort.SliceStable(data, func(i, j int) bool {
 		a, b := data[i].start, data[j].start
@@ -285,6 +293,8 @@ func oldestFirst(data []logData) {
 			return !a.IsZero() // a log with a time comes before one without
 		case !a.Equal(b):
 			return a.Before(b)
+		case !data[i].end.Equal(data[j].end):
+			return data[i].end.Before(data[j].end)
 		}
 		return data[i].log.Path < data[j].log.Path
 	})
@@ -321,9 +331,15 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			continue
 		case source.KindCompaction:
+			if copiedLine(m, seen) {
+				continue
+			}
 			compacted, compaction = true, m.Compaction
 			continue
 		case source.KindInjected:
+			if copiedLine(m, seen) {
+				continue
+			}
 			injected = append(injected, m.Injected...)
 			continue
 		case source.KindStanding:
@@ -347,6 +363,14 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			continue
 		}
 
+		if m.Model == claudecode.Synthetic {
+			// A reply the harness made up (after an API error): no usage,
+			// not a turn, but still activity.
+			if m.Time.After(last) {
+				last = m.Time
+			}
+			continue
+		}
 		i, here := turnOf[m.ID]
 		if m.ID == "" || !seen[m.ID] { // no id: nothing to match repeats on
 			if m.ID != "" {
@@ -405,6 +429,21 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	}
 	s.Harness = sumRuns(runs)
 	return s
+}
+
+// copiedLine reports whether a line with this LineID was already counted in
+// an earlier log (it was copied into a resumed or forked session), and marks
+// it counted otherwise.
+func copiedLine(m source.Message, seen map[string]bool) bool {
+	if m.LineID == "" {
+		return false
+	}
+	key := "line:" + m.LineID
+	if seen[key] {
+		return true
+	}
+	seen[key] = true
+	return false
 }
 
 // sumRuns adds up the harness's records for each run of a session, or
