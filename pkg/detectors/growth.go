@@ -23,7 +23,12 @@ type Growth struct {
 	Compactions  int `json:"compactions"`   // compactions recorded
 	Manual       int `json:"manual"`        // of them, asked for by the user
 	MedianBefore int `json:"median_before"` // median context before a compaction, in tokens
-	MedianAfter  int `json:"median_after"`  // median context after
+	MedianAfter  int `json:"median_after"`  // median size the harness recorded after: the summary
+	// MedianResume is the median context of the first request after a
+	// compaction. It is larger than MedianAfter: the harness sends the system
+	// prompt and tool definitions again and re-attaches files, skill and tool
+	// listings. (2.3–4.8 times on the founder's logs, 2026-11-08.)
+	MedianResume int `json:"median_resume"`
 	// Longest is the longest a compaction took. A median would mislead:
 	// Claude Code prepares some compactions in advance, which then take
 	// milliseconds, while the rest make the user wait.
@@ -87,7 +92,7 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 			f.Bands[i].Max = bandEdges[i]
 		}
 	}
-	var before, after []int
+	var before, after, resume []int
 
 	for _, s := range sessions {
 		id := s.Conversation()
@@ -120,8 +125,24 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 					before = append(before, t.Compaction.Before)
 					after = append(after, t.Compaction.After)
 				}
+				if ctx > 0 {
+					resume = append(resume, ctx)
+				}
 				f.Longest = max(f.Longest, t.Compaction.Duration)
 			}
+		}
+		if tc := s.Trailing; tc != nil {
+			// Compacted after the last reply: counted, with no reply to measure.
+			compacted = true
+			f.Compactions++
+			if tc.Manual {
+				f.Manual++
+			}
+			if tc.Before > 0 {
+				before = append(before, tc.Before)
+				after = append(after, tc.After)
+			}
+			f.Longest = max(f.Longest, tc.Duration)
 		}
 		c.Turns += len(s.Turns)
 		c.Cost += cost
@@ -158,7 +179,7 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 	}
 	f.Top = all[:min(topN, len(all))]
 
-	f.MedianBefore, f.MedianAfter = median(before), median(after)
+	f.MedianBefore, f.MedianAfter, f.MedianResume = median(before), median(after), median(resume)
 	return f
 }
 

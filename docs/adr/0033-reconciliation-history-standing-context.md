@@ -1,6 +1,6 @@
 # ADR 0033: Reconciliation, weekly history, and pricing standing context
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md) [ADR 0036](0036-prices-reconciliation-status.md) and [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md) [ADR 0036](0036-prices-reconciliation-status.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) and [ADR 0038](0038-real-size-after-compaction.md)
 - Date: 2026-11-07
 - Amends: [ADR 0028](0028-harness-recorded-signals.md) (how reconciliation is done), [ADR 0029](0029-m0-build-order-by-user-value.md) item 4 (results kept between runs), [ADR 0010](0010-go-detectors-sql-aggregates.md) (P07 is a Go detector, not SQL), [patterns.md P07](../patterns.md#p07--bloated-standing-and-injected-context)
 

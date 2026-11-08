@@ -98,7 +98,7 @@ func TestForCompaction(t *testing.T) {
 }
 
 func TestForPauses(t *testing.T) {
-	r, ok := ForPauses(detectors.LongPause{Pauses: 4, Saving: 20, Unprompted: 1, UnpromptedCost: 5}, 15, 30_000, 1)
+	r, ok := ForPauses(detectors.LongPause{Pauses: 4, Cost: 20, Saving: 15, Unprompted: 1, UnpromptedCost: 5}, 15, 30_000, 1)
 	if !ok || r.Pattern != "P09" || r.Saving != 15 || r.Likely != 15 || !strings.Contains(r.LikelyNote, "30,000") ||
 		!strings.Contains(r.Finding, "3 times") || !strings.Contains(r.Finding, "Another long wait was") {
 		t.Errorf("got %+v ok=%v", r, ok)

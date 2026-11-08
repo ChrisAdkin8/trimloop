@@ -438,7 +438,7 @@ conversation and read its cache (Claude Code's `fork`) get no suggestion,
 since another model would lose that cache. In the founder's sample, no Agent
 call set a model; sub-agents were 26 % of spend, and their Opus 5.5 and
 Fable turns would have cost $271 (13 % of all spend) less on Sonnet 5.5
-(2026-11-08; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance)
+(first measured 2026-11-07; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance)
 has the current figure).
 
 ## P14 — Thinking-budget overspend
@@ -589,9 +589,11 @@ threshold, which removes more than the part above it.
 **Fix:** L1 — compact when a session passes the threshold or between tasks
 (Claude Code: `/compact`; it compacts on its own only near the context
 limit), or start a new session per task. The report estimates a likely
-saving for compacting by replaying each session as if compacted to the
-typical post-compaction size whenever it passed the threshold, including
-each compaction's cost ([ADR 0032](adr/0032-readable-reports.md)). Live
+saving for compacting by replaying each main session as if compacted to the
+typical size of the first request after a compaction (the summary plus the
+system prompt and re-attached files) whenever it passed the threshold,
+including each compaction's cost ([ADR 0032](adr/0032-readable-reports.md),
+[ADR 0038](adr/0038-real-size-after-compaction.md)). Live
 nudges remind the user at 200k and 500k tokens and show the size in the
 status line ([ADR 0034](adr/0034-live-nudges.md)). Where P04, P07 or P08 are
 detected, report them as the causes: they say *what* fills the context.

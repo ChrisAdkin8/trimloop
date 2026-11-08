@@ -2,6 +2,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
@@ -178,13 +179,38 @@ func analyse() {
 	if !*noHistory {
 		path := *historyPath
 		if path == "" {
-			path = filepath.Join(home, ".trimloop", "history.json")
+			path = defaultHistory(home, os.Getenv("CLAUDE_CONFIG_DIR"))
 		}
 		keepHistory(&r, path, st.oldest)
 	}
 	if err := write(r, *format, *out); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// defaultHistory is where weekly figures are kept: one file per set of
+// logs, so runs over another Claude Code folder (CLAUDE_CONFIG_DIR) do not
+// replace each other's weeks. The folder is named by a hash of its path.
+func defaultHistory(home, configDir string) string {
+	dir := filepath.Join(home, ".trimloop")
+	if configDir == "" {
+		return filepath.Join(dir, "history.json")
+	}
+	if abs, err := filepath.Abs(configDir); err == nil {
+		configDir = abs
+	}
+	sum := sha256.Sum256([]byte(filepath.Clean(configDir)))
+	return filepath.Join(dir, fmt.Sprintf("history-%x.json", sum[:4]))
+}
+
+// partialWeek is the last week whose logs Claude Code may have partly
+// deleted: the week of the oldest log still on disk, by its last change.
+// It returns "" if no log was found.
+func partialWeek(oldest time.Time) string {
+	if oldest.IsZero() {
+		return ""
+	}
+	return detectors.WeekOf(oldest.Local())
 }
 
 // keepHistory merges this run's weekly figures into the history file at path
@@ -196,11 +222,7 @@ func keepHistory(r *report.Results, path string, oldest time.Time) {
 		log.Printf("history not used: %v", err)
 		return
 	}
-	partial := ""
-	if !oldest.IsZero() {
-		partial = detectors.WeekOf(oldest.Local())
-	}
-	r.Weeks = history.Merge(&h, r.Weeks, r.Prices, partial)
+	r.Weeks = history.Merge(&h, r.Weeks, r.Prices, partialWeek(oldest))
 	if err := history.Save(path, h); err != nil {
 		log.Printf("history not saved: %v", err)
 	}
@@ -337,11 +359,16 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	for _, m := range d.msgs {
 		switch m.Kind {
 		case source.KindToolResults:
+			answered := m.UserDecided // the user allowed or refused a call
 			for _, r := range m.Results {
 				if at, ok := callAt[r.CallID]; ok {
 					c := &s.Turns[at[0]].ToolCalls[at[1]]
 					c.Result, c.HasResult = r.ToolResult, true
+					answered = answered || c.Tool == "AskUserQuestion" // the user answered Claude's question
 				}
+			}
+			if answered && !copiedLine(m, seen) {
+				prompted = true
 			}
 			continue
 		case source.KindCompaction:
@@ -461,6 +488,10 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	s.Harness = sumRuns(runs)
 	if s.Kind == "subagent" && s.AgentType == "" {
 		s.AgentType = claudecode.AgentType(d.log.Path)
+	}
+	if compacted {
+		c := compaction
+		s.Trailing = &c
 	}
 	return s
 }

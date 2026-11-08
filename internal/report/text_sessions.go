@@ -48,9 +48,13 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 		fmt.Fprintln(w, "  No sessions.")
 		return
 	}
-	fmt.Fprintf(w, "  %s conversations (a main session with its sub-agents); the median one cost %s.\n",
-		thousands(g.Conversations), dollars(g.MedianCost))
+	fmt.Fprintf(w, "  %s (a main session with its sub-agents); the median one cost %s.\n",
+		count(g.Conversations, "conversation"), dollars(g.MedianCost))
 	for _, s := range g.TopShares {
+		if s.N == 1 {
+			fmt.Fprintf(w, "  The costliest one made %.0f%% of all spend.\n", 100*s.Share)
+			continue
+		}
 		fmt.Fprintf(w, "  The costliest %d made %.0f%% of all spend.\n", s.N, 100*s.Share)
 	}
 	if len(g.Top) > 0 {
@@ -70,16 +74,19 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 		fmt.Fprintf(w, "    %-16s %8s turns, %s each on average\n", label, thousands(b.Turns), dollars(b.MeanCost()))
 	}
 
-	fmt.Fprintf(w, "\n  %d compactions (%d asked for)", g.Compactions, g.Manual)
+	fmt.Fprintf(w, "\n  %s (%d asked for)", count(g.Compactions, "compaction"), g.Manual)
 	if g.MedianBefore > 0 {
-		fmt.Fprintf(w, ", typically from %s to %s tokens", thousands(g.MedianBefore), thousands(g.MedianAfter))
+		fmt.Fprintf(w, ", typically from %s to a %s-token summary", thousands(g.MedianBefore), thousands(g.MedianAfter))
+		if g.MedianResume > 0 {
+			fmt.Fprintf(w, " (the next request sent about %s, with the system prompt and re-attached files)", thousands(g.MedianResume))
+		}
 	}
 	if g.Longest >= time.Second {
 		fmt.Fprintf(w, "; the longest took %s", g.Longest.Round(time.Second))
 	}
 	fmt.Fprintln(w, ".")
-	fmt.Fprintf(w, "  %d sessions passed %s tokens and were never compacted; they cost %s (%.0f%%).\n",
-		g.Uncompacted, thousands(g.Limit), dollars(g.UncompactedCost), pct(g.UncompactedCost, all))
+	fmt.Fprintf(w, "  %s passed %s tokens and %s never compacted; %s cost %s (%.0f%%).\n",
+		count(g.Uncompacted, "session"), thousands(g.Limit), agree(g.Uncompacted, "was", "were"), agree(g.Uncompacted, "it", "they"), dollars(g.UncompactedCost), pct(g.UncompactedCost, all))
 	if rec != nil {
 		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(*rec, all))
 		fmt.Fprintln(w, "  This overlaps P19's saving but can be larger: compacting shrinks a session")
@@ -95,8 +102,8 @@ func subAgentSection(w io.Writer, f detectors.SubAgents, rec *fixes.Recommendati
 		fmt.Fprintln(w, "  No sub-agent runs.")
 		return
 	}
-	fmt.Fprintf(w, "  %s sub-agent runs, %s turns, cost %s (%.0f%% of all spend).\n",
-		thousands(f.Runs), thousands(f.Turns), dollars(f.Cost), pct(f.Cost, all))
+	fmt.Fprintf(w, "  %s, %s, cost %s (%.0f%% of all spend).\n",
+		count(f.Runs, "sub-agent run"), count(f.Turns, "turn"), dollars(f.Cost), pct(f.Cost, all))
 	fmt.Fprintf(w, "  On a cheaper model the same turns would have cost %s less (%.0f%%); untested for quality.\n",
 		dollars(f.Saving), pct(f.Saving, all))
 	fmt.Fprintf(w, "  Cache writes are %.0f%% of their spend (%.0f%% in main sessions), and each written\n",
@@ -104,7 +111,7 @@ func subAgentSection(w io.Writer, f detectors.SubAgents, rec *fixes.Recommendati
 	fmt.Fprintf(w, "  token is read %.0f times (%.0f in main sessions): each run starts with an empty cache.\n",
 		f.ReadsPerWrite, f.MainReadsPerWrite)
 	if f.Large > 0 {
-		fmt.Fprintf(w, "  %d runs passed %s tokens of context and cost %s.\n", f.Large, thousands(f.LargeAbove), dollars(f.LargeCost))
+		fmt.Fprintf(w, "  %s passed %s tokens of context and cost %s.\n", count(f.Large, "run"), thousands(f.LargeAbove), dollars(f.LargeCost))
 	}
 	fmt.Fprintf(w, "\n    %-10s %6s %6s %8s %10s  %-36s %s\n", "cost", "share", "runs", "turns", "saving", "model -> suggested", "agent type")
 	for _, g := range f.ByType {

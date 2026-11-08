@@ -1,6 +1,6 @@
 # ADR 0034: Live nudges in Claude Code
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown) and [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction) and [ADR 0038](0038-real-size-after-compaction.md) (status after compaction, re-arming)
 - Date: 2026-11-08
 - Amends: [ROADMAP.md](../../ROADMAP.md) (M0 scope), [packaging.md §3](../packaging.md#3-the-trimloop-binary) (commands)
 

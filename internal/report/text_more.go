@@ -10,8 +10,8 @@ import (
 // reconcileSection compares the totals with Claude Code's own records.
 func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	fmt.Fprintln(w, "\nCHECKED AGAINST CLAUDE CODE'S OWN RECORDS")
-	compared := fmt.Sprintf("  For %d sessions with a record, Claude Code recorded %s and the logs show %s:\n",
-		c.Sessions, money(c.Harness), money(c.Ours))
+	compared := fmt.Sprintf("  For %s with a record, Claude Code recorded %s and the logs show %s:\n",
+		count(c.Sessions, "session"), money(c.Harness), money(c.Ours))
 	switch {
 	case c.Sessions == 0 && c.Unpriced+c.Behind == 0:
 		fmt.Fprintln(w, "  No session has a cost record from Claude Code to check against.")
@@ -26,17 +26,19 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 		fmt.Fprintf(w, "  the logs show %s more than the records; some records may predate the session's end.\n", money(-c.Gap))
 	}
 	if c.Unpriced > 0 {
-		fmt.Fprintf(w, "  %d sessions have usage with no known price, in the logs or in the record, and are left out.\n", c.Unpriced)
+		fmt.Fprintf(w, "  %s usage with no known price, in the logs or in the record, and %s left out.\n",
+			count(c.Unpriced, "session")+agree(c.Unpriced, " has", " have"), agree(c.Unpriced, "is", "are"))
 	}
 	if c.WebSearches > 0 {
-		fmt.Fprintf(w, "  %d web searches cost about %s on top of their tokens.\n", c.WebSearches, money(c.WebSearchCost))
+		fmt.Fprintf(w, "  %s cost about %s on top of their tokens.\n", count(c.WebSearches, "web search"), money(c.WebSearchCost))
 	}
 	if c.Unrecorded > 0 {
-		fmt.Fprintf(w, "  %d sessions have no record (%s, %.0f%% of spend): their totals cannot be checked.\n",
-			c.Unrecorded, money(c.UnrecordedCost), pct(c.UnrecordedCost, all))
+		fmt.Fprintf(w, "  %s no record (%s, %.0f%% of spend): %s cannot be checked.\n",
+			count(c.Unrecorded, "session")+agree(c.Unrecorded, " has", " have"), money(c.UnrecordedCost), pct(c.UnrecordedCost, all), agree(c.Unrecorded, "its total", "their totals"))
 	}
 	if c.Behind > 0 {
-		fmt.Fprintf(w, "  %d sessions went on after their record was written and are left out.\n", c.Behind)
+		fmt.Fprintf(w, "  %s on after their record was written and %s left out.\n",
+			count(c.Behind, "session")+" went", agree(c.Behind, "is", "are"))
 	}
 	if c.Sessions == 0 {
 		return

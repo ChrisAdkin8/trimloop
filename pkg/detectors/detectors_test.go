@@ -12,6 +12,7 @@ func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
 
 // turn makes a priced turn with the given context (all cache reads, $1 per
 // 1,000 tokens, so cost = context/1000), cache-write cost and idle time.
+// turn makes a priced turn that a message from the user started.
 func turn(context int, writeCost float64, idle time.Duration, first bool) event.Turn {
 	return event.Turn{
 		Usage:      event.Usage{CacheRead: context},
@@ -19,6 +20,7 @@ func turn(context int, writeCost float64, idle time.Duration, first bool) event.
 		IdleBefore: idle,
 		First:      first,
 		Priced:     true,
+		Prompted:   true,
 	}
 }
 
@@ -82,9 +84,13 @@ func TestFindLongPauses(t *testing.T) {
 	if len(f.Top) != 1 || f.Top[0].SessionID != "b" || f.Top[0].Peak != 9000 {
 		t.Errorf("top 1: got %+v, want b with peak 9000", f.Top)
 	}
-	// turn() makes turns no message from the user started.
-	if f.Unprompted != 3 || !near(f.UnpromptedCost, 9.1) {
-		t.Errorf("unprompted: got %d ($%v), want 3 ($9.1)", f.Unprompted, f.UnpromptedCost)
+	// A wait no message from the user ended counts in Cost but not Saving.
+	waited := turn(5000, 4, 3*time.Hour, false)
+	waited.Prompted = false
+	sessions[0].Turns = append(sessions[0].Turns, waited)
+	f = FindLongPauses(sessions, time.Hour, 1)
+	if f.Pauses != 4 || f.Unprompted != 1 || !near(f.UnpromptedCost, 4) || !near(f.Cost, 13.1) || !near(f.Saving, 9.1) {
+		t.Errorf("with a wait on a tool: got %+v", f)
 	}
 }
 

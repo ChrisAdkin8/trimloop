@@ -53,8 +53,9 @@ Code sessions the order was different. Large working context (P19) and
 re-caching after long pauses (P09) were the largest levers: keeping turns
 under 200k could save up to about 19% of spend (first measured as 31%, see
 [ADR 0035](adr/0035-measurement-corrections.md)), with compacting earlier
-likely to save about $463 of $2,134, and fresh starts after long breaks up
-to 17%; cache churn (P01) was about
+likely to save about $314 of $2,180, and fresh starts after the breaks the
+user took up to 14% ($308; the other long waits were on tools, sub-agents or
+timers, [ADR 0038](adr/0038-real-size-after-compaction.md)); cache churn (P01) was about
 1.5% and P02 below zero. One heavy user of a 1M-context model is not
 representative, so the table above is re-ranked only after §8 step 2. Details
 and figures: [ADR 0027](adr/0027-measured-m0-findings.md).

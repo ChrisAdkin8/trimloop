@@ -7,7 +7,7 @@ import "time"
 // and is sent again on every later turn until the session is compacted.
 type Injected struct {
 	Kind  string // the harness's kind, e.g. "skill_listing", "memory_file"
-	Name  string // for a memory file, which one (e.g. "Project CLAUDE.md"); else ""
+	Name  string // a memory file (e.g. "Project CLAUDE.md") or an MCP server's name; else ""
 	Bytes int
 }
 

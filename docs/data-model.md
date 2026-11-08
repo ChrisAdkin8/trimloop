@@ -58,7 +58,7 @@ One model request and its response.
 | `provider` | enum | `anthropic`, `openai`, `google`, … |
 | `provider_request_id` | string? | Provider or gateway request id, where available — de-duplicates the same turn seen by two taps |
 | `response_id` | string? | Provider response or message id — usage is counted once per response |
-| `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`) |
+| `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`). Built so far only as a yes/no: the prototype's `Prompted` is true when the user sent a message, answered Claude's question or decided on a permission since the previous turn; the text is not kept ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
 | `effort` | string? | Reasoning effort or budget requested (`request.effort`) |
 | `repo` | string? | Where the turn ran, when it differs from the session's: sessions can move between repos ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); keyed like Session `repo` |
 | `attribution` | json? | Skill, plugin, MCP server and agent type the harness names as the turn's cause (`harness.attribution`); keyed with `skill`, `plugin`, `mcp` and `agent` unless opted in |
@@ -200,13 +200,13 @@ Numbers only: no names, titles, paths or session ids.
 | `spend` / `turns` | number / int | |
 | `large_context` | number | Input cost of turns over the P19 threshold |
 | `sub_agents` | number | Spend in sub-agents |
-| `pause_rewrite` | number | Cache re-writes after long pauses (P09) |
+| `pause_rewrite` | number | Cache re-writes after long breaks the user took (P09; analysis version 3) |
 | `tool_output` | number | Carried cost of tool output added that week (P04) |
 | `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
 | `compactions` | int | |
 | `prices` | string | Price catalogue version the figures used |
-| `analysis` | int | Analysis version that worked the figures out; a week from an older analysis or catalogue is replaced while the logs still hold it |
-| `kept` | bool | Shown, not stored: the week came from the history file because its logs are gone |
+| `analysis` | int | Analysis version that worked the figures out. A week the logs still hold replaces the stored copy, except a week Claude Code may have partly deleted (up to the week of the oldest log on disk): there the stored copy stays when it has more turns and counted them the same way (version 2 on) ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
+| `kept` | bool | Shown, not stored: the week's figures came from the history file, because its logs are gone or the stored copy was fuller |
 
 ## Usage normalisation
 

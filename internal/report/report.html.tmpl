@@ -231,12 +231,12 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   <p class="muted small">A typical session cost {{dollars .MedianCost}}.</p>
 
   <h3>Compaction</h3>
-  <p>Compacting replaces the session with a short summary. Claude Code did it {{.Compactions}} times ({{.Manual}} when asked){{if .MedianBefore}}, typically shrinking {{short .MedianBefore}} tokens to {{short .MedianAfter}}{{end}}{{if .Longest}}; the longest wait was {{duration .Longest}}{{end}}.</p>
+  <p>Compacting replaces the session with a short summary. Claude Code did it {{.Compactions}} times ({{.Manual}} when asked){{if .MedianBefore}}, typically shrinking {{short .MedianBefore}} tokens to a {{short .MedianAfter}} summary{{if .MedianResume}}; with the system prompt and re-attached files, the next request sent about {{short .MedianResume}}{{end}}{{end}}{{if .Longest}}; the longest wait was {{duration .Longest}}{{end}}.</p>
   {{end}}
 
   {{with .Pause}}
   <h3>Long breaks</h3>
-  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) followed no message from you: Claude was waiting on a tool, a sub-agent or a timer, so starting fresh does not apply to them.{{end}}</p>
+  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) followed no message from you: Claude was waiting on a tool, a sub-agent or a timer. The other {{dollars .Saving}} followed breaks you took.{{end}}</p>
   {{end}}
 </div>
 </details>

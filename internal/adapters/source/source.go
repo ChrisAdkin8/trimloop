@@ -81,8 +81,10 @@ type Message struct {
 	// Attribution is what the harness says caused the turn.
 	Attribution event.Attribution
 
-	// KindToolResults: the results of earlier tool calls.
-	Results []Result
+	// KindToolResults: the results of earlier tool calls, and whether the
+	// user decided on one of them (allowed or refused it when asked).
+	Results     []Result
+	UserDecided bool
 
 	// KindCompaction: what the compaction did, as far as it was recorded.
 	Compaction event.Compaction

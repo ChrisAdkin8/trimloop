@@ -57,8 +57,10 @@ func readInput(in io.Reader) (Input, Reply, error) {
 	m := t.Latest
 	r := Reply{Time: m.Time, Model: m.Model, Usage: m.Usage, Writer: t.Writer.Usage, Fast: m.Fast, USOnly: m.USOnly,
 		Context: m.Usage.InputTotal()}
-	if c := t.Compaction; c != nil && c.Compaction.After > 0 {
-		// Compacted since the latest reply: the session is now the summary.
+	if c := t.Compaction; c != nil {
+		// Compacted since the latest reply. The harness records only the
+		// summary's size; the next request also sends the system prompt and
+		// re-attached files (2–5 times more), so no size is shown until then.
 		r.Compacted, r.Context = true, c.Compaction.After
 		if !c.Time.IsZero() {
 			r.Time = c.Time
@@ -129,9 +131,19 @@ func Hook(event string, in io.Reader, out io.Writer, env Env) {
 	var nudge string
 	switch event {
 	case "stop":
-		if r.Context <= env.Settings.Large && len(st.Crossed) > 0 {
-			// Compacted or cleared: the nudges can be useful again.
-			st.Crossed = map[int]bool{}
+		// Compacted or cleared: a nudge for a size the session is now under
+		// can be useful again.
+		rearmed := false
+		for threshold := range st.Crossed {
+			if r.Context <= threshold {
+				delete(st.Crossed, threshold)
+				rearmed = true
+			}
+		}
+		if rearmed {
+			if r.Context > env.Settings.Large {
+				st.Crossed[env.Settings.Large] = true // still past it: not news
+			}
 			_ = env.Store.Save(inp.SessionID, st)
 		}
 		msg, threshold := env.Settings.AfterReply(r, st.Crossed)

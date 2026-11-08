@@ -389,6 +389,20 @@ func TestHookStopRearmsAfterShrinking(t *testing.T) {
 	if !strings.Contains(out.String(), "200k") {
 		t.Errorf("got %q, want the 200k nudge again", out.String())
 	}
+
+	// Compacted to a size still over 200k: only the 500k nudge comes back.
+	e = env(t, t0.Add(time.Minute))
+	out.Reset()
+	Hook("stop", strings.NewReader(session(t, 600_000, t0)), &out, e)
+	out.Reset()
+	Hook("stop", strings.NewReader(session(t, 300_000, t0)), &out, e)
+	if out.Len() != 0 {
+		t.Errorf("at 300k after compacting: got %q, want nothing", out.String())
+	}
+	Hook("stop", strings.NewReader(session(t, 550_000, t0)), &out, e)
+	if !strings.Contains(out.String(), "550k") {
+		t.Errorf("got %q, want the 500k nudge again", out.String())
+	}
 }
 
 // After a /compact the nudges use the compacted size: no hold, no countdown.
@@ -415,7 +429,7 @@ func TestNudgesAfterCompaction(t *testing.T) {
 		t.Errorf("prompt after compaction: got %q, want it let through", out.String())
 	}
 	StatusLine(strings.NewReader(in), &out, e)
-	if line := out.String(); !strings.Contains(line, "30k tokens") || strings.Contains(line, "cache") {
+	if line := out.String(); !strings.Contains(line, "compacted") || strings.Contains(line, "30k") || strings.Contains(line, "cache") {
 		t.Errorf("status line after compaction: got %q", line)
 	}
 }

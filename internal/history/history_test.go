@@ -66,20 +66,28 @@ func TestLoadRejectsOtherVersions(t *testing.T) {
 	}
 }
 
-// A partly deleted week keeps its fuller stored copy even when an older
-// price list or analysis worked it out; a later, complete week is replaced
-// even when the stored copy counted more turns (an older analysis counted
-// some lines twice).
+// A partly deleted week keeps its fuller stored copy when it counted turns
+// the same way, even at older prices; one that counted them another way is
+// replaced, since more turns may mean lines counted twice. A later, complete
+// week is always replaced.
 func TestMergeOlderFigures(t *testing.T) {
 	f := File{Version: Version, Weeks: map[string]detectors.Week{
-		"2026-10-05": {Week: "2026-10-05", Turns: 120, Spend: 50, Prices: "old", Analysis: detectors.AnalysisVersion},
+		"2026-09-28": {Week: "2026-09-28", Turns: 150, Spend: 80, Analysis: 1}, // counted turns differently
+		"2026-10-05": {Week: "2026-10-05", Turns: 120, Spend: 50, Prices: "old", Analysis: detectors.TurnsCountedSince},
 		"2026-10-12": {Week: "2026-10-12", Turns: 300, Spend: 70}, // no analysis version: older
 	}}
-	weeks := Merge(&f, []detectors.Week{{Week: "2026-10-05", Turns: 100, Spend: 45}, {Week: "2026-10-12", Turns: 250, Spend: 60}}, "new", "2026-10-05")
-	if w := weeks[0]; w.Turns != 120 || w.Prices != "old" || !w.Kept {
+	weeks := Merge(&f, []detectors.Week{
+		{Week: "2026-09-28", Turns: 90, Spend: 40},
+		{Week: "2026-10-05", Turns: 100, Spend: 45},
+		{Week: "2026-10-12", Turns: 250, Spend: 60},
+	}, "new", "2026-10-05")
+	if w := weeks[0]; w.Turns != 90 || w.Kept {
+		t.Errorf("partly deleted week counted another way: got %+v, want this run's figures", w)
+	}
+	if w := weeks[1]; w.Turns != 120 || w.Prices != "old" || !w.Kept {
 		t.Errorf("partly deleted week: got %+v, want the stored copy, marked kept", w)
 	}
-	if w := weeks[1]; w.Turns != 250 || w.Prices != "new" || w.Kept {
+	if w := weeks[2]; w.Turns != 250 || w.Prices != "new" || w.Kept {
 		t.Errorf("complete week: got %+v, want this run's figures", w)
 	}
 }

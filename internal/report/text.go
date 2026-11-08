@@ -55,8 +55,8 @@ func WriteText(out io.Writer, r Results) error {
 	attributionSection(w, r.Attribution)
 
 	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
-	fmt.Fprintf(w, "  %s turns in %d sessions sent more than %s tokens of context.\n",
-		thousands(ctx.Turns), ctx.Sessions, thousands(ctx.Threshold))
+	fmt.Fprintf(w, "  %s in %s sent more than %s tokens of context.\n",
+		count(ctx.Turns, "turn"), count(ctx.Sessions, "session"), thousands(ctx.Threshold))
 	fmt.Fprintf(w, "  Their input cost %s (%.0f%% of all spend).\n", dollars(ctx.Cost), pct(ctx.Cost, all))
 	fmt.Fprintf(w, "  Keeping context under %s tokens would have saved up to %s (%.0f%%).\n",
 		thousands(ctx.Threshold), dollars(ctx.Saving), pct(ctx.Saving, all))
@@ -65,17 +65,17 @@ func WriteText(out io.Writer, r Results) error {
 	growthSection(w, r.Growth, r.CompactFix, all)
 
 	fmt.Fprintf(w, "\nP09 LONG PAUSES (RESUME BLOAT)\n")
-	fmt.Fprintf(w, "  %d times in %d sessions, work carried on after a pause of over %s.\n",
-		pause.Pauses, pause.Sessions, duration(pause.MinGap))
-	fmt.Fprintf(w, "  The cache had expired, so the whole context was written again: %s (%.0f%% of all spend).\n",
-		dollars(pause.Cost), pct(pause.Cost, all))
-	fmt.Fprintf(w, "  Up to %s of that could be saved.\n", dollars(pause.Saving))
+	fmt.Fprintf(w, "  %d times, work carried on after a pause of over %s. The cache had expired, so\n",
+		pause.Pauses, duration(pause.MinGap))
+	fmt.Fprintf(w, "  the whole context was written again: %s (%.0f%% of all spend).\n", dollars(pause.Cost), pct(pause.Cost, all))
+	fmt.Fprintf(w, "  %d %s breaks you took, in %s; starting fresh could have saved up to %s.\n",
+		pause.Pauses-pause.Unprompted, agree(pause.Pauses-pause.Unprompted, "was a", "were"), count(pause.Sessions, "session"), dollars(pause.Saving))
 	if pause.Unprompted > 0 {
-		fmt.Fprintf(w, "  %d of these waits (%s) followed no message from you: Claude was waiting on a\n",
+		fmt.Fprintf(w, "  The other %d (%s) followed no message from you: Claude was waiting on a tool,\n",
 			pause.Unprompted, dollars(pause.UnpromptedCost))
-		fmt.Fprintln(w, "  tool, a sub-agent or a timer, so starting fresh does not apply to them.")
+		fmt.Fprintln(w, "  a sub-agent or a timer.")
 	}
-	fmt.Fprintln(w, "  Action: after a long break, compact the session or start a new one before carrying on.")
+	fmt.Fprintln(w, "  Action: before a long break, compact while the cache is warm; after one, start a new session.")
 	sessionTable(w, pause.Top, "pauses", "context at resume")
 	if r.PauseFix != nil {
 		fmt.Fprintf(w, "\n  %s: %s\n", r.PauseFix.Title, savingText(*r.PauseFix, all))
@@ -170,6 +170,14 @@ func thousands(n int) string {
 func thousands2(v float64) string {
 	cents := int(v*100 + 0.5)
 	return fmt.Sprintf("%s.%02d", thousands(cents/100), cents%100)
+}
+
+// agree picks the verb form for n things: agree(1, "is", "are") is "is".
+func agree(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 // count writes n with its noun: "1 log", "2,000 logs".

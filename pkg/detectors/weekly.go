@@ -17,7 +17,7 @@ type Week struct {
 
 	LargeContext float64 `json:"large_context"` // input cost of turns over the P19 threshold
 	SubAgents    float64 `json:"sub_agents"`    // spend in sub-agents
-	PauseRewrite float64 `json:"pause_rewrite"` // cache re-writes after long pauses (P09)
+	PauseRewrite float64 `json:"pause_rewrite"` // cache re-writes after long breaks the user took (P09)
 	ToolOutput   float64 `json:"tool_output"`   // carried cost of tool output added that week (P04)
 	FileViews    int     `json:"file_views"`
 	Rereads      int     `json:"rereads"`
@@ -26,15 +26,21 @@ type Week struct {
 	Prices string `json:"prices,omitempty"` // price catalogue the figures used
 	// Analysis is the AnalysisVersion that worked the figures out.
 	Analysis int `json:"analysis,omitempty"`
-	// Kept is true when the week came from the history file and is no
-	// longer in the logs (the harness deletes old logs).
+	// Kept is true when the week's figures came from the history file: its
+	// logs are gone, or partly gone and the stored copy was fuller (the
+	// harness deletes old logs). Shown, not stored.
 	Kept bool `json:"kept,omitempty"`
 }
 
 // AnalysisVersion changes whenever a fix changes how the weekly figures are
 // worked out, so figures kept from an older version can be replaced.
-// Version 2 stopped counting made-up replies as turns and copied lines twice.
-const AnalysisVersion = 2
+// Version 2 stopped counting made-up replies as turns and copied lines twice;
+// version 3 counts only breaks the user took in PauseRewrite.
+const AnalysisVersion = 3
+
+// TurnsCountedSince is the first AnalysisVersion that counts turns as this
+// one does, so turn counts from it on can be compared.
+const TurnsCountedSince = 2
 
 // WeekOf returns the Monday that starts t's week, as YYYY-MM-DD in t's
 // location.
@@ -70,7 +76,7 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 			if s.Kind == "subagent" {
 				w.SubAgents += t.Cost.Total()
 			}
-			if !t.First && t.IdleBefore > pauseGap && t.Priced {
+			if !t.First && t.Prompted && t.IdleBefore > pauseGap && t.Priced {
 				w.PauseRewrite += t.Cost.CacheWrites()
 			}
 			if t.CompactedBefore {

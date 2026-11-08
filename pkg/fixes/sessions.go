@@ -93,7 +93,7 @@ func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, afte
 func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float64) (Recommendation, bool) {
 	// Only breaks the user took: after the others, no message from the user
 	// started the next turn, so there was no moment to start fresh.
-	saving := p.Saving - p.UnpromptedCost
+	saving := p.Saving
 	if saving < minSaving {
 		return Recommendation{}, false
 	}

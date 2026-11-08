@@ -67,7 +67,7 @@ func TestFindWeekly(t *testing.T) {
 	mon := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
 	big := event.Turn{Time: mon, Usage: event.Usage{CacheRead: 300_000}, Cost: event.Cost{CacheRead: 3}, Priced: true}
 	paused := event.Turn{Time: mon.Add(8 * 24 * time.Hour), IdleBefore: 2 * time.Hour, Usage: event.Usage{CacheWrite1h: 10},
-		Cost: event.Cost{CacheWrite1h: 5}, Priced: true, CompactedBefore: true}
+		Cost: event.Cost{CacheWrite1h: 5}, Priced: true, CompactedBefore: true, Prompted: true}
 	sessions := []event.Session{
 		{ID: "m", Kind: "main", Turns: []event.Turn{big, paused, {}}}, // the last has no time
 		{ID: "m/a", Kind: "subagent", ParentID: "m", Turns: []event.Turn{{Time: mon, Cost: event.Cost{Output: 1}, Priced: true, First: true}}},
@@ -148,6 +148,15 @@ func TestStandingSources(t *testing.T) {
 	} {
 		if got := mcpSource(group); got != want {
 			t.Errorf("mcpSource(%q) = %q, want %q", group, got, want)
+		}
+	}
+	for server, want := range map[string]string{
+		"plugin:terraform:terraform": SourceSkills,
+		"claude-artifacts":           SourceHarness,
+		"claude.ai Claude Docs":      SourceMCP,
+	} {
+		if got := serverSource(server); got != want {
+			t.Errorf("serverSource(%q) = %q, want %q", server, got, want)
 		}
 	}
 	for kind, want := range map[string]string{

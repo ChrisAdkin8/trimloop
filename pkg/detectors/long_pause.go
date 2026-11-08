@@ -14,7 +14,7 @@ type LongPause struct {
 	MinGap time.Duration `json:"min_gap_ns"` // pauses longer than this count
 
 	Pauses   int     `json:"pauses"`   // turns that followed such a pause and wrote to the cache
-	Sessions int     `json:"sessions"` // sessions with at least one such pause
+	Sessions int     `json:"sessions"` // sessions with at least one break the user took
 	Cost     float64 `json:"cost"`     // cache-write cost of those turns
 
 	// Unprompted counts the pauses after which no message from the user
@@ -24,13 +24,14 @@ type LongPause struct {
 	Unprompted     int     `json:"unprompted"`
 	UnpromptedCost float64 `json:"unprompted_cost"`
 
-	// Saving is Cost: what those re-writes would have saved had the session
-	// been compacted, or a new one started, before carrying on. It is an
-	// upper bound: a compacted or new session still writes its smaller
-	// context.
+	// Saving is the part of Cost after breaks the user took (a message from
+	// the user ended the wait): what those re-writes would have saved had
+	// the session been compacted before the break, or a new one started
+	// after it. It is an upper bound: a compacted or new session still
+	// writes its smaller context.
 	Saving float64 `json:"saving"`
 
-	Top []SessionStat `json:"top"` // sessions with the largest re-cache cost
+	Top []SessionStat `json:"top"` // sessions with the largest re-cache cost after breaks the user took
 }
 
 // FindLongPauses reports turns that came after more than minGap idle and
@@ -50,7 +51,9 @@ func FindLongPauses(sessions []event.Session, minGap time.Duration, topN int) Lo
 			if !t.Prompted {
 				f.Unprompted++
 				f.UnpromptedCost += writes
+				continue
 			}
+			f.Saving += writes
 
 			st := stat(stats, s.ID)
 			st.Turns++
@@ -59,7 +62,6 @@ func FindLongPauses(sessions []event.Session, minGap time.Duration, topN int) Lo
 			st.Peak = max(st.Peak, t.Context())
 		}
 	}
-	f.Saving = f.Cost
 	f.Sessions = len(stats)
 	f.Top = top(stats, topN)
 	return f

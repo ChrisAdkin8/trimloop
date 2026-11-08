@@ -94,7 +94,7 @@ type Settings struct {
 	TopGroups        int            // tools, shapes, projects listed
 	TopFixes         int            // kinds of tool noise with fixes
 	MinFixSaving     float64        // dollars; smaller savings get no recommendation
-	CompactTo        int            // tokens a compaction is assumed to leave, when the logs have none
+	CompactTo        int            // context after a compaction, when the logs show none
 	Titles           bool           // show session titles, which summarise conversations
 	Location         *time.Location // for week boundaries
 }
@@ -110,7 +110,7 @@ func DefaultSettings() Settings {
 		TopGroups:        10,
 		TopFixes:         4,
 		MinFixSaving:     1.0,
-		CompactTo:        30_000,
+		CompactTo:        80_000,
 		Titles:           true,
 		Location:         time.Local,
 	}
@@ -143,11 +143,16 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	if f, ok := fixes.ForSubAgents(r.SubAgents, s.MinFixSaving); ok {
 		r.SubAgentFix = &f
 	}
-	after := r.Growth.MedianAfter
+	// What the first request after a compaction sends, measured; the
+	// harness's own "after" figure counts only the summary.
+	after, summary := r.Growth.MedianResume, r.Growth.MedianAfter
 	if after == 0 {
 		after = s.CompactTo
 	}
-	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after)
+	if summary == 0 || summary > after {
+		summary = after
+	}
+	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after, summary)
 	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, upTo, likely, after, s.MinFixSaving); ok {
 		r.CompactFix = &f
 	}

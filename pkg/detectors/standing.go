@@ -120,11 +120,14 @@ func FindStandingContext(sessions []event.Session) StandingContext {
 				f.Injected += c
 			}
 			for _, in := range t.Injected {
-				name := in.Name
-				if name == "" {
+				name, src := in.Name, injectedSource(in.Kind)
+				switch {
+				case name == "":
 					name = in.Kind
+				case src == SourceMCP:
+					name, src = name+" (instructions)", serverSource(name)
 				}
-				p := part(name, injectedSource(in.Kind))
+				p := part(name, src)
 				p.sum += in.Tokens()
 				p.Times++
 				c := float64(in.Tokens()) * arrival
@@ -159,16 +162,27 @@ var appServers = map[string]bool{
 	"mcp-registry": true, "scheduled-tasks": true,
 }
 
-// mcpSource sorts a tool-definition group by what can be done about it.
-// Servers a plugin brings are turned off with the plugin; servers the
-// desktop app adds have no setting this report can point to.
+// mcpSource sorts a tool-definition group ("mcp__<server>") by what can be
+// done about it; other groups are the harness's own tools.
 func mcpSource(group string) string {
 	server, ok := strings.CutPrefix(group, "mcp__")
-	switch {
-	case !ok, strings.HasPrefix(server, "ccd_"), strings.HasPrefix(server, "Claude_"), appServers[server]:
+	if !ok {
 		return SourceHarness
-	case strings.HasPrefix(server, "plugin_"):
+	}
+	return serverSource(server)
+}
+
+// serverSource sorts an MCP server by who can change it. Servers a plugin
+// brings ("plugin_..." in tool names, "plugin:..." in instructions) are
+// turned off with the plugin; servers the desktop app adds have no setting
+// this report can point to; the rest the user added, or connected in
+// claude.ai.
+func serverSource(server string) string {
+	switch {
+	case strings.HasPrefix(server, "plugin_"), strings.HasPrefix(server, "plugin:"):
 		return SourceSkills
+	case strings.HasPrefix(server, "ccd_"), strings.HasPrefix(server, "Claude_"), appServers[server]:
+		return SourceHarness
 	}
 	return SourceMCP
 }

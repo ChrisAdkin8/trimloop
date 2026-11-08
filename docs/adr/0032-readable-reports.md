@@ -1,6 +1,6 @@
 # ADR 0032: Readable reports — session titles, likely savings, plain language
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction replay)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) and [ADR 0038](0038-real-size-after-compaction.md) (compaction replay)
 - Date: 2026-11-07
 - Amends: [ADR 0004](0004-local-first-hashes-only.md) (what a local report may show), [ADR 0030](0030-how-fixes-are-chosen.md) §2 (ranking)
 
@@ -44,7 +44,9 @@ content.
    - *Compact earlier (P19):* each session is replayed as if compacted to the
      typical post-compaction size (the median from compaction records, else
      30 k) whenever it passed 200 k, including each compaction's own cost,
-     assuming the session then went the same way.
+     assuming the session then went the same way. (Since
+     [ADR 0038](0038-real-size-after-compaction.md): the measured size of the
+     first request after a compaction, else 80 k, and main sessions only.)
    - *Start fresh after a long break (P09):* each turn after a pause of over
      an hour is priced as if it had started a new session of the typical
      first-request size.

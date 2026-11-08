@@ -12,34 +12,40 @@ import (
 // the session would otherwise have gone the same way, which no fix
 // guarantees, so reports show them as estimates beside the upper bound.
 
-// LikelyCompactionSaving estimates what compacting each session whenever its
-// context passed at tokens, down to after tokens, would have saved (P19),
-// and the most that fix could save.
+// LikelyCompactionSaving estimates what compacting each main session
+// whenever its context passed at tokens would have saved (P19), and the most
+// that fix could save. after is the context the first request after a
+// compaction sends (the summary, the system prompt and tool definitions, and
+// what the harness re-attaches); summary is the summary's own size, which
+// the compaction request writes as output.
 //
-// It replays each session: from a simulated compaction on, every turn sends
-// the tokens the compaction removed fewer, priced at what history cost on
-// that turn (historyRate: a cache read, or a write when the cache was
-// rebuilt). The turn still writes its own new tokens, so those are not
-// counted as saved. A simulated compaction happens before the turn that
-// would pass at, at the session's size after the previous turn, and costs a
-// summary request (reading that size, writing about after tokens) and
-// re-caching the summary. Real
+// It replays each main session (sub-agents cannot be compacted by the user):
+// from a simulated compaction on, every turn sends the tokens the compaction
+// removed fewer, priced at what history cost on that turn (historyRate: a
+// cache read, or a write when the cache was rebuilt). The turn still writes
+// its own new tokens, so those are not counted as saved. A simulated
+// compaction happens before the turn that would pass at, at the session's
+// size after the previous turn, and costs a summary request (reading that
+// size, writing the summary) and writing the new context to the cache. Real
 // compactions in the log reset the replay. It assumes the session then went
 // on the same way; re-reading files after a compaction would lower the
 // saving.
 //
 // upTo is the same replay with every affected turn cut to after tokens and
 // compactions free, so likely never exceeds it.
-func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, upTo float64) {
+func LikelyCompactionSaving(sessions []event.Session, at, after, summary int) (likely, upTo float64) {
 	if after >= at {
 		return 0, 0
 	}
 	for _, s := range sessions {
+		if s.Kind == "subagent" {
+			continue
+		}
 		removed := 0 // tokens the simulated compactions have removed so far
 		prev := 0    // the previous turn's context, as logged
 		for _, t := range s.Turns {
 			if t.CompactedBefore {
-				removed = 0
+				removed, prev = 0, 0 // a real compaction: nothing left to compact before this turn
 			}
 			ctx := t.Context()
 			if !t.Priced || ctx == 0 {
@@ -50,7 +56,7 @@ func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, up
 			// turn's own new tokens stay.
 			if size := prev - removed; ctx-removed > at && size > after {
 				removed += size - after
-				likely -= compactionCost(t, size, after)
+				likely -= compactionCost(t, size, after, summary)
 			}
 			prev = ctx
 			if cut := min(removed, ctx-after); cut > 0 {
@@ -64,10 +70,11 @@ func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, up
 }
 
 // compactionCost prices one compaction at turn t's model and options: the
-// summary request reads the context and writes the summary, and the next
-// turn writes the summary to the cache.
-func compactionCost(t event.Turn, size, after int) float64 {
-	c, ok := price.Cost(t.Model, event.Usage{CacheRead: size, CacheWrite1h: after, Output: after},
+// summary request reads the session and writes the summary, and the next
+// turn writes the new context to the cache. Some of that context (the system
+// prompt and tool definitions) is usually still cached, so this errs high.
+func compactionCost(t event.Turn, size, after, summary int) float64 {
+	c, ok := price.Cost(t.Model, event.Usage{CacheRead: size, CacheWrite1h: after, Output: summary},
 		price.Options{Fast: t.Fast, USOnly: t.USOnly})
 	if !ok {
 		return 0

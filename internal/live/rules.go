@@ -40,8 +40,9 @@ type Reply struct {
 	Context int // tokens the request sent
 
 	// Compacted is true when the session was compacted after this reply;
-	// Context and Time are then the compaction's. The next message writes
-	// the summary to the cache whenever it is sent, so waiting costs nothing.
+	// Context and Time are then the compaction's, and Context is only the
+	// summary. The next message writes the new context to the cache whenever
+	// it is sent, so waiting costs nothing.
 	Compacted bool
 }
 
@@ -107,6 +108,9 @@ type StatusParts struct {
 // known; effort is the harness's effort level, or "".
 func (s Settings) Status(r Reply, now time.Time, cost float64, effort string) StatusParts {
 	p := StatusParts{Context: tokens(r.Context) + " tokens", Level: s.LevelOf(r.Context)}
+	if r.Compacted {
+		p.Context, p.Level = "compacted · size after the next reply", Small
+	}
 	if cost >= 0 {
 		p.Cost = money(cost)
 	}

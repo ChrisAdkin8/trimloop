@@ -1,6 +1,6 @@
 # ADR 0037: Partly deleted weeks, breaks the user took, and nudges after a compaction
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; decisions 1–4 amended by [ADR 0038](0038-real-size-after-compaction.md)
 - Date: 2026-11-08
 - Amends: [ADR 0033](0033-reconciliation-history-standing-context.md) and [ADR 0035](0035-measurement-corrections.md) (which stored week wins), [ADR 0036](0036-prices-reconciliation-status.md) decision 3, [ADR 0034](0034-live-nudges.md) (what the nudges read), [ADR 0032](0032-readable-reports.md) (the compaction replay), [patterns.md P09](../patterns.md#p09--resume-bloat) (which breaks the fix counts)
 
@@ -68,9 +68,11 @@ On the founder's logs (2026-11-08, $2,166 over 44 days):
 
 - "Start fresh after a long break": up to $296, likely about $285 (was up
   to $368); P09 itself still reports $368, of which $72 was waits on tools.
-- Compacting earlier: likely about $462, up to $700 (was $468 and $695 on
-  the same day's logs).
+- Compacting earlier: likely about $462, up to $700 (was $463 and $701 on
+  the same day's logs). Corrected by ADR 0038: about $314, up to $547.
 - "Remove MCP servers you don't use" falls from $19 to $5: the rest was
   servers the desktop app adds.
+- Running sub-agents on Sonnet 5.5: up to $284 (was $281), now that every
+  Opus and Fable model suggests it.
 - The history file keeps the oldest week's fuller figures through price
   and analysis changes; the report says when a week's figures are older.

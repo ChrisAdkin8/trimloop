@@ -25,6 +25,15 @@ type record struct {
 	Cwd       string `json:"cwd"`
 	IsMeta    bool   `json:"isMeta"` // user lines the harness wrote, not the user
 
+	// User lines: who sent it ("human", "peer", "task-notification", ...;
+	// missing in older versions), whether it is a compaction's summary, and
+	// for tool results, who allowed the call ("user_..." when the user did).
+	Origin             *origin `json:"origin"`
+	IsCompactSummary   bool    `json:"isCompactSummary"`
+	PermissionDecision *struct {
+		Source string `json:"source"`
+	} `json:"permissionDecision"`
+
 	// Assistant lines: what the harness says caused the turn.
 	AttributionSkill     string `json:"attributionSkill"`
 	AttributionPlugin    string `json:"attributionPlugin"`
@@ -99,11 +108,22 @@ type input struct {
 
 // attachment is the part of an attachment line Read uses. A prompt snapshot
 // keeps its fields either inside "snapshot" or at the top level.
+// origin says who sent a user line or queued message.
+type origin struct {
+	Kind string `json:"kind"`
+}
+
 type attachment struct {
-	Type     string    `json:"type"`
-	Files    []memFile `json:"files"` // instructions: the memory files
-	Snapshot *snapshot `json:"snapshot"`
-	snapshot           // prompt_snapshot fields at the top level
+	Type        string  `json:"type"`
+	CommandMode string  `json:"commandMode"` // queued_command: "prompt" for a message
+	Origin      *origin `json:"origin"`      // queued_command: who sent it
+
+	// mcp_instructions_delta: each server's name and its instructions.
+	AddedNames  []string  `json:"addedNames"`
+	AddedBlocks []string  `json:"addedBlocks"`
+	Files       []memFile `json:"files"` // instructions: the memory files
+	Snapshot    *snapshot `json:"snapshot"`
+	snapshot              // prompt_snapshot fields at the top level
 }
 
 type memFile struct {
@@ -192,7 +212,11 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			}
 			return source.Message{}, false, nil
 		}
-		return source.Message{Kind: source.KindToolResults, SessionID: rec.SessionID, Time: ts, Results: results}, true, nil
+		m := source.Message{Kind: source.KindToolResults, SessionID: rec.SessionID, Time: ts, Results: results, LineID: rec.UUID}
+		if d := rec.PermissionDecision; d != nil && strings.HasPrefix(d.Source, "user") {
+			m.UserDecided = true // the user allowed or refused the call
+		}
+		return m, true, nil
 
 	case rec.Type == "ai-title" && rec.AITitle != "":
 		return source.Message{Kind: source.KindTitle, SessionID: rec.SessionID, Title: rec.AITitle}, true, nil
@@ -359,6 +383,11 @@ func projectOf(cwd string) string {
 // and memory-file names are kept, never the text.
 func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 	a := rec.Attachment
+	if a.Type == "queued_command" && a.CommandMode == "prompt" && a.Origin != nil && a.Origin.Kind == "human" {
+		// A message the user typed while Claude was working. It reaches the
+		// model as the user's message, not as text the harness added.
+		return source.Message{Kind: source.KindPrompt, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID}, true, nil
+	}
 	if a.Type == "prompt_snapshot" {
 		snap := a.snapshot
 		if a.Snapshot != nil {
@@ -382,11 +411,17 @@ func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 		return source.Message{}, false, nil // not added to the conversation
 	}
 	var pieces []event.Injected
-	if a.Type == "instructions" && len(a.Files) > 0 {
+	switch {
+	case a.Type == "instructions" && len(a.Files) > 0:
 		for _, f := range a.Files {
 			pieces = append(pieces, event.Injected{Kind: "memory_file", Name: memoryName(f), Bytes: len(f.Content)})
 		}
-	} else {
+	case a.Type == "mcp_instructions_delta" && len(a.AddedNames) > 0 && len(a.AddedNames) == len(a.AddedBlocks):
+		// One piece per server, so each can be sorted by who can change it.
+		for i, name := range a.AddedNames {
+			pieces = append(pieces, event.Injected{Kind: a.Type, Name: name, Bytes: len(a.AddedBlocks[i])})
+		}
+	default:
 		pieces = []event.Injected{{Kind: a.Type, Bytes: size}}
 	}
 	return source.Message{Kind: source.KindInjected, SessionID: rec.SessionID, Time: ts, Injected: pieces, LineID: rec.UUID}, true, nil
@@ -439,11 +474,15 @@ func replyUsage(top anthropic.Usage, steps []anthropic.Usage) event.Usage {
 }
 
 // typedPrompt reports whether a user line with no tool results is a message
-// the user sent, rather than one the harness wrote for them: lines marked
-// isMeta, and notices that a background task finished. Only the answer is
-// kept; the text is not.
+// the user sent, rather than one the harness or another agent wrote. Newer
+// lines say who sent them; for older ones, lines marked isMeta, compaction
+// summaries and notices that a background task finished are not the user's.
+// Only the answer is kept; the text is not.
 func typedPrompt(rec record) bool {
-	if rec.IsMeta {
+	if rec.Origin != nil {
+		return rec.Origin.Kind == "human"
+	}
+	if rec.IsMeta || rec.IsCompactSummary {
 		return false
 	}
 	text := ""

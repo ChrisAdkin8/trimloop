@@ -50,11 +50,11 @@ func Load(path string) (File, error) {
 // Merge adds this run's weeks to the history and returns every week, oldest
 // first. The harness deletes old logs, oldest first, so only weeks up to
 // partialUpTo (the week of the oldest log still on disk) can be partly
-// deleted. For those, the stored copy stays when it has more turns, even if
-// an older analysis or price list worked it out; every later week in the
-// logs is complete there and replaces the stored copy. partialUpTo "" means
-// no week is treated as partial. Weeks whose figures come from the history
-// file are marked Kept.
+// deleted. For those, the stored copy stays when it has more turns and
+// counted them the same way (detectors.TurnsCountedSince), even if another
+// price list worked it out; every later week in the logs is complete there
+// and replaces the stored copy. partialUpTo "" means no week is treated as
+// partial. Weeks whose figures come from the history file are marked Kept.
 func Merge(f *File, current []detectors.Week, prices, partialUpTo string) []detectors.Week {
 	fromLogs := map[string]bool{}
 	for _, w := range current {
@@ -62,7 +62,7 @@ func Merge(f *File, current []detectors.Week, prices, partialUpTo string) []dete
 		w.Analysis = detectors.AnalysisVersion
 		w.Kept = false
 		old, ok := f.Weeks[w.Week]
-		if ok && w.Week <= partialUpTo && old.Turns > w.Turns {
+		if ok && w.Week <= partialUpTo && old.Turns > w.Turns && old.Analysis >= detectors.TurnsCountedSince {
 			continue // partly deleted: the stored copy is fuller
 		}
 		f.Weeks[w.Week] = w

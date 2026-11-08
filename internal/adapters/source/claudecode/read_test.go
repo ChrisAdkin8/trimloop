@@ -75,6 +75,26 @@ func TestParseLine(t *testing.T) {
 			line: `{"type":"user","isMeta":true,"message":{"role":"user","content":"Caveat: ..."}}`,
 		},
 		{
+			name:   "a line from the user, by its origin",
+			line:   `{"type":"user","origin":{"kind":"human"},"isMeta":true,"message":{"role":"user","content":"/compact"}}`,
+			want:   source.Message{Kind: source.KindPrompt},
+			wantOK: true,
+		},
+		{
+			name: "a line from another agent is skipped",
+			line: `{"type":"user","origin":{"kind":"peer"},"message":{"role":"user","content":"report"}}`,
+		},
+		{
+			name: "a compaction summary is skipped",
+			line: `{"type":"user","isCompactSummary":true,"message":{"role":"user","content":"This session is being continued"}}`,
+		},
+		{
+			name:   "a message typed while Claude works is a prompt",
+			line:   `{"type":"attachment","uuid":"q1","attachment":{"type":"queued_command","commandMode":"prompt","prompt":"also do x","origin":{"kind":"human"}}}`,
+			want:   source.Message{Kind: source.KindPrompt, LineID: "q1"},
+			wantOK: true,
+		},
+		{
 			name: "a background-task notice is skipped",
 			line: `{"type":"user","message":{"role":"user","content":"<task-notification>done</task-notification>"}}`,
 		},
@@ -345,6 +365,10 @@ func TestReadTailSeesCompaction(t *testing.T) {
 	writeFile(t, p, compact+reply)
 	if tl, err := ReadTail(p); err != nil || tl.Compaction != nil {
 		t.Errorf("got %+v, %v; want no compaction after the reply", tl, err)
+	}
+	writeFile(t, p, compact)
+	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "" {
+		t.Errorf("got %+v, %v; want the compaction alone", tl, err)
 	}
 }
 

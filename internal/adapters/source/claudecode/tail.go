@@ -39,8 +39,9 @@ type Tail struct {
 	// tail did.
 	Writer source.Message
 
-	// Compaction is a compaction logged after Latest, if any: the session
-	// is now its After size, though no reply has said so yet.
+	// Compaction is a compaction logged after Latest, if any: no reply has
+	// shown the session's new size yet. Latest may then be empty, when no
+	// reply is left in the tail.
 	Compaction *source.Message
 }
 
@@ -105,8 +106,10 @@ func ReadTail(path string) (Tail, error) {
 			return t, nil
 		}
 	}
-	if !found {
+	if !found && t.Compaction == nil {
 		return Tail{}, ErrNoResponse
 	}
+	// A compaction with no reply in the tail (what it re-attached can run to
+	// most of a megabyte) still says where the session stands.
 	return t, nil
 }

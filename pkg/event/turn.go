@@ -96,6 +96,10 @@ type Session struct {
 	// harness generated; "" if none. Generated titles summarise the
 	// conversation, so they come from content and are shown locally only.
 	Title string
+
+	// Trailing is a compaction logged after the session's last turn (the
+	// session ended, or the log was read, before another reply), or nil.
+	Trailing *Compaction
 }
 
 // Start and End are the times of the session's first and last turns, zero

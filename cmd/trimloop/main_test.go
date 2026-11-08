@@ -322,7 +322,7 @@ func TestFullReportOnFixture(t *testing.T) {
 	if err := report.WriteText(&buf, r); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"repo", "1 compactions (1 asked for)", "/compact", "No sub-agent runs."} {
+	for _, want := range []string{"repo", "1 compaction (1 asked for)", "/compact", "No sub-agent runs."} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}
@@ -458,5 +458,69 @@ func TestWriteMakesExistingReportPrivate(t *testing.T) {
 	}
 	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
 		t.Errorf("got %v, want 0600", info.Mode().Perm())
+	}
+}
+
+// A turn is Prompted when the user typed a message, answered Claude's
+// question or decided on a permission since the previous turn; other user
+// lines and copied lines do not count, and the flag does not carry over.
+func TestBuildSessionPrompted(t *testing.T) {
+	asst := func(id, calls string) string {
+		return `{"type":"assistant","message":{"id":"` + id + `","content":[` + calls + `],"usage":{"output_tokens":1}}}` + "\n"
+	}
+	ask := `{"type":"tool_use","id":"q1","name":"AskUserQuestion","input":{}}`
+	bash := `{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"ls"}}`
+	bash2 := `{"type":"tool_use","id":"b2","name":"Bash","input":{"command":"ls"}}`
+	result := func(id, extra string) string {
+		return `{"type":"user"` + extra + `,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"` + id + `","content":"ok"}]}}` + "\n"
+	}
+	l := writeLog(t, "s.jsonl", ""+
+		`{"type":"user","uuid":"u1","origin":{"kind":"human"},"message":{"role":"user","content":"hi"}}`+"\n"+
+		asst("m1", ask)+
+		result("q1", "")+ // the user answered
+		asst("m2", bash)+
+		result("b1", "")+ // a tool ran: not the user
+		asst("m3", bash2)+
+		result("b2", `,"permissionDecision":{"decision":"accept","source":"user_temporary"}`)+ // the user allowed it
+		asst("m4", "")+
+		`{"type":"user","origin":{"kind":"peer"},"message":{"role":"user","content":"from another agent"}}`+"\n"+
+		asst("m5", "")+
+		`{"type":"user","isCompactSummary":true,"message":{"role":"user","content":"summary"}}`+"\n"+
+		asst("m6", ""))
+	s, _, err := readSession(cc, l, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []bool{true, true, false, true, false, false}
+	for i, w := range want {
+		if i >= len(s.Turns) || s.Turns[i].Prompted != w {
+			t.Fatalf("turns: got %+v, want prompted %v", s.Turns, want)
+		}
+	}
+	// The same lines copied into a resumed log mark nothing.
+	seen := map[string]bool{"line:u1": true}
+	l2 := writeLog(t, "r.jsonl", `{"type":"user","uuid":"u1","origin":{"kind":"human"},"message":{"role":"user","content":"hi"}}`+"\n"+asst("m9", ""))
+	if s, _, _ := readSession(cc, l2, seen); len(s.Turns) != 1 || s.Turns[0].Prompted {
+		t.Errorf("copied prompt: got %+v", s.Turns)
+	}
+}
+
+func TestDefaultHistory(t *testing.T) {
+	if got := defaultHistory("/h", ""); got != "/h/.trimloop/history.json" {
+		t.Errorf("default logs: got %q", got)
+	}
+	a, b := defaultHistory("/h", "/x/one"), defaultHistory("/h", "/x/two")
+	if a == b || !strings.HasPrefix(a, "/h/.trimloop/history-") || a != defaultHistory("/h", "/x/one/") {
+		t.Errorf("other folders: got %q and %q", a, b)
+	}
+}
+
+func TestPartialWeek(t *testing.T) {
+	if partialWeek(time.Time{}) != "" {
+		t.Error("no logs: want no partial week")
+	}
+	wed := time.Date(2026, 9, 23, 12, 0, 0, 0, time.Local)
+	if got := partialWeek(wed); got != "2026-09-21" {
+		t.Errorf("got %q, want the Monday of that week", got)
 	}
 }

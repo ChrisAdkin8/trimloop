@@ -19,8 +19,9 @@ findings report with estimated savings. No proxy, no server.
   references ([ADR 0017](docs/adr/0017-content-addressed-segments.md)).
 - Normaliser: segmenting, redaction, fingerprinting, pricing.
 - DuckDB store. Not built: the prototype keeps everything in memory for one
-  run; the store comes with saved offsets (build order item 1) and is needed
-  before P06.
+  run, and weekly figures in a history file. As ADR 0029 item 4 says, the
+  store follows when needed: P06 needs it. It holds no content before
+  redaction is built (item 7; ADR 0004).
 - Detectors P01–P07, P09, P10, P12, P14 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
   [ADR 0028](docs/adr/0028-harness-recorded-signals.md)), and P13 for
   sub-agents in reduced fidelity ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
@@ -63,12 +64,12 @@ definitions; weekly figures kept between runs
 live nudges in Claude Code — status line, after-reply and before-send hooks,
 and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)).
 
-1. The DuckDB store, with saved offsets so a re-run reads only new lines.
+1. Saved offsets, so a re-run reads only new lines.
 2. Command-line options: `--since`, `--repo` (`analyse`, `--format` and
    `--out` are done).
 3. P14 in reduced fidelity: spend by effort level.
 4. P02 cache-lifetime fit.
-5. P03, P06 (on the store), P01; then P05, and P12 in reduced fidelity from harness
+5. P03, P06 (with the DuckDB store, numbers only until item 7), P01; then P05, and P12 in reduced fidelity from harness
    records (its full fidelity, and P10's, stays in M3).
 6. Distribution: installable release, minimal conformance runner, profiles.
 7. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.

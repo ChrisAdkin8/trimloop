@@ -274,7 +274,7 @@ re-ranks the M0 build order from it.
 
 **Implemented** (ADR 0031 items 2–4): findings 1–4 and 8 are now in the
 report. The code's figures differ slightly from the table above: the
-sub-agent saving is $271 (13 %), as it also prices sub-agent turns on Fable
+sub-agent saving is $271 (13 %; 2026-11-07, §8 has the current figure), as it also prices sub-agent turns on Fable
 and leaves out forks, which read the main session's cache; concentration is
 by conversation (a main session with its sub-agents) — top 1 24 %, top 5
 59 %, top 10 75 %; and projects are attributed per turn, with worktrees
@@ -296,15 +296,16 @@ methods changed. This table is the reference for figures other documents quote; 
 
 | Figure | Value | When | Method |
 |---|---|---|---|
-| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 → $2,149 → $2,166 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
+| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 → $2,149 → $2,166 → $2,180 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
 | Spend in turns over 200k tokens (P19) | 57–58 % | 11-06 → 11-08 | Input cost of those turns |
 | P19 saving, keeping turns under 200k | 31 % → **19 %** ($415) | 11-06 → 11-08 | First priced at the turn's average input price; corrected to price the removed history at the cache-read price (or write price when the cache was rebuilt) |
-| Compact earlier, likely saving | $820–841 → $463 → **$462** (up to $700) | 11-07 → 11-08 | Replay of compacting at 200k; corrected as above ([ADR 0035](adr/0035-measurement-corrections.md)), then compacting before the turn that passes the limit ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)); the logs kept growing |
+| Compact earlier, likely saving | $820–841 → $463 → $462 → **$314** (up to $547) | 11-07 → 11-08 | Replay of compacting at 200k; corrected as above ([ADR 0035](adr/0035-measurement-corrections.md)); then compacting before the turn that passes the limit ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)); then to the measured size of the first request after a compaction (median 80k, not the 22–29k summary) and main sessions only ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
+| Size after a compaction | summary median 22–29k; first request after it median 80k (2.3–4.8×) | 11-08 | The harness records only the summary; the next request also sends the system prompt, tools and re-attached files ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
 | Re-writes after a break of over an hour (P09) | 17 % ($353–368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
-| Of those, waits no message from the user ended | 36 of 137, $72 | 11-08 | A tool, sub-agent, timer or background task ended the wait; "start fresh" counts only the rest: up to $296, likely about $285 ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)) |
+| Of those, waits not on the user | 36 of 137, $72 → **31, $60** | 11-08 | A tool, sub-agent, timer or background task ended the wait; "start fresh" counts only the rest: up to $296 → **$308**, likely about $296 ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md); answers to Claude's questions and permission decisions count as the user's, [ADR 0038](adr/0038-real-size-after-compaction.md)) |
 | Tool output (P04) | 2.2 % above 8k tokens per result; **12 %** carried in all | 11-06; 11-07 | 2.2 % is the saving from capping each result at 8k tokens (ADR 0027); 12 % is the cost of carrying all tool output; the report now uses a 2k target (about 3 %) |
 | What every request carries (P07) | 4.3 % injected text → **11 %** with system prompt and tool definitions | 11-07 | Carried like tool output (ADR 0033) |
-| Sub-agents on a cheaper model (P13) | $235 → $271–274 → $281 → **$284** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)) |
+| Sub-agents on a cheaper model (P13) | $235 → $271–274 → $281 → $284 → **$287** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)); every Opus and Fable model ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)); the logs kept growing |
 | Read only the lines you need (P03/P04) | about $76 of carried cost → card up to **$48** | 11-07 → 11-08 | $76 was the carried cost of file-view output the fix aims at; $48 is the card's upper bound, keeping each file-view result under the 2k-token target |
 | Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | $0.18 of it is Claude Code pricing Sonnet 5.5 cache reads at $0.20, where the pricing page says $0.10 (ADR 0036). The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
 | Re-writes after breaks: earlier quotes | about $314–340 | 11-07 | The first message back after more than an hour, sessions over 200k; the same money as the P09 row |

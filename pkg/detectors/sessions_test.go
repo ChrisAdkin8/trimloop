@@ -103,6 +103,17 @@ func TestFindGrowth(t *testing.T) {
 	if f.Uncompacted != 1 || !near(f.UncompactedCost, 12) {
 		t.Errorf("uncompacted: got %d costing %v, want the main session 'big' at $12", f.Uncompacted, f.UncompactedCost)
 	}
+	if f.MedianResume != 30_000 {
+		t.Errorf("resume: got %d, want the first turn after the compaction", f.MedianResume)
+	}
+
+	// A compaction after the last reply is counted, and the session no
+	// longer counts as never compacted.
+	sessions[0].Trailing = &event.Compaction{Before: 700_000, After: 40_000}
+	f = FindGrowth(sessions, 500_000, 2)
+	if f.Compactions != 2 || f.Uncompacted != 0 || f.MedianResume != 30_000 {
+		t.Errorf("trailing compaction: got %d compactions, %d uncompacted, resume %d", f.Compactions, f.Uncompacted, f.MedianResume)
+	}
 }
 
 func TestFindAttribution(t *testing.T) {
@@ -149,7 +160,7 @@ func TestLikelyCompactionSaving(t *testing.T) {
 	// 100k session to 50k ($50 saved); before each later turn it compacts
 	// the 150k session to 50k again, removing 150k then 250k in all ($150,
 	// $250). Each turn keeps its own new 100k.
-	got, upTo := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000)
+	got, upTo := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000, 50_000)
 	if !near(got, 450) || !near(upTo, 150+250+350) {
 		t.Errorf("got %v up to %v, want 450 up to 750", got, upTo)
 	}
@@ -157,11 +168,29 @@ func TestLikelyCompactionSaving(t *testing.T) {
 	s.Turns[2].CompactedBefore = true
 	s.Turns[2].Usage.CacheRead, s.Turns[2].Cost.CacheRead = 40_000, 40
 	s.Turns[3].Usage.CacheRead, s.Turns[3].Cost.CacheRead = 60_000, 60
-	if got, _ := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000); !near(got, 50) {
+	if got, _ := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000, 50_000); !near(got, 50) {
 		t.Errorf("after a real compaction: got %v, want 50", got)
 	}
-	if got, _ := LikelyCompactionSaving([]event.Session{s}, 50_000, 60_000); got != 0 {
+	if got, _ := LikelyCompactionSaving([]event.Session{s}, 50_000, 60_000, 60_000); got != 0 {
 		t.Error("compacting to more than the threshold saves nothing")
+	}
+}
+
+// Sub-agents are left out (the user cannot compact them), and a real
+// compaction leaves nothing to compact before the turn after it.
+func TestLikelyCompactionSkipsSubAgentsAndRealCompactions(t *testing.T) {
+	turn := func(ctx int) event.Turn {
+		return event.Turn{Usage: event.Usage{CacheRead: ctx}, Cost: event.Cost{CacheRead: float64(ctx) / 1000}, Priced: true}
+	}
+	sub := event.Session{Kind: "subagent", Turns: []event.Turn{turn(100_000), turn(200_000)}}
+	if got, upTo := LikelyCompactionSaving([]event.Session{sub}, 150_000, 50_000, 50_000); got != 0 || upTo != 0 {
+		t.Errorf("sub-agent: got %v up to %v, want nothing", got, upTo)
+	}
+	after := turn(180_000) // still over the limit straight after a real compaction
+	after.CompactedBefore = true
+	main := event.Session{Kind: "main", Turns: []event.Turn{turn(900_000), after}}
+	if got, _ := LikelyCompactionSaving([]event.Session{main}, 150_000, 50_000, 50_000); got != 0 {
+		t.Errorf("after a real compaction: got %v, want 0 (no simulated compaction of the old size)", got)
 	}
 }
 
@@ -173,14 +202,14 @@ func TestLikelyCompactionCountsTheCompaction(t *testing.T) {
 	for i := range turns {
 		turns[i] = big
 	}
-	saving, upTo := LikelyCompactionSaving([]event.Session{{Turns: turns}}, 200_000, 50_000)
+	saving, upTo := LikelyCompactionSaving([]event.Session{{Turns: turns}}, 200_000, 50_000, 50_000)
 	ctx := float64(big.Context())
 	gross := 49 * (ctx - 50_000) * historyRate(big) // history is priced as a cache read
 	if saving <= 0 || saving >= gross || math.Abs(upTo-gross) > 1e-6 {
 		t.Errorf("got %v up to %v; want between 0 and %v, up to %v (the compaction's own cost comes off)", saving, upTo, gross, gross)
 	}
 	// A single turn does not repay the compaction: no saving, never negative.
-	if got, _ := LikelyCompactionSaving([]event.Session{{Turns: turns[:1]}}, 200_000, 50_000); got != 0 {
+	if got, _ := LikelyCompactionSaving([]event.Session{{Turns: turns[:1]}}, 200_000, 50_000, 50_000); got != 0 {
 		t.Errorf("one turn: got %v, want 0", got)
 	}
 }
@@ -218,7 +247,7 @@ func TestLikelyCompactionPricesHistoryNotNewTokens(t *testing.T) {
 	turn := event.Turn{Usage: event.Usage{CacheRead: 300_000, CacheWrite1h: 100_000},
 		Cost: event.Cost{CacheRead: 0.3, CacheWrite1h: 1}, Priced: true}
 	s := event.Session{Turns: []event.Turn{turn, turn}}
-	got, _ := LikelyCompactionSaving([]event.Session{s}, 350_000, 50_000)
+	got, _ := LikelyCompactionSaving([]event.Session{s}, 350_000, 50_000, 50_000)
 	// Nothing comes before the first turn, so the replay compacts before the
 	// second: 350k removed, at $1 per million.
 	if want := 350_000 / 1e6; !near(got, want) {
