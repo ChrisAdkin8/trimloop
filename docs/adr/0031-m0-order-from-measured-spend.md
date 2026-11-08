@@ -1,6 +1,6 @@
 # ADR 0031: Re-rank M0 from measured spend; sub-agent model fit in M0
 
-- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md)
+- Status: Accepted — mostly built (items 1–7, 9 and 10; saved offsets, item 8's filters and item 11 on to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md)
 - Date: 2026-11-07
 - Amends: [ADR 0029](0029-m0-build-order-by-user-value.md) (M0 build order), [patterns.md](../patterns.md) (P13, P14 milestones)
 
@@ -75,8 +75,8 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 | 6 | **P07 with injected context by kind**, priced by carried cost | $88 (4.3 %) | Done (ADR 0033), with the system prompt and tool definitions: $221 (11 %) |
 | 7 | **Results kept between runs** (ADR 0029 item 4) | Needed to measure any fix | Weekly figures kept (ADR 0033); saved offsets to do |
 | 8 | **Command-line options**: `--since`, `--repo`, `--format` | Filters for item 4's groups | `--format` (text, HTML, JSON) and `--out` done |
-| 9 | **P14 in reduced fidelity** | ≤ $67 (3 %) | |
-| 10 | **P02 cache-lifetime fit** | Guards a false saving (ADR 0027) | |
+| 9 | **P14 in reduced fidelity** | ≤ $67 (3 %) | Done ([ADR 0042](0042-p02-p14-and-main-session-models.md)) |
+| 10 | **P02 cache-lifetime fit** | Guards a false saving (ADR 0027) | Done ([ADR 0042](0042-p02-p14-and-main-session-models.md)): P02 for 5–60 minute waits, and the hour's cache shown to pay off |
 | 11 | **P03, P06, P01; then P05, P12** (P10 in M0 is the reduced report, built; full fidelity stays in M3, [ADR 0035](0035-measurement-corrections.md)) | P05, P11, P12 small in this sample (errors 3.3 %, retries 1.4 h of 52 h) | |
 | 12 | **Distribution** (ADR 0029 item 10) | — | |
 | 13 | **Keyed fingerprints and related work** (ADR 0029 item 11) | — | |

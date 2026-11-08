@@ -1,8 +1,8 @@
 # ADR 0042: P02, P14 and main-session models in M0
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0043](0043-weekly-trend-for-new-findings.md)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0043](0043-weekly-trend-for-new-findings.md) and [ADR 0044](0044-effort-thinking-and-cache-figures.md) (decisions 1 and 3)
 - Date: 2026-11-08
-- Amends: [ADR 0031](0031-m0-order-from-measured-spend.md) (P13 in M0 covers main sessions too), [ADR 0029](0029-m0-build-order-by-user-value.md) and [ROADMAP](../../ROADMAP.md) (P14 and P02, build order items 3 and 4, done), [ADR 0028](0028-harness-recorded-signals.md) (P14 from effort levels built)
+- Amends: [ADR 0031](0031-m0-order-from-measured-spend.md) (P13 in M0 covers main sessions too; items 9 and 10 done), [ADR 0029](0029-m0-build-order-by-user-value.md) items 3 (P14) and 7 (P02), and [ROADMAP](../../ROADMAP.md) (all three done), [ADR 0028](0028-harness-recorded-signals.md) (P14 from effort levels built)
 
 ## Context
 

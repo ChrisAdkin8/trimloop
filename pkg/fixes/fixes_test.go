@@ -143,8 +143,21 @@ func TestNewFindingCards(t *testing.T) {
 	if _, ok := ForCacheLife(detectors.CacheLife{Saving: 0.5}, 1); ok {
 		t.Error("P02 under the minimum should give no card")
 	}
-	if r, ok := ForCacheLife(detectors.CacheLife{Waits: 3, SubAgent: 2, Saving: 5}, 1); !ok || r.Pattern != "P02" || !strings.Contains(r.Finding, "2 in sub-agents") {
+	if r, ok := ForCacheLife(detectors.CacheLife{Waits: 3, SubAgent: 2, Saving: 5, MainShort: 304, SubShort: 1, MainHour: 117}, 1); !ok || r.Pattern != "P02" ||
+		!strings.Contains(r.Finding, "2 in sub-agents") || !strings.Contains(r.Finding, "304 main sessions and 1 sub-agent used the 5-minute cache") {
 		t.Errorf("P02: got %+v", r)
+	}
+	if r, _ := ForCacheLife(detectors.CacheLife{Waits: 3, Saving: 5, MainShort: 4, SubShort: 2}, 1); strings.Contains(r.Primary.How, "main session") || len(r.Alternatives) != 0 {
+		t.Errorf("P02 with no session on the hour: got %+v", r.Primary)
+	}
+	r, _ := ForEffort(detectors.Effort{Saving: 2, Turns: 5, Usual: "max", TopModels: []string{"claude-fable-5-1"}}, 1)
+	if !strings.Contains(r.Primary.What, "come back to high") || strings.Contains(r.Finding, "The other") ||
+		!strings.Contains(r.Primary.How, "ran on Fable 5.1") || !strings.Contains(r.Primary.How, "modelSettings") {
+		t.Errorf("P14 when usually on max: got %+v", r)
+	}
+	r, _ = ForEffort(detectors.Effort{Saving: 2, Turns: 5, Unmatched: 2, Usual: "medium"}, 1)
+	if !strings.Contains(r.Finding, "The other 2 ran on a model") {
+		t.Errorf("P14 unmatched: got %q", r.Finding)
 	}
 	m := detectors.MainModels{Newer: 3, LowerTier: 4, NewerTurns: 2, TierTurns: 1, ByModel: []detectors.ModelSpend{
 		{Model: "claude-opus-5", Newer: "claude-opus-5-5", NewerSave: 3},
@@ -157,7 +170,8 @@ func TestNewFindingCards(t *testing.T) {
 	if len(ForMainModels(m, 10)) != 0 {
 		t.Error("P13 main under the minimum should give no card")
 	}
-	if r, ok := ForEffort(detectors.Effort{Saving: 2, Turns: 5, HighMean: 1000}, 1); !ok || r.Pattern != "P14" || !strings.Contains(r.Finding, "1,000") {
+	if r, ok := ForEffort(detectors.Effort{Saving: 2, Turns: 5, HighMean: 1000, Usual: "medium"}, 1); !ok || r.Pattern != "P14" ||
+		!strings.Contains(r.Finding, "same model's high-effort turns") || !strings.Contains(r.Primary.How, "/effort medium") {
 		t.Errorf("P14: got %+v", r)
 	}
 }

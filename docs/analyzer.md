@@ -578,8 +578,8 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P10 Compaction thrash | `harness.compaction` **or** `request.full_body` | — |
 | P12 Retry storms | `harness.retries` **or** `request.full_body` | `timing.per_turn` |
 | P19 Large working context | `usage.cache_read` | `usage.cache_write`, `response.tool_calls` (what fills the context), `harness.compaction` |
-| P13 Model over-provisioning (sub-agents, reduced) | Sub-agent sessions (the profile's `sidechains`) | `harness.attribution` (agent type) |
-| P14 Thinking-budget overspend | `usage.reasoning` | `request.effort`, `outcome.git` (turn-complexity classes, M4) |
+| P13 Model over-provisioning (sub-agents and main sessions, reduced) | Sub-agent sessions (the profile's `sidechains`); per-turn model | `harness.attribution` (agent type) |
+| P14 Thinking-budget overspend | `request.effort` (reduced, M0: thinking, else output, by effort level within each model) **or** `usage.reasoning` (full) | `outcome.git` (turn-complexity classes, M4) |
 | P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |
 | P17 Repeated instructions | — | `content.local`, `harness.skills` |
 | P18 Hot documentation | `response.tool_calls` | `content.local`, `harness.skills` |

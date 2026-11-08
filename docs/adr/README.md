@@ -38,7 +38,7 @@ and M4 automatic fixes).
 | [0028](0028-harness-recorded-signals.md) | Use the signals harnesses record — accounting, injected context, effort, retries, outcomes | Log signals (M0) | Partly |
 | [0029](0029-m0-build-order-by-user-value.md) | M0 build order by value to the user | Build order (M0) | An order: re-ranked by 0031 |
 | [0030](0030-how-fixes-are-chosen.md) | How fixes are chosen — the fix ladder, failure-preserving cuts, measure after | Fixes | Partly |
-| [0031](0031-m0-order-from-measured-spend.md) | Re-rank M0 from measured spend; sub-agent model fit in M0 | Build order (M0) | Mostly: items 1–7 |
+| [0031](0031-m0-order-from-measured-spend.md) | Re-rank M0 from measured spend; sub-agent model fit in M0 | Build order (M0) | Mostly: items 1–7, 9, 10 |
 | [0032](0032-readable-reports.md) | Readable reports — session titles, likely savings, plain language | Reports (M0) | Yes |
 | [0033](0033-reconciliation-history-standing-context.md) | Reconciliation, weekly history, and pricing standing context | Findings (M0) | Yes |
 | [0034](0034-live-nudges.md) | Live nudges in Claude Code | Live nudges (M0) | Yes |
@@ -51,6 +51,7 @@ and M4 automatic fixes).
 | [0041](0041-compaction-edges-and-quartile-rule.md) | Compaction edge cases and the quartile rule | Measurements (M0) | Yes |
 | [0042](0042-p02-p14-and-main-session-models.md) | P02, P14 and main-session models in M0 | Detectors (M0) | Yes |
 | [0043](0043-weekly-trend-for-new-findings.md) | Weekly figures for P02, P14 and main-session models | Reports, history (M0) | Yes |
+| [0044](0044-effort-thinking-and-cache-figures.md) | Effort by thinking tokens, and fairer cache figures | Measurements (M0) | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

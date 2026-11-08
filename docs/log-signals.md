@@ -40,8 +40,9 @@ message id, [ADR 0026](adr/0026-usage-dedup-across-logs.md)), timestamps and
 idle gaps, `cache_creation` by TTL, `model`, sub-agent linkage, and — in the
 design — tool calls and results, command shapes, compaction boundaries,
 harness cost records, injected context and attribution. The prototype now
-reports cost by token class, P19, P09, P04, P07, P10 (from compaction
-records), P13 for sub-agents, reconciliation and weekly figures; §8 has the
+reports cost by token class, P19, P09, P02, P04, P07, P10 (from compaction
+records), P13 for sub-agents and main sessions, P14 by effort level,
+reconciliation and weekly figures; §8 has the
 current measured figures. (Updated 2026-11-08; this section first listed
 only P19 and P09.)
 
@@ -297,25 +298,25 @@ methods changed. How each figure is worked out today is in [measurements.md](mea
 
 | Figure | Value | When | Method |
 |---|---|---|---|
-| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 → $2,149 → $2,166 → $2,180 → $2,191 → $2,200 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
+| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 → $2,149 → $2,166 → $2,180 → $2,191 → $2,200 → $2,252 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
 | Spend in turns over 200k tokens (P19) | 57–58 % | 11-06 → 11-08 | Input cost of those turns |
 | P19 saving, keeping turns under 200k | 31 % → 19 % ($415, then $424 as the logs grew) → **31 %** ($673) | 11-06 → 11-08 | Removed history first priced at the turn's average input price; then as a cache read (ADR 0035); then as a write where the cache was rebuilt (ADR 0039), by position (ADR 0040) |
-| Compact earlier, likely saving | $820–841 → $463 → $462 → $314 → $531 → **$535** ($513–$644; up to $824) | 11-07 → 11-08 | Replay of compacting at 200k; the steps are ADR 0035, 0037, 0038, 0039 and 0040, the current method is in [measurements.md](measurements.md) |
+| Compact earlier, likely saving | $820–841 → $463 → $462 → $314 → $531 → $535 → **$554** ($533–$666; up to $849) | 11-07 → 11-08 | Replay of compacting at 200k; the steps are ADR 0035, 0037, 0038, 0039 and 0040, the current method is in [measurements.md](measurements.md) |
 | Size after a compaction | summary median 22–29k; first request after it median 80k → **92k** (middle half 57k–98k, 15 compactions) | 11-08 | The harness records only the summary; the next request also sends the system prompt, tools and re-attached files ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
 | Re-writes after a break of over an hour (P09) | 17 % ($353–368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
 | Of those, waits not on the user | 36 of 137, $72 → 31, $60 → **32, $62** | 11-08 | "Start fresh" counts only breaks the user took: up to $296 (likely $285) → $308 ($296) → **$306 ($294)**; who ended a wait: ADR 0037, 0038, 0039 |
 | Tool output (P04) | 2.2 % above 8k tokens per result; 12 % → **15 %** ($341) carried in all | 11-06; 11-07; 11-08 | 2.2 % is the saving from capping each result at 8k tokens (ADR 0027); 12 % is the cost of carrying all tool output; the report now uses a 2k target (about 3 %); 15 % prices rebuilt-cache turns as writes ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)) |
 | What every request carries (P07) | 4.3 % injected text → 11 % → **12 %** ($264) with system prompt and tool definitions | 11-07 → 11-08 | Carried like tool output (ADR 0033); injected text priced as a write on rebuilt-cache turns ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)) |
-| Sub-agents on a cheaper model (P13) | $235 → $271–274 → $281 → $284 → $287 → $289 → **$291** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)); every Opus and Fable model ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)); the logs kept growing |
+| Sub-agents on a cheaper model (P13) | $235 → $271–274 → $281 → $284 → $287 → $289 → $291 → **$299** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)); every Opus and Fable model ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)); the logs kept growing |
 | Read only the lines you need (P03/P04) | about $76 of carried cost → card up to $48 → **$58** (rebuilt-cache turns as writes, ADR 0039) | 11-07 → 11-08 | $76 was the carried cost of file-view output the fix aims at; $48 is the card's upper bound, keeping each file-view result under the 2k-token target |
 | Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | $0.18 of it is Claude Code pricing Sonnet 5.5 cache reads at $0.20, where the pricing page says $0.10 (ADR 0036). The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
 | Re-writes after breaks: earlier quotes | about $314–340 | 11-07 | The first message back after more than an hour, sessions over 200k; the same money as the P09 row |
-| Cache expiring during short waits (P02) | 86 waits, 84 in sub-agents; up to **$101** | 11-08 | Sessions on the 5-minute cache after 5–60 minutes, against the hour's cache ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
-| The hour's cache against 5 minutes | **$761** cheaper | 11-08 | Turns that wrote with the hour, priced on the 5-minute cache ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
+| Cache expiring during short waits (P02) | 86 waits, 84 in sub-agents; $101 → **$102** (what the expiry cost). Every 5-minute session on the hour's cache instead: **$22–23 more** (hindsight on the 34 that waited said $65 less) | 11-08 | First priced against the hour's cache; then against the cache still there; the hour's option over all 5-minute sessions, as ADR 0027 measured it ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
+| The hour's cache against 5 minutes | $761 → $376–$822 → about $593 → **$380–$825** | 11-08 | All turns of sessions on the hour, priced on the 5-minute cache; a range: only waits over 10 minutes losing the cache, against every wait over 5 (neither exact, the low end not a floor); a single likely figure from a thin sub-agent sample was tried and dropped ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
 | Main-session models (P13) | newer version **$29**; Fable 5.1 to Opus 5.5 **$79** (quality untested) | 11-08 | Same turns priced on the other model ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
-| Effort above high (P14) | about $67 → **$77** | 11-07 → 11-08 | Output above high's mean on xhigh and max turns; the logs grew ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
-| Spend in the costliest sessions | top 1: 23–24 % → **22 %**, top 5: 59 % → **60 %**, top 10: 75 % → **76 %** | 11-07 → 11-08 | Main session with its sub-agents; the logs kept growing |
+| Weekly totals of the new columns | short waits $102, top effort $110, cheaper choice $214 | 11-08 | Sums of the weekly figures; they equal the findings ([ADR 0043](adr/0043-weekly-trend-for-new-findings.md)) |
+| Effort above high (P14) | about $67 → $77 → $47 → **$41** | 11-07 → 11-08 | Turn by turn above high's mean output; then by each level's mean thinking per turn above high's; then within each model (every xhigh turn was Fable, most high turns Opus) ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
+| Spend in the costliest sessions | top 1: 23–24 % → **22 %**, top 5: 59 % → 60 % → **61 %**, top 10: 75 % → **76 %** | 11-07 → 11-08 | Main session with its sub-agents; the logs kept growing |
 | Sessions past 500k that never compacted | 6, about $292 | 11-07 → 11-08 | |
 | Costliest project | 22 % → 32 % | 11-07 | 22 % used each session's starting folder; 32 % counts each turn's own project, with worktrees under their project |
-| Lower effort (P14), at most | about $67 (3 %) | 11-07 | Output of max and xhigh turns priced at high's mean |
 

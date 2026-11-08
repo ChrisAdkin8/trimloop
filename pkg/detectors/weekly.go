@@ -26,9 +26,9 @@ type Week struct {
 
 	// Added in analysis version 5, so the P02, P14 and P13 main-session
 	// cards can be checked week by week (ADR 0043).
-	ShortWaits  float64 `json:"short_waits"`  // what the hour's cache would have saved after 5-60 minute waits (P02)
+	ShortWaits  float64 `json:"short_waits"`  // what a 5-minute cache expiring after 5-60 minute waits cost (P02)
 	TopEffort   float64 `json:"top_effort"`   // output cost of xhigh and max turns (P14)
-	OlderModels float64 `json:"older_models"` // main-session spend on a model with a newer version or a tier down (P13)
+	OlderModels float64 `json:"older_models"` // main-session spend on a model with a newer, cheaper version or a cheaper tier (P13)
 
 	Prices string `json:"prices,omitempty"` // price catalogue the figures used
 	// Analysis is the AnalysisVersion that worked the figures out.
@@ -46,8 +46,9 @@ type Week struct {
 // prices carried tool output as a write on rebuilt-cache turns, leaves
 // sub-agent pauses out of PauseRewrite, counts refusals as the user's and
 // compactions after a session's last reply (ADR 0039); version 5 adds the
-// short-wait, top-effort and older-model figures (ADR 0043).
-const AnalysisVersion = 5
+// short-wait, top-effort and older-model figures (ADR 0043); version 6
+// prices short waits against the cache still there (ADR 0044).
+const AnalysisVersion = 6
 
 // TurnsCountedSince is the first AnalysisVersion that counts turns as this
 // one does, so turn counts from it on can be compared.

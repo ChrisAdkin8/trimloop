@@ -41,9 +41,11 @@ func WriteText(out io.Writer, r Results) error {
 		fmt.Fprintf(w, "  %-22s %10s  %5.1f%%\n", row.name, dollars(row.cost), pct(row.cost, all))
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
-	if c := r.CacheLife; c.HourAsShort > c.HourActual {
-		fmt.Fprintf(w, "  Keeping the cache for an hour cost %s less than the 5-minute cache would have\n", dollars(c.HourAsShort-c.HourActual))
-		fmt.Fprintln(w, "  (on the turns that used it): the hour pays for itself on these logs.")
+	if c := r.CacheLife; c.HourAsShortLow > c.HourActual {
+		fmt.Fprintf(w, "  Keeping the cache for an hour cost %s to %s less than the 5-minute cache would\n",
+			money(c.HourAsShortLow-c.HourActual), money(c.HourAsShort-c.HourActual))
+		fmt.Fprintln(w, "  have, in the sessions that used it (the first if only waits over 10 minutes lost a")
+		fmt.Fprintln(w, "  5-minute cache, the second if every wait over 5 did): the hour pays for itself here.")
 	}
 
 	if len(r.Actions) > 0 {

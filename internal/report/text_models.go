@@ -14,12 +14,22 @@ func cacheLifeSection(w io.Writer, c detectors.CacheLife, rec *fixes.Recommendat
 	fmt.Fprintln(w, "\nP02 CACHE EXPIRING DURING SHORT WAITS")
 	if c.Waits == 0 {
 		fmt.Fprintln(w, "  No session on the 5-minute cache waited long enough to lose it.")
+		fmt.Fprintf(w, "  In these logs %s and %s used the 5-minute cache; %s and %s the hour's.\n",
+			count(c.MainShort, "main session"), count(c.SubShort, "sub-agent"), count(c.MainHour, "main session"), count(c.SubHour, "sub-agent"))
 		return
 	}
 	fmt.Fprintf(w, "  %s on the 5-minute cache (%d in sub-agents) waited 5 minutes to an hour, so the\n",
 		count(c.Waits, "turn"), c.SubAgent)
-	fmt.Fprintf(w, "  whole history was saved again: those turns cost %s; on the hour's cache, %s less (%.0f%%).\n",
-		dollars(c.Cost), dollars(c.Saving), pct(c.Saving, all))
+	fmt.Fprintf(w, "  whole history was saved again: those turns cost %s, %s more than with the cache still\n",
+		dollars(c.Cost), dollars(c.Saving))
+	fmt.Fprintf(w, "  there (%.0f%% of all spend).\n", pct(c.Saving, all))
+	fmt.Fprintf(w, "  In these logs %s and %s used the 5-minute cache; %s and %s the hour's.\n",
+		count(c.MainShort, "main session"), count(c.SubShort, "sub-agent"), count(c.MainHour, "main session"), count(c.SubHour, "sub-agent"))
+	if c.HourNet > 0 {
+		fmt.Fprintf(w, "  Putting all of them on the hour's cache would have saved about %s, net of its dearer writes.\n", dollars(c.HourNet))
+	} else {
+		fmt.Fprintf(w, "  Putting all of them on the hour's cache would have cost %s more: its writes are dearer.\n", dollars(-c.HourNet))
+	}
 	sessionTable(w, c.Top, "waits", "context")
 	if rec != nil {
 		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(*rec, all))
@@ -60,14 +70,27 @@ func effortSection(w io.Writer, e detectors.Effort, rec *fixes.Recommendation, a
 		fmt.Fprintln(w, "  No turns.")
 		return
 	}
-	fmt.Fprintf(w, "    %-10s %8s %10s %12s\n", "level", "turns", "spend", "output cost")
+	perTurn := "thinking a turn"
+	if !e.Thinking {
+		perTurn = "output a turn"
+	}
+	fmt.Fprintf(w, "    %-10s %8s %10s %12s %16s\n", "level", "turns", "spend", "output cost", perTurn)
 	for _, g := range e.ByLevel {
 		level := g.Level
 		if level == "" {
 			level = "not logged"
 		}
-		fmt.Fprintf(w, "    %-10s %8s %10s %12s\n", level, thousands(g.Turns), dollars(g.Cost), dollars(g.OutCost))
+		think := ""
+		switch {
+		case e.Thinking && g.ThinkN > 0:
+			think = thousands(g.Think / g.ThinkN)
+		case !e.Thinking && g.Turns > 0:
+			think = thousands(g.Output / g.Turns)
+		}
+		fmt.Fprintf(w, "    %-10s %8s %10s %12s %16s\n", level, thousands(g.Turns), dollars(g.Cost), dollars(g.OutCost), think)
 	}
+	fmt.Fprintln(w, "  Levels mix models (each thinks a different amount); the saving compares each model")
+	fmt.Fprintln(w, "  with its own high-effort turns.")
 	if rec != nil {
 		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(*rec, all))
 		printFixes(w, *rec)

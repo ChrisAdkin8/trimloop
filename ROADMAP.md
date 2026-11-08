@@ -21,10 +21,11 @@ findings report with estimated savings. No proxy, no server.
 - DuckDB store. Not built: the prototype keeps everything in memory for one
   run, and weekly figures in a history file. As ADR 0029 item 4 says, the
   store follows when needed: P06 needs it. It holds no content before
-  redaction is built (item 7; ADR 0004).
+  redaction is built (build order item 5; ADR 0004).
 - Detectors P01–P07, P09, P10, P12, P14 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
   [ADR 0028](docs/adr/0028-harness-recorded-signals.md)), and P13 for
-  sub-agents in reduced fidelity ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
+  sub-agents and main sessions in reduced fidelity
+  ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md), [ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)).
 - Reader also takes the harness's own cost and compaction records. Done in
   the prototype: reconciliation reports the gap with them (about 13 %).
   ADR 0028's acceptance test, within 2 % with auxiliary turns added, is not
@@ -62,17 +63,18 @@ P07 priced by carried cost, including the system prompt and tool
 definitions; weekly figures kept between runs
 ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md));
 live nudges in Claude Code — status line, after-reply and before-send hooks,
-and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)).
+and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)); P02 cache
+expiry during short waits, P13 for main sessions and P14 by effort level in
+reduced fidelity ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md),
+[ADR 0044](docs/adr/0044-effort-thinking-and-cache-figures.md)).
 
 1. Saved offsets, so a re-run reads only new lines.
 2. Command-line options: `--since`, `--repo` (`analyse`, `--format` and
    `--out` are done).
-3. P14 in reduced fidelity: spend by effort level. Done in the prototype ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)).
-4. P02 cache-lifetime fit. Done in the prototype, with P13 for main sessions ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)).
-5. P03, P06 (with the DuckDB store, numbers only until item 7), P01; then P05, and P12 in reduced fidelity from harness
+3. P03, P06 (with the DuckDB store, numbers only until item 5), P01; then P05, and P12 in reduced fidelity from harness
    records (its full fidelity, and P10's, stays in M3).
-6. Distribution: installable release, minimal conformance runner, profiles.
-7. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
+4. Distribution: installable release, minimal conformance runner, profiles.
+5. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 
 **Done when:** on a sample of real sessions, findings are reproducible and a
 developer agrees at least half of the top-5 are worth fixing.

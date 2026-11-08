@@ -53,6 +53,8 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 	"float":    func(n int) float64 { return float64(n) },
 	"neg":      func(x float64) float64 { return -x },
 	"sub":      func(a, b float64) float64 { return a - b },
+	"div":      func(a, b int) int { return a / max(1, b) },
+	"plural":   count,
 	// args packs values for a sub-template, which reads them with index.
 	"args": func(v ...any) []any { return v },
 }).Parse(htmlSource))

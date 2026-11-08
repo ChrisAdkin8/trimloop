@@ -72,7 +72,7 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 	}
 	fmt.Fprintln(w, "\nWEEK BY WEEK")
 	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s %9s %7s %9s %9s %9s\n", "week of", "spend", "turns", "large ctx", "sub-agents",
-		"tool out", "re-reads", "breaks", "compact", "short wt", "top eff", "old mdl")
+		"tool out", "re-reads", "breaks", "compact", "short wt", "top eff", "cheaper")
 	for _, k := range weeks {
 		kept := ""
 		if k.Kept {
@@ -84,7 +84,7 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%% %9s %7d %9s %9s %9s%s\n", k.Week, money(k.Spend), thousands(k.Turns),
 			pct(k.LargeContext, k.Spend), pct(k.SubAgents, k.Spend), money(k.ToolOutput),
 			pct(float64(k.Rereads), float64(k.FileViews)), money(k.PauseRewrite), k.Compactions,
-			money(k.ShortWaits), money(k.TopEffort), money(k.OlderModels), kept)
+			measured(k, k.ShortWaits), measured(k, k.TopEffort), measured(k, k.OlderModels), kept)
 	}
 }
 
@@ -93,4 +93,13 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 func olderFigures(k detectors.Week, prices string) bool {
 	// Analysis 0 is a week stored before versions were recorded: older.
 	return k.Prices != "" && prices != "" && k.Prices != prices || k.Analysis < detectors.AnalysisVersion
+}
+
+// measured writes a figure added in analysis version 5, or "-" for a week an
+// earlier version stored, which did not measure it.
+func measured(k detectors.Week, v float64) string {
+	if k.Analysis < 5 {
+		return "-"
+	}
+	return money(v)
 }

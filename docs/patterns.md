@@ -92,10 +92,12 @@ fidelity and cannot name the cause.
 
 ## P02 — Cache TTL expiry
 
-**In M0 (reduced fidelity):** turns in sessions on the 5-minute cache
-(Claude Code's sub-agents) after a wait of 5 minutes to an hour, priced
-against the hour's cache; and, the other way, what the hour saved the
-sessions that used it ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md); [measurements.md](measurements.md)).
+**In M0 (reduced fidelity):** turns in sessions on the 5-minute cache (in
+the founder's logs, sub-agents and SDK runs) after a wait of 5 minutes to an
+hour, priced against the cache still being there; what the hour's cache
+would save all such sessions net of its dearer writes; and, the other way,
+what the hour saved the sessions that used it, as a range
+([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0044](adr/0044-effort-thinking-and-cache-figures.md); [measurements.md](measurements.md)).
 
 **What happens:** The developer pauses longer than the cache lives, so the
 next turn pays again for a prefix that was cached moments before the pause.
@@ -458,24 +460,29 @@ has the current figure).
 
 ## P14 — Thinking-budget overspend
 
-**In M0 (reduced fidelity, built):** spend by effort level and the output
-above a typical high-effort turn on xhigh and max turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)).
+**In M0 (reduced fidelity, built):** spend by effort level, and how much
+more xhigh and max turns think per turn, on average, than the same model's
+high-effort turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)).
 
 **What happens:** Extended reasoning tokens are spent on trivial turns.
 
 **Signals:** Reasoning tokens high on turns labelled low-complexity. In
-reduced fidelity (M0): reasoning tokens and output cost by requested effort
-level (`request.effort`), and the share spent at the highest levels.
+reduced fidelity (M0): thinking tokens (Claude Code logs them in
+`output_tokens_details`, as part of output) and output cost by requested
+effort level (`request.effort`), and how much more per turn, on average, the
+highest levels think than high does ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)).
 
 **Fix:** L1 (M0) — report spend by effort level and recommend a lower
 default or per-turn effort where the harness supports it. Measured in the
 founder's sample, the lever is smaller than its token share suggests: `max`
 and `xhigh` turns were 22 % of spend but their output cost $109, and running
 them at `high`'s mean output would save at most ≈ $67 (3 %)
-([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07)). L3 (M4, op
+([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07);
+2026-11-07, a method since replaced: [measurements.md](measurements.md) has
+the current one, log-signals §8 the current figure). L3 (M4, op
 `cap_thinking`) — cap the budget per turn class; canary-gated.
 
-**Requires:** `usage.reasoning`. **Optional:** `request.effort`.
+**Requires:** `request.effort` (reduced, M0) or `usage.reasoning` (full). **Optional:** `usage.reasoning` in reduced fidelity, where it replaces output tokens.
 
 ## P15 — Duplicated exploration across a team
 

@@ -195,18 +195,18 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table>
-    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="n">Short waits</th><th class="n">Top effort</th><th class="n">Older models</th><th class="barcell"></th></tr></thead>
+    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="n">Short waits</th><th class="n">Top effort</th><th class="n">Cheaper choice</th><th class="barcell"></th></tr></thead>
     <tbody>
     {{range .Weeks}}<tr>
       <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{if $.Older .}} <span class="muted small">(older prices or method)</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
       <td class="n">{{dollars .Spend}}</td><td class="n">{{thousands .Turns}}</td>
       <td class="n">{{pct .LargeContext .Spend}}</td><td class="n">{{pct .SubAgents .Spend}}</td>
-      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td><td class="n">{{dollars .ShortWaits}}</td><td class="n">{{dollars .TopEffort}}</td><td class="n">{{dollars .OlderModels}}</td>
+      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td>{{if ge .Analysis 5}}<td class="n">{{dollars .ShortWaits}}</td><td class="n">{{dollars .TopEffort}}</td><td class="n">{{dollars .OlderModels}}</td>{{else}}<td class="n muted">—</td><td class="n muted">—</td><td class="n muted">—</td>{{end}}
       <td class="barcell"><div class="bar" style="width: {{width .Spend $.MaxWeek}}%"></div></td>
     </tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Short waits": what the hour's cache would have saved after waits of 5 minutes to an hour. "Top effort": the output cost of xhigh and max turns. "Older models": main-session spend on a model with a newer version or a cheaper tier. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
+  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Short waits": what a 5-minute cache expiring after a wait of 5 minutes to an hour cost. Dashes: not measured for that week (stored by an earlier version). "Top effort": the output cost of xhigh and max turns. "Cheaper choice": main-session spend on a model with a newer, cheaper version or a cheaper tier. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
 </div>
 </details>
 </section>
@@ -240,14 +240,15 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   {{end}}
   {{with .CacheLife}}
   <h3>Shorter waits</h3>
-  {{if .Waits}}<p>Sub-agents keep their cache for 5 minutes, not an hour. {{.Waits}} times ({{.SubAgent}} in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: {{dollars .Cost}}, of which {{dollars .Saving}} the hour's cache would have saved.</p>
+  <p>In these logs {{plural .MainShort "main session"}} and {{plural .SubShort "sub-agent"}} kept their cache for 5 minutes; {{plural .MainHour "main session"}} and {{plural .SubHour "sub-agent"}} for an hour.</p>
+  {{if .Waits}}<p>{{.Waits}} times ({{.SubAgent}} in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: {{dollars .Cost}}, {{dollars .Saving}} more than with the cache still there.{{if gt .HourNet 0.0}} Putting every session on the 5-minute cache on the hour's would have saved about {{dollars .HourNet}}, net of its dearer writes.{{else}} Putting every session on the 5-minute cache on the hour's would have cost {{dollars (neg .HourNet)}} more: its writes are dearer.{{end}}</p>
   <div class="scroll"><table class="sortable">
-    <thead><tr><th data-sort>Session</th><th class="n" data-sort>Waits</th><th class="n" data-sort>Largest context</th><th class="n" data-sort>Hour's cache saves</th></tr></thead>
+    <thead><tr><th data-sort>Session</th><th class="n" data-sort>Waits</th><th class="n" data-sort>Largest context</th><th class="n" data-sort>Cost of the expiry</th></tr></thead>
     <tbody>
     {{range .Top}}{{$l := $.Name .SessionID}}<tr><td class="name session">{{template "session" (args $l .SessionID)}}</td><td class="n" data-v="{{.Turns}}">{{.Turns}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td><td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td></tr>{{end}}
     </tbody>
   </table></div>{{else}}<p>No session on the 5-minute cache waited long enough to lose it.</p>{{end}}
-  {{if gt .HourAsShort .HourActual}}<p class="muted small">Keeping the cache for an hour cost {{dollars (sub .HourAsShort .HourActual)}} less than the 5-minute cache would have, on the turns that used it: the hour pays for itself here.</p>{{end}}
+  {{if gt .HourAsShortLow .HourActual}}<p class="muted small">Keeping the cache for an hour cost {{dollars (sub .HourAsShortLow .HourActual)}} to {{dollars (sub .HourAsShort .HourActual)}} less than the 5-minute cache would have, in the sessions that used it: the hour pays for itself here. The first figure is if only waits over 10 minutes lost a 5-minute cache, the second if every wait over 5 minutes did. Neither is exact: the logged wait includes the next reply's own time, and requests the logs do not record can keep a cache alive, even past 10 minutes.</p>{{end}}
   {{end}}
 </div>
 </details>
@@ -348,12 +349,12 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   {{with .Effort}}
   <h3>Effort level</h3>
   <div class="scroll"><table class="sortable">
-    <thead><tr><th data-sort>Level</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Output cost</th></tr></thead>
+    <thead><tr><th data-sort>Level</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Output cost</th><th class="n" data-sort>{{if .Thinking}}Thinking{{else}}Output{{end}} a turn</th></tr></thead>
     <tbody>
-    {{range .ByLevel}}<tr><td>{{if .Level}}{{.Level}}{{else}}<span class="muted">not logged</span>{{end}}</td><td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.OutCost}}">{{dollars .OutCost}}</td></tr>{{end}}
+    {{range .ByLevel}}<tr><td>{{if .Level}}{{.Level}}{{else}}<span class="muted">not logged</span>{{end}}</td><td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.OutCost}}">{{dollars .OutCost}}</td><td class="n">{{if $.Effort.Thinking}}{{if .ThinkN}}{{thousands (div .Think .ThinkN)}}{{end}}{{else}}{{thousands (div .Output .Turns)}}{{end}}</td></tr>{{end}}
     </tbody>
   </table></div>
-  {{if .HighMean}}<p class="muted small">A high-effort turn wrote {{thousands .HighMean}} output tokens on average; output beyond that on xhigh and max turns cost {{dollars .Saving}}, an upper bound since harder work gets higher effort on purpose.</p>{{end}}
+  {{if .HighMean}}<p class="muted small">Levels mix models, and each model thinks a different amount, so the saving compares each model's xhigh and max turns with its own high-effort turns: {{dollars .Saving}} less had they done the same on average. Harder work gets higher effort on purpose, so a lower level would save less.</p>{{end}}
   {{end}}
 </div>
 </details>

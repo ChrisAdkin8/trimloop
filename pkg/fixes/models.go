@@ -7,31 +7,46 @@ import (
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
-// ForCacheLife recommends keeping long waits out of sub-agents (P02, ADR
-// 0042), or returns false if they would save less than minSaving.
+// ForCacheLife recommends keeping long waits in sessions whose cache lasts
+// an hour (P02, ADRs 0042, 0044), or returns false below minSaving. Which
+// kind of session keeps the hour is read from the logs, not assumed: in
+// Claude Code main sessions usually do, but SDK runs may not.
 func ForCacheLife(f detectors.CacheLife, minSaving float64) (Recommendation, bool) {
 	if f.Saving < minSaving {
 		return Recommendation{}, false
 	}
-	return Recommendation{
+	where := fmt.Sprintf("In these logs %s and %s used the 5-minute cache; %s and %s kept theirs for an hour.",
+		plural(f.MainShort, "main session"), plural(f.SubShort, "sub-agent"),
+		plural(f.MainHour, "main session"), plural(f.SubHour, "sub-agent"))
+	r := Recommendation{
 		Pattern: "P02",
-		Title:   "Keep long waits out of sub-agents",
+		Title:   "Keep long waits out of sessions with a 5-minute cache",
 		Finding: fmt.Sprintf("%d times (%d in sub-agents), a session whose cache lasts 5 minutes waited longer, up to an "+
-			"hour, so its next turn paid to save its whole history again. Claude Code's sub-agents use the 5-minute "+
-			"cache; main sessions keep theirs for an hour.", f.Waits, f.SubAgent),
+			"hour, so its next turn paid to save its whole history again. %s", f.Waits, f.SubAgent, where),
 		Saving:  f.Saving,
-		Overlap: "Separate from the long-break fix, which covers waits over an hour",
+		Overlap: "Separate from the long-break fix (waits over an hour); shares sub-agent turns with the cheaper-model fix: do not add them",
 		Primary: Fix{Structure,
-			"Run long builds, test suites and other slow commands in the main session, not in sub-agents.",
-			"The main session keeps its cache for an hour; a sub-agent's lasts 5 minutes, so a sub-agent that waits " +
-				"on a slow command, or on its own background task, saves its whole history again when it carries on."},
+			"Run long builds, test suites and other slow commands in a session that keeps its cache for an hour.",
+			"A session on the 5-minute cache that waits on a slow command, or on its own background task, saves its " +
+				"whole history again when it carries on. In Claude Code that is usually the main session rather " +
+				"than a sub-agent; sessions run through the SDK may use the 5-minute cache too."},
 		Alternatives: []Fix{
 			{Advise,
 				"Tell Claude not to give sub-agents work that waits on slow commands.",
 				`Add to CLAUDE.md: "Run slow builds and test suites yourself, in the background if they take minutes; ` +
 					`don't hand them to a sub-agent."`},
 		},
-	}, true
+		Check: "After a week, the weekly \"short waits\" figure should fall.",
+	}
+	if f.MainHour == 0 && f.SubHour == 0 {
+		// No session here kept the hour: there is nowhere better to move the wait.
+		r.Primary = Fix{Structure,
+			"Don't let a session wait on slow commands: start them in the background and check back.",
+			"Every session in these logs used the 5-minute cache, so any session that waits longer than 5 minutes " +
+				"saves its whole history again when it carries on."}
+		r.Alternatives = nil
+	}
+	return r, true
 }
 
 // ForMainModels recommends a newer model in the same line, which costs no
@@ -75,6 +90,7 @@ func ForMainModels(f detectors.MainModels, minSaving float64) []Recommendation {
 				"it does the work as well is not known from the logs.", f.TierTurns, joinNames(from), joinNames(unique(to))),
 			Saving:   f.LowerTier,
 			Examples: from,
+			Overlap:  "May share turns at the highest effort with the effort fix: do not add them",
 			Primary: Fix{Advise,
 				fmt.Sprintf("Start sessions on %s and switch to %s for the hardest problems.", joinNames(unique(to)), joinNames(from)),
 				`Choose the model with /model at the start of a task, or set "model" in .claude/settings.json.`},
@@ -90,16 +106,42 @@ func ForEffort(f detectors.Effort, minSaving float64) (Recommendation, bool) {
 	if f.Saving < minSaving {
 		return Recommendation{}, false
 	}
+	// Come back to the usual level, or to high if the usual level is itself
+	// one of the highest.
+	back := f.Usual
+	if back == "" || back == "xhigh" || back == "max" {
+		back = "high"
+	}
+	finding := fmt.Sprintf("%d turns ran at the highest effort levels (xhigh or max); most turns ran at %s. Had "+
+		"%d of them %s as much per turn, on average, as the same model's high-effort turns, they would have "+
+		"cost %s less.", f.Turns, f.Usual, f.Turns-f.Unmatched,
+		map[bool]string{true: "thought", false: "written"}[f.Thinking], dollars(f.Saving))
+	if f.Unmatched > 0 {
+		finding += fmt.Sprintf(" The other %d ran on a model with too few high-effort turns to compare with.", f.Unmatched)
+	}
+	finding += " Harder work gets higher effort on purpose, so a lower level would save less than this."
+	how := fmt.Sprintf(`Effort can be set per model ("modelSettings" in ~/.claude/settings.json): if it is, lower it `+
+		`there. Otherwise keep the default at %s with /effort %s (or "effortLevel" in .claude/settings.json), and `+
+		`raise it with /effort for a task that needs it.`, back, back)
+	if len(f.TopModels) > 0 {
+		names := make([]string, 0, len(f.TopModels))
+		for _, m := range f.TopModels {
+			names = append(names, price.DisplayName(m))
+		}
+		how = fmt.Sprintf(`The xhigh and max turns ran on %s. Effort can be set per model ("modelSettings" in `+
+			`~/.claude/settings.json): if it is, lower it there. Otherwise keep the default at %s with /effort %s `+
+			`(or "effortLevel" in .claude/settings.json), and raise it with /effort for a task that needs it.`,
+			joinNames(names), back, back)
+	}
 	return Recommendation{
 		Pattern: "P14",
 		Title:   "Save the highest effort for hard problems",
-		Finding: fmt.Sprintf("%d turns ran at the highest effort levels (xhigh or max). Their output beyond a typical "+
-			"high-effort turn (%s tokens) cost %s. Harder work gets higher effort on purpose, so this is an upper bound.",
-			f.Turns, thousandsInt(f.HighMean), dollars(f.Saving)),
-		Saving: f.Saving,
+		Finding: finding,
+		Saving:  f.Saving,
+		Overlap: "May share turns with the cheaper-model fixes: do not add them",
 		Primary: Fix{Advise,
-			"Use xhigh and max effort only for hard problems; high is enough for most work.",
-			"Set the effort level in Claude Code's model settings (/model), and raise it for a task that needs it."},
+			fmt.Sprintf("Use xhigh and max effort only for hard problems, and come back to %s after.", back),
+			how},
 		Check: "Untested for quality: after a week, compare turns per task and tool errors with before.",
 	}, true
 }
@@ -128,4 +170,12 @@ func unique(xs []string) []string {
 		}
 	}
 	return out
+}
+
+// plural writes n with its noun: "1 sub-agent", "304 main sessions".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return thousandsInt(n) + " " + noun + "s"
 }

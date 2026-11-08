@@ -1,6 +1,6 @@
 # ADR 0029: M0 build order by value to the user
 
-- Status: Accepted — order re-ranked by [ADR 0031](0031-m0-order-from-measured-spend.md); item 4 amended by [ADR 0033](0033-reconciliation-history-standing-context.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md)
+- Status: Accepted — order re-ranked by [ADR 0031](0031-m0-order-from-measured-spend.md); item 4 amended by [ADR 0033](0033-reconciliation-history-standing-context.md); items 3 and 7 built by [ADR 0042](0042-p02-p14-and-main-session-models.md)
 - Date: 2026-11-07
 - Amends: [ADR 0027](0027-measured-m0-findings.md) (M0 order of work)
 

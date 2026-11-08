@@ -1,12 +1,12 @@
 # ADR 0043: Weekly figures for P02, P14 and main-session models
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; labels and the meaning of `short_waits` (analysis version 6) amended by [ADR 0044](0044-effort-thinking-and-cache-figures.md)
 - Date: 2026-11-08
 - Amends: [ADR 0033](0033-reconciliation-history-standing-context.md) (what the history file keeps), [ADR 0042](0042-p02-p14-and-main-session-models.md) (how its cards are checked)
 
 ## Context
 
-ADR 0042's cards each say to check the effect after a week, but the weekly
+ADR 0042's cards are checked by their effect over the following weeks, but the weekly
 figures (kept in the history file, ADR 0033) had no column for them, so a
 change could not be seen week by week as it can for long breaks and tool
 output. A review of the reports also found P02's top sessions unnamed in
