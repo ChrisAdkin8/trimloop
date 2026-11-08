@@ -46,6 +46,7 @@ and M4 automatic fixes).
 | [0036](0036-prices-reconciliation-status.md) | Prices checked against the pricing page; reconciliation reports the gap in M0 | Measurements (M0) | Yes |
 | [0037](0037-partial-weeks-prompts-compaction-nudges.md) | Partly deleted weeks, breaks the user took, nudges after a compaction | Measurements, live nudges (M0) | Yes |
 | [0038](0038-real-size-after-compaction.md) | The real size after a compaction, and who ended a wait | Measurements, live nudges (M0) | Yes |
+| [0039](0039-rebuilt-cache-and-likely-ranges.md) | Removed history on a rebuilt cache, and likely savings as a range | Measurements (M0) | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

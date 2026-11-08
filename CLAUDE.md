@@ -7,6 +7,7 @@ and `--format text|html|json`, `--out FILE` and `--no-titles` change the
 output) and test with `go test ./...`. The
 report code is in `internal/report`; all formats render one
 `report.Results`. Weekly figures are kept in `~/.trimloop/history.json`
+(one `history-<id>.json` per other `CLAUDE_CONFIG_DIR`)
 (`internal/history`; pass `--no-history` or `--history FILE` when testing
 against real logs). Live nudges (`trimloop statusline`, `hook`, `setup`)
 are in `internal/live`; they write under `~/.trimloop`, so set `HOME` to a

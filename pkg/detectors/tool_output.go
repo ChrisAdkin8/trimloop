@@ -197,10 +197,23 @@ func arrivalRate(t event.Turn) float64 {
 	return perToken(c.CacheRead, u.CacheRead)
 }
 
-// historyRate is a turn's price per token for the history it re-sends: a
-// cache read if it read from the cache, else a cache write (the cache was
-// rebuilt, for example after a pause), else uncached input.
+// historyRate is a turn's price per token for the history it re-sends after
+// the fixed start: a cache write when the cache was rebuilt (the turn wrote
+// more than it read, as after a pause: the system prompt and tools are
+// often still read, the rest written), else a cache read, else uncached
+// input.
 func historyRate(t event.Turn) float64 {
+	u, c := t.Usage, t.Cost
+	if w := u.CacheWrite5m + u.CacheWrite1h; w > 0 && w > u.CacheRead {
+		return c.CacheWrites() / float64(w)
+	}
+	return prefixRate(t)
+}
+
+// prefixRate is a turn's price per token for its fixed start (the system
+// prompt and tool definitions): a cache read if it read from the cache, else
+// a cache write, else uncached input.
+func prefixRate(t event.Turn) float64 {
 	u, c := t.Usage, t.Cost
 	if u.CacheRead > 0 {
 		return c.CacheRead / float64(u.CacheRead)

@@ -1,6 +1,6 @@
 # ADR 0035: Measurement corrections and how actions are ranked
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) and [ADR 0038](0038-real-size-after-compaction.md)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md), [ADR 0038](0038-real-size-after-compaction.md) and [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md)
 - Date: 2026-11-08
 - Amends: [ADR 0026](0026-usage-dedup-across-logs.md) (which line of a message counts), [ADR 0027](0027-measured-m0-findings.md) (how P19's saving is priced), [ADR 0031](0031-m0-order-from-measured-spend.md) (P10 in M0), [ADR 0032](0032-readable-reports.md) (ranking), [ADR 0033](0033-reconciliation-history-standing-context.md) (reconciliation rule, history)
 
@@ -56,7 +56,7 @@ were wrong:
 On the founder's logs (2026-11-08, $2,134 over 44 days):
 
 - Compacting earlier: likely about $463, up to $688 (was $841 and $1,146).
-- P19's saving: about 19 % (was 31 %).
+- P19's saving: about 19 % (was 31 %). (ADR 0039: decision 2 was not built as written; built as written, about 31 %.)
 - Claude Code's records show about 13 % ($202 on 409 sessions) more than
   the logs, not 2–4 %; 4 sessions are left out as not covered.
 - [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance)

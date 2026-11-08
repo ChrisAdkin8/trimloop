@@ -88,7 +88,10 @@ func ReadTail(path string) (Tail, error) {
 		if err != nil || !ok {
 			continue
 		}
-		if m.Kind == source.KindCompaction && !found && t.Compaction == nil {
+		if m.Kind == source.KindCompaction && t.Compaction == nil &&
+			(!found || !m.Time.IsZero() && m.Time.After(t.Latest.Time)) {
+			// After the latest reply, or before it in the log but later in
+			// time: the reply that triggered a compaction can be logged after it.
 			t.Compaction = &m
 			continue
 		}

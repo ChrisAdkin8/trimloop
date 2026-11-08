@@ -1,8 +1,8 @@
 # ADR 0038: The real size after a compaction, and who ended a wait
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; decisions 1, 3 and 4 amended by [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md)
 - Date: 2026-11-08
-- Amends: [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (decisions 1–4), [ADR 0035](0035-measurement-corrections.md) and [ADR 0032](0032-readable-reports.md) (the compaction replay), [ADR 0034](0034-live-nudges.md) (status line and re-arming), [ADR 0033](0033-reconciliation-history-standing-context.md) (P07 sources, history file), [data-model.md](../data-model.md) (Turn, Week)
+- Amends: [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (decisions 1–4), [ADR 0035](0035-measurement-corrections.md) and [ADR 0032](0032-readable-reports.md) (the compaction replay), [ADR 0034](0034-live-nudges.md) (status line and re-arming), [ADR 0033](0033-reconciliation-history-standing-context.md) (P07 sources, history file), [data-model.md](../data-model.md) (Turn, Week), [patterns.md P09](../patterns.md#p09--resume-bloat)
 
 ## Context
 
@@ -11,7 +11,7 @@ logs, and that its history rule could keep wrong figures:
 
 1. **A compaction's recorded "after" size is only the summary.** The first
    request after each of the 16 compactions with a reply sent 2.3–4.8 times
-   that (a median of 80k tokens against 29k): it also carries the system
+   that (a median of 80k tokens against a 22–29k summary): it also carries the system
    prompt, tool definitions and the files, skill and tool listings the
    harness re-attaches. The compaction replay compacted to the summary's
    size, so "compact earlier: likely $463" was overstated by about a third,
@@ -61,7 +61,8 @@ logs, and that its history rule could keep wrong figures:
 
 On the founder's logs (2026-11-08, $2,180 over 44 days):
 
-- Compacting earlier: likely about $314, up to $547 (was $463 and $701).
+- Compacting earlier: likely about $314, up to $547 (was $462 and $700).
+  Corrected by ADR 0039: about $531, up to $820.
 - Start fresh after a long break: up to $308, likely about $296; 31 waits
   ($60) were not on the user (was 36, $72).
 - "Remove MCP servers you don't use" is $2.56: the rest of the instruction

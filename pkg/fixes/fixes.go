@@ -36,16 +36,20 @@ type Fix struct {
 
 // Recommendation is the advice for one finding.
 type Recommendation struct {
-	Pattern      string          `json:"pattern"` // e.g. "P04"
-	Title        string          `json:"title"`   // the action, e.g. "Read only the lines you need"
-	Finding      string          `json:"finding"` // what was found, in a sentence
-	Noise        event.NoiseKind `json:"noise"`
-	Saving       float64         `json:"saving"`                // the finding's estimated saving, an upper bound
-	Likely       float64         `json:"likely"`                // a likelier saving for this fix; 0 if not estimated
-	LikelyNote   string          `json:"likely_note,omitempty"` // how Likely was estimated
-	Examples     []string        `json:"examples"`              // the shapes or tools that cost most
-	Primary      Fix             `json:"primary"`
-	Alternatives []Fix           `json:"alternatives"`
+	Pattern    string          `json:"pattern"` // e.g. "P04"
+	Title      string          `json:"title"`   // the action, e.g. "Read only the lines you need"
+	Finding    string          `json:"finding"` // what was found, in a sentence
+	Noise      event.NoiseKind `json:"noise"`
+	Saving     float64         `json:"saving"`                // the finding's estimated saving, an upper bound
+	Likely     float64         `json:"likely"`                // a likelier saving for this fix; 0 if not estimated
+	LikelyNote string          `json:"likely_note,omitempty"` // how Likely was estimated
+	// LikelyLow and LikelyHigh bound Likely when it rests on a measured
+	// quantity that varies (the size after a compaction); 0 if not given.
+	LikelyLow    float64  `json:"likely_low,omitempty"`
+	LikelyHigh   float64  `json:"likely_high,omitempty"`
+	Examples     []string `json:"examples"` // the shapes or tools that cost most
+	Primary      Fix      `json:"primary"`
+	Alternatives []Fix    `json:"alternatives"`
 
 	// Check says how to tell whether the fix worked or did harm, where that
 	// needs more than another run (for example, a fix untested for quality).

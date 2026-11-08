@@ -71,7 +71,8 @@ func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, afte
 			g.Uncompacted, thousandsInt(g.Limit)),
 		Saving: upTo,
 		Likely: likely,
-		LikelyNote: fmt.Sprintf("Replays each session as if compacted to %s tokens whenever it passed %s, "+
+		LikelyNote: fmt.Sprintf("Replays each main session as if compacted to %s tokens (what the first request "+
+			"after a compaction typically sends) whenever it passed %s, "+
 			"including the cost of each compaction, and assumes it then went on the same way. "+
 			"Re-reading files after a compaction would lower the saving.", thousandsInt(after), thousandsInt(threshold)),
 		Overlap: "Shares money with the long-pause and tool-output fixes: do not add them",
@@ -101,9 +102,9 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float
 		"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses-p.Unprompted)
 	switch {
 	case p.Unprompted == 1:
-		finding += " Another long wait was on a tool, a sub-agent or a timer, not on you; it is left out of this saving."
+		finding += " Another long wait was on a tool, a sub-agent, a timer or another agent, not on you; it is left out of this saving."
 	case p.Unprompted > 1:
-		finding += fmt.Sprintf(" Another %d long waits were on a tool, a sub-agent or a timer, not on you; "+
+		finding += fmt.Sprintf(" Another %d long waits were on a tool, a sub-agent, a timer or another agent, not on you; "+
 			"they are left out of this saving.", p.Unprompted)
 	}
 	return Recommendation{

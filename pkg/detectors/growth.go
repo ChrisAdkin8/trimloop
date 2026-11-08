@@ -29,6 +29,11 @@ type Growth struct {
 	// prompt and tool definitions again and re-attaches files, skill and tool
 	// listings. (2.3–4.8 times on the founder's logs, 2026-11-08.)
 	MedianResume int `json:"median_resume"`
+	// ResumeLow and ResumeHigh are the lower and upper quartiles of the
+	// same: how much the likely compaction saving depends on it.
+	ResumeLow  int `json:"resume_low"`
+	ResumeHigh int `json:"resume_high"`
+	Resumes    int `json:"resumes"` // compactions those were measured on
 	// Longest is the longest a compaction took. A median would mislead:
 	// Claude Code prepares some compactions in advance, which then take
 	// milliseconds, while the rest make the user wait.
@@ -125,7 +130,10 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 					before = append(before, t.Compaction.Before)
 					after = append(after, t.Compaction.After)
 				}
-				if ctx > 0 {
+				// What the next request sent, measured on main sessions (those
+				// the user can compact), and only when it is smaller than the
+				// session was before: a larger one is not a request after it.
+				if ctx > 0 && s.Kind != "subagent" && (t.Compaction.Before == 0 || ctx < t.Compaction.Before) {
 					resume = append(resume, ctx)
 				}
 				f.Longest = max(f.Longest, t.Compaction.Duration)
@@ -180,16 +188,21 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 	f.Top = all[:min(topN, len(all))]
 
 	f.MedianBefore, f.MedianAfter, f.MedianResume = median(before), median(after), median(resume)
+	f.ResumeLow, f.ResumeHigh, f.Resumes = quantile(resume, 0.25), quantile(resume, 0.75), len(resume)
 	return f
 }
 
 // median returns the middle value of xs (the upper middle for an even
 // count), or 0 if xs is empty. It sorts a copy.
-func median(xs []int) int {
+func median(xs []int) int { return quantile(xs, 0.5) }
+
+// quantile returns the value at fraction q of the sorted xs (q 0.5 is the
+// median as above), or 0 for none.
+func quantile(xs []int, q float64) int {
 	if len(xs) == 0 {
 		return 0
 	}
 	s := append([]int(nil), xs...)
 	sort.Ints(s)
-	return s[len(s)/2]
+	return s[min(len(s)-1, int(q*float64(len(s))))]
 }

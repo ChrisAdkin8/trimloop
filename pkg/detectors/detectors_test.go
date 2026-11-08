@@ -92,6 +92,11 @@ func TestFindLongPauses(t *testing.T) {
 	if f.Pauses != 4 || f.Unprompted != 1 || !near(f.UnpromptedCost, 4) || !near(f.Cost, 13.1) || !near(f.Saving, 9.1) {
 		t.Errorf("with a wait on a tool: got %+v", f)
 	}
+	// A pause in a sub-agent is not a break the user could restart from.
+	sessions[1].Kind = "subagent"
+	if f = FindLongPauses(sessions, time.Hour, 1); f.Unprompted != 2 || !near(f.Saving, 2.1) {
+		t.Errorf("with a sub-agent pause: got %+v", f)
+	}
 }
 
 func TestTotalCost(t *testing.T) {

@@ -258,3 +258,21 @@ func TestLikelyCompactionPricesHistoryNotNewTokens(t *testing.T) {
 		t.Errorf("P19 saving: got %v, want %v", f.Saving, want)
 	}
 }
+
+// After a pause the cache is rebuilt: the fixed start is still read, but the
+// history after it is written, so removing history saves the write price.
+func TestHistoryRateAfterARebuild(t *testing.T) {
+	rebuilt := event.Turn{Usage: event.Usage{CacheRead: 27_000, CacheWrite1h: 300_000},
+		Cost: event.Cost{CacheRead: 0.027, CacheWrite1h: 3}, Priced: true}
+	if got := historyRate(rebuilt); !near(got, 10e-6) {
+		t.Errorf("history: got %v per token, want the write price", got)
+	}
+	if got := prefixRate(rebuilt); !near(got, 1e-6) {
+		t.Errorf("prefix: got %v per token, want the read price", got)
+	}
+	warm := event.Turn{Usage: event.Usage{CacheRead: 300_000, CacheWrite1h: 2_000},
+		Cost: event.Cost{CacheRead: 0.3, CacheWrite1h: 0.02}, Priced: true}
+	if got := historyRate(warm); !near(got, 1e-6) {
+		t.Errorf("warm cache: got %v per token, want the read price", got)
+	}
+}

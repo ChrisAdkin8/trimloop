@@ -123,7 +123,8 @@ skill, plugin and MCP server names and command types stay
 ([ADR 0032](docs/adr/0032-readable-reports.md)).
 
 Each run also keeps week-by-week figures (numbers only) in
-`~/.trimloop/history.json`, so you can compare before and after a change
+`~/.trimloop/history.json` (with `CLAUDE_CONFIG_DIR` set to another folder,
+in `~/.trimloop/history-<id>.json`, one per folder), so you can compare before and after a change
 even once Claude Code has deleted the old logs. `--history FILE` moves the
 file; `--no-history` neither reads nor writes it
 ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
@@ -151,7 +152,7 @@ Everything stays on your machine, readable by you only (mode 0600):
 | File | What it holds |
 |---|---|
 | The report you ask for (`--out`, or `trimloop-report.html`) | Figures, project names and session titles |
-| `~/.trimloop/history.json` | Weekly figures only: no names, titles or paths |
+| `~/.trimloop/history.json` (or `history-<id>.json` per `CLAUDE_CONFIG_DIR` folder) | Weekly figures only: no names, titles or paths |
 | `~/.trimloop/live/<session>.json` | Which nudges a session has been shown |
 | `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
 

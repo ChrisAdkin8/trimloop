@@ -83,12 +83,12 @@ func FindStandingContext(sessions []event.Session) StandingContext {
 			if t.CompactedBefore {
 				inContext = nil
 			}
-			history, arrival := historyRate(t), arrivalRate(t)
+			history, prefix, arrival := historyRate(t), prefixRate(t), arrivalRate(t)
 
 			// The fixed start: re-sent on every turn, from the cache after the first.
 			if st := t.Standing; st.Bytes() > 0 {
 				f.Covered++
-				rate := history
+				rate := prefix
 				if i == 0 || !sameStanding(s.Turns[i-1].Standing, st) {
 					rate = arrival // new, or changed: written again
 				}

@@ -482,7 +482,9 @@ func TestBuildSessionPrompted(t *testing.T) {
 		result("b1", "")+ // a tool ran: not the user
 		asst("m3", bash2)+
 		result("b2", `,"permissionDecision":{"decision":"accept","source":"user_temporary"}`)+ // the user allowed it
-		asst("m4", "")+
+		asst("m4", `{"type":"tool_use","id":"b3","name":"Bash","input":{"command":"rm x"}}`)+
+		`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b3","is_error":true,"content":"The user doesn't want to proceed with this tool use."}]}}`+"\n"+ // the user refused
+		asst("m4b", "")+
 		`{"type":"user","origin":{"kind":"peer"},"message":{"role":"user","content":"from another agent"}}`+"\n"+
 		asst("m5", "")+
 		`{"type":"user","isCompactSummary":true,"message":{"role":"user","content":"summary"}}`+"\n"+
@@ -491,7 +493,7 @@ func TestBuildSessionPrompted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []bool{true, true, false, true, false, false}
+	want := []bool{true, true, false, true, true, false, false}
 	for i, w := range want {
 		if i >= len(s.Turns) || s.Turns[i].Prompted != w {
 			t.Fatalf("turns: got %+v, want prompted %v", s.Turns, want)
@@ -509,6 +511,9 @@ func TestDefaultHistory(t *testing.T) {
 	if got := defaultHistory("/h", ""); got != "/h/.trimloop/history.json" {
 		t.Errorf("default logs: got %q", got)
 	}
+	if got := defaultHistory("/h", "/h/.claude/"); got != "/h/.trimloop/history.json" {
+		t.Errorf("the default folder named explicitly: got %q", got)
+	}
 	a, b := defaultHistory("/h", "/x/one"), defaultHistory("/h", "/x/two")
 	if a == b || !strings.HasPrefix(a, "/h/.trimloop/history-") || a != defaultHistory("/h", "/x/one/") {
 		t.Errorf("other folders: got %q and %q", a, b)
@@ -522,5 +527,23 @@ func TestPartialWeek(t *testing.T) {
 	wed := time.Date(2026, 9, 23, 12, 0, 0, 0, time.Local)
 	if got := partialWeek(wed); got != "2026-09-21" {
 		t.Errorf("got %q, want the Monday of that week", got)
+	}
+}
+
+// The reply that triggered a compaction can be logged after the compaction
+// with an earlier time: it belongs before it, and the next reply is the
+// first after the compaction.
+func TestBuildSessionReplyLoggedAfterItsCompaction(t *testing.T) {
+	l := writeLog(t, "s.jsonl", ""+
+		`{"type":"assistant","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","usage":{"cache_read_input_tokens":900000}}}`+"\n"+
+		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-11-01T09:05:00Z","compactMetadata":{"preTokens":960000,"postTokens":30000}}`+"\n"+
+		`{"type":"assistant","timestamp":"2026-11-01T09:04:57Z","message":{"id":"m2","usage":{"cache_read_input_tokens":960000}}}`+"\n"+
+		`{"type":"assistant","timestamp":"2026-11-01T09:06:00Z","message":{"id":"m3","usage":{"cache_read_input_tokens":80000}}}`+"\n")
+	s, _, err := readSession(cc, l, map[string]bool{})
+	if err != nil || len(s.Turns) != 3 {
+		t.Fatalf("got %+v, %v", s.Turns, err)
+	}
+	if s.Turns[1].CompactedBefore || !s.Turns[2].CompactedBefore || s.Turns[2].Compaction.After != 30000 {
+		t.Errorf("got compacted-before %v, %v; want only the third turn", s.Turns[1].CompactedBefore, s.Turns[2].CompactedBefore)
 	}
 }

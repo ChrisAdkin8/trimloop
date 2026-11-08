@@ -90,7 +90,8 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 	if rec != nil {
 		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(*rec, all))
 		fmt.Fprintln(w, "  This overlaps P19's saving but can be larger: compacting shrinks a session")
-		fmt.Fprintln(w, "  to a short summary, well under the limit P19 measures against.")
+		fmt.Fprintln(w, "  well under the limit P19 measures against, to a summary plus the system prompt")
+		fmt.Fprintln(w, "  and the files Claude Code attaches again.")
 		printFixes(w, *rec)
 	}
 }

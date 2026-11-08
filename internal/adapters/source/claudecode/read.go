@@ -216,6 +216,9 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		if d := rec.PermissionDecision; d != nil && strings.HasPrefix(d.Source, "user") {
 			m.UserDecided = true // the user allowed or refused the call
 		}
+		for _, r := range results {
+			m.UserDecided = m.UserDecided || r.Refused
+		}
 		return m, true, nil
 
 	case rec.Type == "ai-title" && rec.AITitle != "":
@@ -315,6 +318,10 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 // toolResult measures one tool_result block: the size of the text the model
 // received, and whether it was an error or a preview of saved output. Images
 // are not counted.
+// refusedTag starts the result Claude Code sends when the user refuses a
+// tool call; such a result carries no permissionDecision.
+const refusedTag = "The user doesn't want to proceed"
+
 func toolResult(b block) source.Result {
 	r := source.Result{CallID: b.ToolUseID}
 	r.Error = b.IsError
@@ -322,6 +329,7 @@ func toolResult(b block) source.Result {
 	if json.Unmarshal(b.Content, &text) == nil {
 		r.Bytes = len(text)
 		r.Persisted = strings.HasPrefix(text, persistedTag)
+		r.Refused = strings.HasPrefix(text, refusedTag)
 		return r
 	}
 	var parts []struct {
@@ -334,6 +342,7 @@ func toolResult(b block) source.Result {
 				r.Bytes += len(p.Text)
 				if i == 0 {
 					r.Persisted = strings.HasPrefix(p.Text, persistedTag)
+					r.Refused = strings.HasPrefix(p.Text, refusedTag)
 				}
 			}
 		}
@@ -463,7 +472,11 @@ func memoryName(f memFile) string {
 // instead, so the reply is not priced as free.
 func replyUsage(top anthropic.Usage, steps []anthropic.Usage) event.Usage {
 	u := anthropic.NormalizeUsage(top)
-	if u.InputTotal() > 0 || u.Output > 0 || len(steps) == 0 {
+	// The top-level counts can be zero with only a stray cache-write split
+	// left (a reply that triggered a compaction, logged after it): the steps
+	// then hold the real figures.
+	empty := top.InputTokens+top.CacheReadInputTokens+top.CacheCreationInputTokens+top.OutputTokens == 0
+	if !empty || len(steps) == 0 {
 		return u
 	}
 	var sum event.Usage

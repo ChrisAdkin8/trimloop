@@ -190,6 +190,7 @@ exact change is rendered on a developer machine (design §6.2).
 ### Week (history file)
 
 Figures per calendar week, kept between runs in `~/.trimloop/history.json`
+(one `history-<id>.json` per other `CLAUDE_CONFIG_DIR` folder)
 so a fix can be compared before and after once the harness has deleted the
 logs ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)).
 Numbers only: no names, titles, paths or session ids.
@@ -200,7 +201,7 @@ Numbers only: no names, titles, paths or session ids.
 | `spend` / `turns` | number / int | |
 | `large_context` | number | Input cost of turns over the P19 threshold |
 | `sub_agents` | number | Spend in sub-agents |
-| `pause_rewrite` | number | Cache re-writes after long breaks the user took (P09; analysis version 3) |
+| `pause_rewrite` | number | Cache re-writes after long breaks the user took (P09; analysis version 3; a stored week from an earlier version counted every long wait, and reports mark it as older) |
 | `tool_output` | number | Carried cost of tool output added that week (P04) |
 | `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
 | `compactions` | int | |

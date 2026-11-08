@@ -339,3 +339,20 @@ func TestReconcileSectionGivesReasons(t *testing.T) {
 		t.Errorf("got %q", out)
 	}
 }
+
+func TestOlderFigures(t *testing.T) {
+	now := detectors.AnalysisVersion
+	for _, tc := range []struct {
+		w    detectors.Week
+		want bool
+	}{
+		{detectors.Week{Analysis: now, Prices: "p"}, false},
+		{detectors.Week{Analysis: now}, false},           // no prices recorded: not a difference
+		{detectors.Week{Analysis: 0, Prices: "p"}, true}, // stored before versions were recorded
+		{detectors.Week{Analysis: now, Prices: "old"}, true},
+	} {
+		if got := olderFigures(tc.w, "p"); got != tc.want {
+			t.Errorf("%+v: got %v, want %v", tc.w, got, tc.want)
+		}
+	}
+}

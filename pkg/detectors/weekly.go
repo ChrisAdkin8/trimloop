@@ -57,7 +57,7 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 		k := WeekOf(t.In(loc))
 		w, ok := weeks[k]
 		if !ok {
-			w = &Week{Week: k}
+			w = &Week{Week: k, Analysis: AnalysisVersion}
 			weeks[k] = w
 		}
 		return w
@@ -76,12 +76,15 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 			if s.Kind == "subagent" {
 				w.SubAgents += t.Cost.Total()
 			}
-			if !t.First && t.Prompted && t.IdleBefore > pauseGap && t.Priced {
+			if userBreak(s, t, pauseGap) {
 				w.PauseRewrite += t.Cost.CacheWrites()
 			}
 			if t.CompactedBefore {
 				w.Compactions++
 			}
+		}
+		if s.Trailing != nil && len(s.Turns) > 0 && !s.Turns[len(s.Turns)-1].Time.IsZero() {
+			get(s.Turns[len(s.Turns)-1].Time).Compactions++ // after the last reply, in its week
 		}
 		for _, cc := range carry(s) {
 			if cc.at.IsZero() {

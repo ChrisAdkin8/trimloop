@@ -195,18 +195,18 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table>
-    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">Compactions</th><th class="barcell"></th></tr></thead>
+    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="barcell"></th></tr></thead>
     <tbody>
     {{range .Weeks}}<tr>
       <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{if $.Older .}} <span class="muted small">(older prices or method)</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
       <td class="n">{{dollars .Spend}}</td><td class="n">{{thousands .Turns}}</td>
       <td class="n">{{pct .LargeContext .Spend}}</td><td class="n">{{pct .SubAgents .Spend}}</td>
-      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{.Compactions}}</td>
+      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td>
       <td class="barcell"><div class="bar" style="width: {{width .Spend $.MaxWeek}}%"></div></td>
     </tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
+  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
 </div>
 </details>
 </section>
@@ -236,7 +236,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
   {{with .Pause}}
   <h3>Long breaks</h3>
-  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) followed no message from you: Claude was waiting on a tool, a sub-agent or a timer. The other {{dollars .Saving}} followed breaks you took.{{end}}</p>
+  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) were not breaks you could restart from: Claude was waiting on a tool, a sub-agent, a timer or another agent. The other {{dollars .Saving}} followed breaks you took.{{end}}</p>
   {{end}}
 </div>
 </details>
@@ -370,7 +370,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <div class="panel card">
   <h3>{{$a.Title}}</h3>
   {{if $a.Finding}}<p>{{$a.Finding}}</p>{{end}}
-  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span> <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join $a.Examples ", "}}</span>{{end}}{{end}}</p>
+  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join $a.Examples ", "}}</span>{{end}}{{end}}</p>
   <div class="fix">
     <p><b>{{$a.Primary.What}}</b></p>
     <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>

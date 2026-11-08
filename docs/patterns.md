@@ -344,10 +344,13 @@ activity in the session's log. Saving: the cache-write cost of those turns,
 an upper bound (a compacted or new session still writes its smaller
 context). A main session also goes idle while a subagent runs; such gaps are
 not breaks, and the advice must allow for them
-([ADR 0027](adr/0027-measured-m0-findings.md)): the report counts the waits
-no message from the user ended (a tool, a sub-agent, a timer or a background
-task), and the "start fresh" saving leaves them out
-([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)).
+([ADR 0027](adr/0027-measured-m0-findings.md)). A break the user took is a
+pause in a main session that the user ended: by typing, answering Claude's
+question, or allowing or refusing a tool call. The report counts the other
+waits (on a tool, a sub-agent, a timer or another agent, or inside a
+sub-agent), and the "start fresh" saving leaves them out
+([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md), [ADR 0038](adr/0038-real-size-after-compaction.md),
+[ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)).
 
 **Fix:** L1 — report the cost of cold resumes and recommend continuing within
 the cache lifetime or starting fresh. (No automatic fix: rewriting a resumed
@@ -358,8 +361,9 @@ from pricing each post-pause turn as a new session's first request
 ([ADR 0032](adr/0032-readable-reports.md)). Live nudges show the cache
 countdown and, once it has expired, the cost of the next message; over
 500k tokens the first message back is held once
-([ADR 0034](adr/0034-live-nudges.md)); after a `/compact` they use the
-compacted size and hold nothing (ADR 0037).
+([ADR 0034](adr/0034-live-nudges.md)); after a `/compact` the status line
+says "compacted", shows a size again after the next reply, and holds
+nothing (ADR 0037, ADR 0038).
 
 ## P10 — Compaction thrash
 
@@ -583,8 +587,11 @@ the cache was rebuilt ([ADR 0035](adr/0035-measurement-corrections.md)). An
 upper bound for keeping every turn under the threshold: some context is
 needed. Overlaps P09; the two are never added. The compaction card's
 figures differ because they measure another change: compacting down to
-the typical post-compaction size (about 30 k) whenever a session passes the
-threshold, which removes more than the part above it.
+the typical size of the first request after a compaction (about 92k on the
+founder's logs: the summary, the system prompt and re-attached files)
+whenever a session passes the threshold, which removes more than the part
+above it. Removed history is priced as a cache read, or as a write on a turn
+where the cache was rebuilt ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)).
 
 **Fix:** L1 — compact when a session passes the threshold or between tasks
 (Claude Code: `/compact`; it compacts on its own only near the context

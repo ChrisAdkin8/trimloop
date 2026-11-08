@@ -71,9 +71,9 @@ func WriteText(out io.Writer, r Results) error {
 	fmt.Fprintf(w, "  %d %s breaks you took, in %s; starting fresh could have saved up to %s.\n",
 		pause.Pauses-pause.Unprompted, agree(pause.Pauses-pause.Unprompted, "was a", "were"), count(pause.Sessions, "session"), dollars(pause.Saving))
 	if pause.Unprompted > 0 {
-		fmt.Fprintf(w, "  The other %d (%s) followed no message from you: Claude was waiting on a tool,\n",
+		fmt.Fprintf(w, "  The other %d (%s) were not breaks you could restart from: Claude was waiting\n",
 			pause.Unprompted, dollars(pause.UnpromptedCost))
-		fmt.Fprintln(w, "  a sub-agent or a timer.")
+		fmt.Fprintln(w, "  on a tool, a sub-agent, a timer or another agent.")
 	}
 	fmt.Fprintln(w, "  Action: before a long break, compact while the cache is warm; after one, start a new session.")
 	sessionTable(w, pause.Top, "pauses", "context at resume")

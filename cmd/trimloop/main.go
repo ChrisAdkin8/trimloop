@@ -102,7 +102,7 @@ func analyse() {
 	format := flag.String("format", "summary", "report format: summary (a few lines), text (the full report), html or json")
 	out := flag.String("out", "", "write the report to this file (default: standard output, or "+defaultHTML+" for html)")
 	noTitles := flag.Bool("no-titles", false, "leave out session titles, which summarise what was asked")
-	historyPath := flag.String("history", "", "file that keeps weekly figures between runs (default ~/.trimloop/history.json)")
+	historyPath := flag.String("history", "", "file that keeps weekly figures between runs (default ~/.trimloop/history.json; with CLAUDE_CONFIG_DIR, one file per folder)")
 	noHistory := flag.Bool("no-history", false, "do not read or update the history file")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [analyse] [--format summary|text|html|json] [--out FILE] [--no-titles] [--history FILE | --no-history]\n"+
@@ -193,11 +193,11 @@ func analyse() {
 // replace each other's weeks. The folder is named by a hash of its path.
 func defaultHistory(home, configDir string) string {
 	dir := filepath.Join(home, ".trimloop")
-	if configDir == "" {
-		return filepath.Join(dir, "history.json")
-	}
-	if abs, err := filepath.Abs(configDir); err == nil {
+	if abs, err := filepath.Abs(configDir); configDir != "" && err == nil {
 		configDir = abs
+	}
+	if configDir == "" || filepath.Clean(configDir) == filepath.Join(home, ".claude") {
+		return filepath.Join(dir, "history.json") // the default logs, however named
 	}
 	sum := sha256.Sum256([]byte(filepath.Clean(configDir)))
 	return filepath.Join(dir, fmt.Sprintf("history-%x.json", sum[:4]))
@@ -352,6 +352,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	compacted := false            // a compaction since the last new turn
 	prompted := false             // a message from the user since the last new turn
 	var compaction event.Compaction
+	var compactedAt time.Time                // when that compaction was logged as happening
 	customTitle := false                     // the user named the session: generated titles no longer replace it
 	var injected []event.Injected            // added since the last new turn
 	var standing *event.Standing             // the latest system prompt and tool list
@@ -375,7 +376,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			if copiedLine(m, seen) {
 				continue
 			}
-			compacted, compaction = true, m.Compaction
+			compacted, compaction, compactedAt = true, m.Compaction, m.Time
 			continue
 		case source.KindInjected:
 			if copiedLine(m, seen) {
@@ -433,6 +434,9 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			if m.ID != "" {
 				seen[m.ID] = true
 			}
+			// The reply that triggered a compaction can be logged after it,
+			// with an earlier time: it still belongs before the compaction.
+			before := compacted && !compactedAt.IsZero() && !m.Time.IsZero() && m.Time.Before(compactedAt)
 			t := event.Turn{
 				ID:              m.ID,
 				Seq:             len(s.Turns),
@@ -444,13 +448,13 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				USOnly:          m.USOnly,
 				Project:         m.Project,
 				Attribution:     m.Attribution,
-				CompactedBefore: compacted,
+				CompactedBefore: compacted && !before,
 				Prompted:        prompted,
 				Injected:        injected,
 				Standing:        standing,
 			}
 			injected, prompted = nil, false
-			if compacted {
+			if compacted && !before {
 				t.Compaction = compaction
 			}
 			if s.Project == "" {
@@ -464,7 +468,9 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			t.Cost, t.Priced = price.Cost(m.Model, m.Usage, price.Options{Fast: m.Fast, USOnly: m.USOnly})
 			s.Turns = append(s.Turns, t)
-			compacted, compaction = false, event.Compaction{}
+			if !before {
+				compacted, compaction = false, event.Compaction{}
+			}
 			i, here = len(s.Turns)-1, true
 			if m.ID != "" {
 				turnOf[m.ID] = i

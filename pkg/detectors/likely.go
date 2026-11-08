@@ -92,7 +92,7 @@ func LikelyPauseSaving(sessions []event.Session, minGap time.Duration, fresh int
 		for _, t := range s.Turns {
 			writes := t.Cost.CacheWrites()
 			ctx := t.Context()
-			if t.First || !t.Prompted || t.IdleBefore <= minGap || writes == 0 || !t.Priced || ctx <= fresh {
+			if !userBreak(s, t, minGap) || writes == 0 || ctx <= fresh {
 				continue
 			}
 			saving += writes * float64(ctx-fresh) / float64(ctx)

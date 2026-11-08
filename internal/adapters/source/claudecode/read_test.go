@@ -362,9 +362,15 @@ func TestReadTailSeesCompaction(t *testing.T) {
 	if err != nil || tl.Compaction == nil || tl.Compaction.Compaction.After != 30000 || tl.Latest.ID != "m1" {
 		t.Errorf("got %+v, %v; want m1 then a compaction to 30k", tl, err)
 	}
-	writeFile(t, p, compact+reply)
+	later := `{"type":"assistant","timestamp":"2026-11-01T09:02:00Z","message":{"id":"m2","usage":{"cache_read_input_tokens":80000}}}` + "\n"
+	writeFile(t, p, compact+later)
 	if tl, err := ReadTail(p); err != nil || tl.Compaction != nil {
 		t.Errorf("got %+v, %v; want no compaction after the reply", tl, err)
+	}
+	early := `{"type":"assistant","timestamp":"2026-11-01T09:00:30Z","message":{"id":"m0","usage":{"cache_read_input_tokens":552000}}}` + "\n"
+	writeFile(t, p, compact+early) // the triggering reply, logged after the compaction
+	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "m0" {
+		t.Errorf("got %+v, %v; want the compaction seen after m0", tl, err)
 	}
 	writeFile(t, p, compact)
 	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "" {
@@ -419,5 +425,12 @@ func TestParseLineSumsIterations(t *testing.T) {
 		`"iterations":[{"output_tokens":99}]}}}`))
 	if m.Usage.Output != 3 {
 		t.Errorf("a non-zero top level should be kept: got %+v", m.Usage)
+	}
+	// Zero counts with only a cache-write split left still mean "see the steps".
+	m, _, _ = parseLine([]byte(`{"type":"assistant","message":{"id":"m","usage":{"input_tokens":0,"output_tokens":0,` +
+		`"cache_creation_input_tokens":0,"cache_creation":{"ephemeral_1h_input_tokens":862},` +
+		`"iterations":[{"cache_read_input_tokens":965429,"output_tokens":578}]}}}`))
+	if m.Usage.CacheRead != 965429 || m.Usage.Output != 578 {
+		t.Errorf("split only: got %+v", m.Usage)
 	}
 }

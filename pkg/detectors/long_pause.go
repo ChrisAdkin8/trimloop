@@ -17,9 +17,10 @@ type LongPause struct {
 	Sessions int     `json:"sessions"` // sessions with at least one break the user took
 	Cost     float64 `json:"cost"`     // cache-write cost of those turns
 
-	// Unprompted counts the pauses after which no message from the user
-	// started the next turn: the session was waiting on a tool, a sub-agent,
-	// a timer or a background task. Starting fresh does not apply to them.
+	// Unprompted counts the pauses that were not breaks in a session the
+	// user could restart: no message from the user ended them (the session
+	// was waiting on a tool, a sub-agent, a timer or another agent), or they
+	// were in a sub-agent. Starting fresh does not apply to them.
 	// UnpromptedCost is their share of Cost.
 	Unprompted     int     `json:"unprompted"`
 	UnpromptedCost float64 `json:"unprompted_cost"`
@@ -48,7 +49,7 @@ func FindLongPauses(sessions []event.Session, minGap time.Duration, topN int) Lo
 			}
 			f.Pauses++
 			f.Cost += writes
-			if !t.Prompted {
+			if !userBreak(s, t, minGap) {
 				f.Unprompted++
 				f.UnpromptedCost += writes
 				continue
@@ -65,4 +66,11 @@ func FindLongPauses(sessions []event.Session, minGap time.Duration, topN int) Lo
 	f.Sessions = len(stats)
 	f.Top = top(stats, topN)
 	return f
+}
+
+// userBreak reports whether turn t of session s came after a break the user
+// took and could have started fresh from: a long pause in a main session
+// that a message from the user ended, with a priced turn.
+func userBreak(s event.Session, t event.Turn, minGap time.Duration) bool {
+	return s.Kind != "subagent" && !t.First && t.Prompted && t.IdleBefore > minGap && t.Priced
 }

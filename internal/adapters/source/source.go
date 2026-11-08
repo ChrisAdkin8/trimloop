@@ -124,7 +124,8 @@ const (
 
 // Result is one tool result, linked to its call by CallID.
 type Result struct {
-	CallID string
+	CallID  string
+	Refused bool // the user refused the call when asked
 	event.ToolResult
 }
 

@@ -52,7 +52,7 @@ var injectedNames = map[string]string{
 	"invoked_skills":          "Skills that were used",
 	"mcp_instructions_delta":  "MCP server instructions",
 	"total_tokens_reminder":   "Token-count reminders",
-	"queued_command":          "Messages you typed while Claude worked",
+	"queued_command":          "Background-task notices and messages from other agents",
 	"deferred_tools_delta":    "Notes on tools loaded when needed",
 	"agent_listing_delta":     "List of available sub-agents",
 	"environment":             "Environment details (folder, date, system)",

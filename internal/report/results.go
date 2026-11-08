@@ -4,6 +4,7 @@
 package report
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -154,6 +155,16 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	}
 	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after, summary)
 	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, upTo, likely, after, s.MinFixSaving); ok {
+		// The likely saving rests on the size after a compaction, measured
+		// on few compactions: show what its quartiles give.
+		if lo, hi := r.Growth.ResumeLow, r.Growth.ResumeHigh; lo > 0 && hi > lo {
+			high, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, lo, min(summary, lo))
+			low, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, hi, min(summary, hi))
+			f.LikelyLow, f.LikelyHigh = min(low, likely), max(high, likely)
+			f.LikelyNote += fmt.Sprintf(" The size after a compaction varies: at %s to %s tokens (the middle half "+
+				"of %d compactions measured) the likely saving is %s to %s.",
+				approx(lo), approx(hi), r.Growth.Resumes, money(f.LikelyLow), money(f.LikelyHigh))
+		}
 		r.CompactFix = &f
 	}
 	fresh := detectors.TypicalStart(sessions)

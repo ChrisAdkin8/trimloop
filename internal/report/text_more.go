@@ -71,7 +71,7 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 		return
 	}
 	fmt.Fprintln(w, "\nWEEK BY WEEK")
-	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s\n", "week of", "spend", "turns", "large ctx", "sub-agents", "tool out", "re-reads")
+	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s %9s %7s\n", "week of", "spend", "turns", "large ctx", "sub-agents", "tool out", "re-reads", "breaks", "compact")
 	for _, k := range weeks {
 		kept := ""
 		if k.Kept {
@@ -80,14 +80,15 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 		if olderFigures(k, prices) {
 			kept += "  (older prices or method)"
 		}
-		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%%%s\n", k.Week, money(k.Spend), thousands(k.Turns),
+		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%% %9s %7d%s\n", k.Week, money(k.Spend), thousands(k.Turns),
 			pct(k.LargeContext, k.Spend), pct(k.SubAgents, k.Spend), money(k.ToolOutput),
-			pct(float64(k.Rereads), float64(k.FileViews)), kept)
+			pct(float64(k.Rereads), float64(k.FileViews)), money(k.PauseRewrite), k.Compactions, kept)
 	}
 }
 
 // olderFigures reports whether a week's figures were worked out with another
 // price list or an older analysis than this run's, so they may not compare.
 func olderFigures(k detectors.Week, prices string) bool {
-	return k.Prices != "" && k.Prices != prices || k.Analysis != 0 && k.Analysis < detectors.AnalysisVersion
+	// Analysis 0 is a week stored before versions were recorded: older.
+	return k.Prices != "" && prices != "" && k.Prices != prices || k.Analysis < detectors.AnalysisVersion
 }
