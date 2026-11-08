@@ -1,6 +1,6 @@
 # ADR 0032: Readable reports — session titles, likely savings, plain language
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction replay)
 - Date: 2026-11-07
 - Amends: [ADR 0004](0004-local-first-hashes-only.md) (what a local report may show), [ADR 0030](0030-how-fixes-are-chosen.md) §2 (ranking)
 

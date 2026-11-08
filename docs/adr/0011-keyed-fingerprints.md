@@ -2,7 +2,7 @@
 
 - Status: Proposed — key management amended by [ADR 0019](0019-fingerprint-key-management.md); developer identity and key storage on developer machines by [ADR 0024](0024-developer-identity-and-key-handling.md)
 - Date: 2026-11-05
-- Amends: [ADR 0004](0004-local-first-hashes-only.md) (what "hashes-only" protects)
+- Amends: [ADR 0004](0004-local-first-hashes-only.md) (what "hashes-only" protects), [ADR 0001](0001-capture-proxy-otel-transcripts.md) item 4 (connectors run in `serve` connector mode)
 
 ## Context
 

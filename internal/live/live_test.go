@@ -390,3 +390,32 @@ func TestHookStopRearmsAfterShrinking(t *testing.T) {
 		t.Errorf("got %q, want the 200k nudge again", out.String())
 	}
 }
+
+// After a /compact the nudges use the compacted size: no hold, no countdown.
+func TestNudgesAfterCompaction(t *testing.T) {
+	in := session(t, 552_000, t0)
+	var hook struct {
+		Path string `json:"transcript_path"`
+	}
+	if err := json.Unmarshal([]byte(in), &hook); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(hook.Path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fmt.Fprintf(f, `{"type":"system","subtype":"compact_boundary","timestamp":%q,"compactMetadata":{"preTokens":552000,"postTokens":30000,"trigger":"manual"}}`+"\n",
+		t0.Add(time.Minute).Format(time.RFC3339))
+	_ = f.Close()
+
+	e := env(t, t0.Add(2*time.Hour))
+	var out bytes.Buffer
+	Hook("prompt", strings.NewReader(in), &out, e)
+	if out.Len() != 0 {
+		t.Errorf("prompt after compaction: got %q, want it let through", out.String())
+	}
+	StatusLine(strings.NewReader(in), &out, e)
+	if line := out.String(); !strings.Contains(line, "30k tokens") || strings.Contains(line, "cache") {
+		t.Errorf("status line after compaction: got %q", line)
+	}
+}

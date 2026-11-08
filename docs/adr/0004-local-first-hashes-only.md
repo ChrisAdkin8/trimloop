@@ -25,7 +25,7 @@ recommendations need data from many machines.
 ## Consequences
 
 - Most detectors must work on fingerprints alone. The catalogue in
-  `patterns.md` is designed around that; P07 (bloated standing context) shows
+  `patterns.md` is designed around that; P07 (bloated standing and injected context) shows
   section sizes but can only show text locally.
 - Recommendation templates that need content (e.g. a proposed CLAUDE.md diff)
   are rendered on the developer's machine, not the collector.

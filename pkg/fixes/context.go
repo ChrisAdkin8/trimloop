@@ -69,7 +69,8 @@ var contextFixes = map[string]Recommendation{
 			"instructions to the session: %s.",
 		Primary: Fix{Source,
 			"Remove MCP servers this project doesn't use.",
-			"claude mcp remove <name>, or turn the server off for this project in /mcp."},
+			"claude mcp remove <name> for a server you added, or turn it off for this project in /mcp; " +
+				"a server named by a long id is a connector, turned off in Claude's connector settings."},
 		Alternatives: []Fix{
 			{Cap, "Limit what each MCP result can add.",
 				`Set MAX_MCP_OUTPUT_TOKENS in the "env" section of .claude/settings.json.`},

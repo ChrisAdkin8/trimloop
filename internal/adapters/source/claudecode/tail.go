@@ -25,42 +25,55 @@ var ErrNoResponse = errors.New("no reply with usage near the end of the log")
 // only the end of the file, so it is fast enough to run on every status-line
 // refresh. A last line still being written is ignored.
 func LastResponse(path string) (source.Message, error) {
-	m, _, err := LastResponses(path)
-	return m, err
+	t, err := ReadTail(path)
+	return t.Latest, err
 }
 
-// LastResponses returns the latest reply with usage and, when that reply
-// wrote nothing to the cache, the latest one before it that did (its
-// writes say which cache lifetime the session uses). writer is empty if
-// the latest reply wrote to the cache itself, or none in the tail did.
-func LastResponses(path string) (source.Message, source.Message, error) {
-	var none, latest source.Message
+// Tail is what the end of a session log says about where the session stands.
+type Tail struct {
+	Latest source.Message // the latest reply with usage
+
+	// Writer is the latest reply before Latest that wrote to the cache, when
+	// Latest wrote nothing: its writes say which cache lifetime the session
+	// uses. Empty if Latest wrote to the cache itself, or no reply in the
+	// tail did.
+	Writer source.Message
+
+	// Compaction is a compaction logged after Latest, if any: the session
+	// is now its After size, though no reply has said so yet.
+	Compaction *source.Message
+}
+
+// ReadTail reads the end of a session log, so it is fast enough to run on
+// every status-line refresh. A last line still being written is ignored.
+func ReadTail(path string) (Tail, error) {
+	var t Tail
 	found := false
 	f, err := os.Open(path)
 	if err != nil {
-		return none, none, err
+		return t, err
 	}
 	defer func() { _ = f.Close() }() // read-only: closing cannot lose data
 	info, err := f.Stat()
 	if err != nil {
-		return none, none, err
+		return t, err
 	}
 	start := max(0, info.Size()-tailBytes)
 	buf := make([]byte, info.Size()-start)
 	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
-		return none, none, err
+		return t, err
 	}
 	// Drop an unfinished last line, and a first line cut by the start.
 	if i := bytes.LastIndexByte(buf, '\n'); i >= 0 {
 		buf = buf[:i]
 	} else {
-		return none, none, ErrNoResponse
+		return t, ErrNoResponse
 	}
 	if start > 0 {
 		if i := bytes.IndexByte(buf, '\n'); i >= 0 {
 			buf = buf[i+1:]
 		} else {
-			return none, none, ErrNoResponse
+			return t, ErrNoResponse
 		}
 	}
 	for len(buf) > 0 {
@@ -71,21 +84,29 @@ func LastResponses(path string) (source.Message, source.Message, error) {
 			buf = nil
 		}
 		m, ok, err := parseLine(bytes.TrimSpace(line))
-		if err != nil || !ok || m.Kind != source.KindTurn || m.Model == Synthetic {
+		if err != nil || !ok {
+			continue
+		}
+		if m.Kind == source.KindCompaction && !found && t.Compaction == nil {
+			t.Compaction = &m
+			continue
+		}
+		if m.Kind != source.KindTurn || m.Model == Synthetic {
 			continue
 		}
 		wrote := m.Usage.CacheWrite5m+m.Usage.CacheWrite1h > 0
 		if !found {
-			latest, found = m, true
+			t.Latest, found = m, true
 			if wrote {
-				return latest, none, nil
+				return t, nil
 			}
 		} else if wrote {
-			return latest, m, nil
+			t.Writer = m
+			return t, nil
 		}
 	}
 	if !found {
-		return none, none, ErrNoResponse
+		return Tail{}, ErrNoResponse
 	}
-	return latest, none, nil
+	return t, nil
 }

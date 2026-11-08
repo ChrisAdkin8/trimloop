@@ -117,6 +117,7 @@ const (
 	KindInjected                // text the harness added to the conversation
 	KindStanding                // the system prompt and tool definitions, as recorded
 	KindCostRecord              // the harness's running record of the session's cost
+	KindPrompt                  // the user sent a message (only the fact is kept, not the text)
 )
 
 // Result is one tool result, linked to its call by CallID.

@@ -145,19 +145,20 @@ func TestLikelyCompactionSaving(t *testing.T) {
 		return event.Turn{Usage: event.Usage{CacheRead: ctx}, Cost: event.Cost{CacheRead: float64(ctx) / 1000}, Priced: true}
 	}
 	s := event.Session{Turns: []event.Turn{turn(100_000), turn(200_000), turn(300_000), turn(400_000)}}
-	// At 200k the replay compacts to 50k (150k removed, $150 saved); at 300k
-	// it is at 150k, not over (another $150); at 400k it is at 250k and
-	// compacts again (350k removed, $350).
+	// Each turn adds 100k. Before the 200k turn the replay compacts the
+	// 100k session to 50k ($50 saved); before each later turn it compacts
+	// the 150k session to 50k again, removing 150k then 250k in all ($150,
+	// $250). Each turn keeps its own new 100k.
 	got, upTo := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000)
-	if !near(got, 650) || !near(upTo, 150+250+350) {
-		t.Errorf("got %v up to %v, want 650 up to 750", got, upTo)
+	if !near(got, 450) || !near(upTo, 150+250+350) {
+		t.Errorf("got %v up to %v, want 450 up to 750", got, upTo)
 	}
 	// A real compaction resets the replay.
 	s.Turns[2].CompactedBefore = true
 	s.Turns[2].Usage.CacheRead, s.Turns[2].Cost.CacheRead = 40_000, 40
 	s.Turns[3].Usage.CacheRead, s.Turns[3].Cost.CacheRead = 60_000, 60
-	if got, _ := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000); !near(got, 150) {
-		t.Errorf("after a real compaction: got %v, want 150", got)
+	if got, _ := LikelyCompactionSaving([]event.Session{s}, 150_000, 50_000); !near(got, 50) {
+		t.Errorf("after a real compaction: got %v, want 50", got)
 	}
 	if got, _ := LikelyCompactionSaving([]event.Session{s}, 50_000, 60_000); got != 0 {
 		t.Error("compacting to more than the threshold saves nothing")
@@ -165,7 +166,8 @@ func TestLikelyCompactionSaving(t *testing.T) {
 }
 
 func TestLikelyCompactionCountsTheCompaction(t *testing.T) {
-	// One compaction, then 50 turns that each send all but 50k tokens fewer.
+	// 50 turns of 400k: one compaction before the second, then 49 turns that
+	// each send all but 50k tokens fewer.
 	big := opusTurn(400_000)
 	turns := make([]event.Turn, 50)
 	for i := range turns {
@@ -173,7 +175,7 @@ func TestLikelyCompactionCountsTheCompaction(t *testing.T) {
 	}
 	saving, upTo := LikelyCompactionSaving([]event.Session{{Turns: turns}}, 200_000, 50_000)
 	ctx := float64(big.Context())
-	gross := 50 * (ctx - 50_000) * historyRate(big) // history is priced as a cache read
+	gross := 49 * (ctx - 50_000) * historyRate(big) // history is priced as a cache read
 	if saving <= 0 || saving >= gross || math.Abs(upTo-gross) > 1e-6 {
 		t.Errorf("got %v up to %v; want between 0 and %v, up to %v (the compaction's own cost comes off)", saving, upTo, gross, gross)
 	}
@@ -185,10 +187,12 @@ func TestLikelyCompactionCountsTheCompaction(t *testing.T) {
 
 func TestLikelyPauseSaving(t *testing.T) {
 	paused := event.Turn{Usage: event.Usage{CacheWrite1h: 100_000}, Cost: event.Cost{CacheWrite1h: 10},
-		Priced: true, IdleBefore: 2 * time.Hour}
+		Priced: true, IdleBefore: 2 * time.Hour, Prompted: true}
 	short := paused
 	short.IdleBefore = time.Minute
-	s := event.Session{Turns: []event.Turn{{First: true, Priced: true}, paused, short}}
+	waited := paused // a wait on a tool: no message from the user
+	waited.Prompted = false
+	s := event.Session{Turns: []event.Turn{{First: true, Priced: true}, paused, short, waited}}
 	if got := LikelyPauseSaving([]event.Session{s}, time.Hour, 20_000); !near(got, 8) {
 		t.Errorf("got %v, want 8 (80%% of the $10 re-write)", got)
 	}
@@ -215,7 +219,9 @@ func TestLikelyCompactionPricesHistoryNotNewTokens(t *testing.T) {
 		Cost: event.Cost{CacheRead: 0.3, CacheWrite1h: 1}, Priced: true}
 	s := event.Session{Turns: []event.Turn{turn, turn}}
 	got, _ := LikelyCompactionSaving([]event.Session{s}, 350_000, 50_000)
-	if want := 2 * 350_000 / 1e6; !near(got, want) { // 350k removed each turn, at $1 per million
+	// Nothing comes before the first turn, so the replay compacts before the
+	// second: 350k removed, at $1 per million.
+	if want := 350_000 / 1e6; !near(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	f := FindContextSize([]event.Session{s}, 300_000, 1)

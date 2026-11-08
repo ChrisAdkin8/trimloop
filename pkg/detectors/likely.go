@@ -20,8 +20,10 @@ import (
 // the tokens the compaction removed fewer, priced at what history cost on
 // that turn (historyRate: a cache read, or a write when the cache was
 // rebuilt). The turn still writes its own new tokens, so those are not
-// counted as saved. Each simulated compaction costs a summary request (reading
-// at tokens, writing about after tokens) and re-caching the summary. Real
+// counted as saved. A simulated compaction happens before the turn that
+// would pass at, at the session's size after the previous turn, and costs a
+// summary request (reading that size, writing about after tokens) and
+// re-caching the summary. Real
 // compactions in the log reset the replay. It assumes the session then went
 // on the same way; re-reading files after a compaction would lower the
 // saving.
@@ -34,6 +36,7 @@ func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, up
 	}
 	for _, s := range sessions {
 		removed := 0 // tokens the simulated compactions have removed so far
+		prev := 0    // the previous turn's context, as logged
 		for _, t := range s.Turns {
 			if t.CompactedBefore {
 				removed = 0
@@ -42,10 +45,14 @@ func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, up
 			if !t.Priced || ctx == 0 {
 				continue
 			}
-			if ctx-removed > at {
-				removed += ctx - removed - after
-				likely -= compactionCost(t, at, after)
+			// Compact before this turn when it would pass the limit: the
+			// session is then its size after the previous turn, and this
+			// turn's own new tokens stay.
+			if size := prev - removed; ctx-removed > at && size > after {
+				removed += size - after
+				likely -= compactionCost(t, size, after)
 			}
+			prev = ctx
 			if cut := min(removed, ctx-after); cut > 0 {
 				rate := historyRate(t)
 				likely += float64(cut) * rate
@@ -59,8 +66,8 @@ func LikelyCompactionSaving(sessions []event.Session, at, after int) (likely, up
 // compactionCost prices one compaction at turn t's model and options: the
 // summary request reads the context and writes the summary, and the next
 // turn writes the summary to the cache.
-func compactionCost(t event.Turn, at, after int) float64 {
-	c, ok := price.Cost(t.Model, event.Usage{CacheRead: at, CacheWrite1h: after, Output: after},
+func compactionCost(t event.Turn, size, after int) float64 {
+	c, ok := price.Cost(t.Model, event.Usage{CacheRead: size, CacheWrite1h: after, Output: after},
 		price.Options{Fast: t.Fast, USOnly: t.USOnly})
 	if !ok {
 		return 0
@@ -78,7 +85,7 @@ func LikelyPauseSaving(sessions []event.Session, minGap time.Duration, fresh int
 		for _, t := range s.Turns {
 			writes := t.Cost.CacheWrites()
 			ctx := t.Context()
-			if t.First || t.IdleBefore <= minGap || writes == 0 || !t.Priced || ctx <= fresh {
+			if t.First || !t.Prompted || t.IdleBefore <= minGap || writes == 0 || !t.Priced || ctx <= fresh {
 				continue
 			}
 			saving += writes * float64(ctx-fresh) / float64(ctx)

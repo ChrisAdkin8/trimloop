@@ -59,8 +59,24 @@ func TestParseLine(t *testing.T) {
 			wantOK: true,
 		},
 		{
-			name: "user line is skipped",
-			line: `{"type":"user","message":{"role":"user","content":"hi"}}`,
+			name:   "a typed message is a prompt, without its text",
+			line:   `{"type":"user","uuid":"u1","message":{"role":"user","content":"hi"}}`,
+			want:   source.Message{Kind: source.KindPrompt, LineID: "u1"},
+			wantOK: true,
+		},
+		{
+			name:   "a typed message in blocks is a prompt",
+			line:   `{"type":"user","message":{"role":"user","content":[{"type":"text","text":"go on"}]}}`,
+			want:   source.Message{Kind: source.KindPrompt},
+			wantOK: true,
+		},
+		{
+			name: "a message the harness wrote is skipped",
+			line: `{"type":"user","isMeta":true,"message":{"role":"user","content":"Caveat: ..."}}`,
+		},
+		{
+			name: "a background-task notice is skipped",
+			line: `{"type":"user","message":{"role":"user","content":"<task-notification>done</task-notification>"}}`,
 		},
 		{
 			name: "assistant line without usage is skipped",
@@ -110,7 +126,7 @@ func TestRead(t *testing.T) {
 		got = append(got, m)
 	}
 	m1 := source.Message{ID: "m1", Usage: event.Usage{Output: 5}}
-	if want := []source.Message{m1, m1}; !reflect.DeepEqual(got, want) {
+	if want := []source.Message{{Kind: source.KindPrompt}, m1, m1}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }
@@ -306,13 +322,29 @@ func TestLastResponsesFindsLastWriter(t *testing.T) {
 	writeFile(t, p, ""+
 		`{"type":"assistant","message":{"id":"m1","usage":{"cache_creation_input_tokens":50,"cache_creation":{"ephemeral_5m_input_tokens":50}}}}`+"\n"+
 		`{"type":"assistant","message":{"id":"m2","usage":{"cache_read_input_tokens":200}}}`+"\n")
-	m, w, err := LastResponses(p)
-	if err != nil || m.ID != "m2" || w.ID != "m1" || w.Usage.CacheWrite5m != 50 {
-		t.Errorf("got %+v, %+v, %v; want m2 with writer m1", m, w, err)
+	tl, err := ReadTail(p)
+	if err != nil || tl.Latest.ID != "m2" || tl.Writer.ID != "m1" || tl.Writer.Usage.CacheWrite5m != 50 || tl.Compaction != nil {
+		t.Errorf("got %+v, %v; want m2 with writer m1", tl, err)
 	}
 	writeFile(t, p, `{"type":"assistant","message":{"id":"m3","usage":{"cache_creation_input_tokens":5}}}`+"\n")
-	if m, w, err := LastResponses(p); err != nil || m.ID != "m3" || w.ID != "" {
-		t.Errorf("got %+v, %+v, %v; want m3 with no separate writer", m, w, err)
+	if tl, err := ReadTail(p); err != nil || tl.Latest.ID != "m3" || tl.Writer.ID != "" {
+		t.Errorf("got %+v, %v; want m3 with no separate writer", tl, err)
+	}
+}
+
+// A compaction after the latest reply is reported; one before it is not.
+func TestReadTailSeesCompaction(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.jsonl")
+	reply := `{"type":"assistant","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","usage":{"cache_read_input_tokens":552000}}}` + "\n"
+	compact := `{"type":"system","subtype":"compact_boundary","timestamp":"2026-11-01T09:01:00Z","compactMetadata":{"preTokens":552000,"postTokens":30000,"trigger":"manual"}}` + "\n"
+	writeFile(t, p, reply+compact)
+	tl, err := ReadTail(p)
+	if err != nil || tl.Compaction == nil || tl.Compaction.Compaction.After != 30000 || tl.Latest.ID != "m1" {
+		t.Errorf("got %+v, %v; want m1 then a compaction to 30k", tl, err)
+	}
+	writeFile(t, p, compact+reply)
+	if tl, err := ReadTail(p); err != nil || tl.Compaction != nil {
+		t.Errorf("got %+v, %v; want no compaction after the reply", tl, err)
 	}
 }
 

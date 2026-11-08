@@ -113,6 +113,10 @@ type sessionRow struct {
 // Name returns the label for a session id, with the id as a last resort.
 func (v view) Name(id string) Label { return v.Labels[id] }
 
+// Older reports whether a week's figures came from another price list or an
+// older analysis.
+func (v view) Older(k detectors.Week) bool { return olderFigures(k, v.Prices) }
+
 // Untitled is how a session with no title is shown.
 const Untitled = "Untitled session"
 

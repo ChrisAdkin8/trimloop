@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"sort"
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -24,8 +25,9 @@ type Reconciliation struct {
 	Behind     int     `json:"behind"`
 	BehindCost float64 `json:"behind_cost"`
 
-	// Unrecorded counts main sessions with no harness record (older
-	// versions, or runs that ended early), and what the logs show for them.
+	// Unrecorded counts conversations with no harness record (older
+	// versions, runs that ended early, or sub-agents whose main session's
+	// log is gone), and what the logs show for them.
 	Unrecorded     int     `json:"unrecorded"`
 	UnrecordedCost float64 `json:"unrecorded_cost"`
 
@@ -127,6 +129,21 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 			g.Ours += o.Ours
 			g.OursUncached += o.OursUncached
 		}
+	}
+	// Sub-agents whose main session's log is gone have no record either.
+	for _, s := range sessions {
+		if s.Kind == "main" {
+			delete(ours, s.ID)
+		}
+	}
+	orphans := make([]string, 0, len(ours))
+	for id := range ours {
+		orphans = append(orphans, id)
+	}
+	sort.Strings(orphans) // a fixed order keeps the sum the same on every run
+	for _, id := range orphans {
+		f.Unrecorded++
+		f.UnrecordedCost += ours[id]
 	}
 	f.Gap = f.Harness - f.Ours
 	f.WebSearchCost = float64(f.WebSearches) * price.WebSearch

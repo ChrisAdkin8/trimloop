@@ -17,6 +17,13 @@ type LongPause struct {
 	Sessions int     `json:"sessions"` // sessions with at least one such pause
 	Cost     float64 `json:"cost"`     // cache-write cost of those turns
 
+	// Unprompted counts the pauses after which no message from the user
+	// started the next turn: the session was waiting on a tool, a sub-agent,
+	// a timer or a background task. Starting fresh does not apply to them.
+	// UnpromptedCost is their share of Cost.
+	Unprompted     int     `json:"unprompted"`
+	UnpromptedCost float64 `json:"unprompted_cost"`
+
 	// Saving is Cost: what those re-writes would have saved had the session
 	// been compacted, or a new one started, before carrying on. It is an
 	// upper bound: a compacted or new session still writes its smaller
@@ -40,6 +47,10 @@ func FindLongPauses(sessions []event.Session, minGap time.Duration, topN int) Lo
 			}
 			f.Pauses++
 			f.Cost += writes
+			if !t.Prompted {
+				f.Unprompted++
+				f.UnpromptedCost += writes
+			}
 
 			st := stat(stats, s.ID)
 			st.Turns++

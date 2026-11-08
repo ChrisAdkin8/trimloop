@@ -117,7 +117,11 @@ func Cost(model string, u event.Usage, o Options) (c event.Cost, ok bool) {
 var cheaper = map[string]string{
 	"claude-opus-5-5":  "claude-sonnet-5-5",
 	"claude-opus-5":    "claude-sonnet-5-5",
+	"claude-opus-4-8":  "claude-sonnet-5-5",
+	"claude-opus-4-7":  "claude-sonnet-5-5",
+	"claude-opus-4-6":  "claude-sonnet-5-5",
 	"claude-fable-5-1": "claude-sonnet-5-5",
+	"claude-fable-5":   "claude-sonnet-5-5",
 }
 
 // Cheaper returns the model to suggest in place of model, and false if there

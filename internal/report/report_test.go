@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 )
 
@@ -326,5 +327,15 @@ func TestCostRange(t *testing.T) {
 func TestDollarsNegative(t *testing.T) {
 	if got := dollars(-6.08); got != "-$6.08" {
 		t.Errorf("dollars(-6.08) = %q", got)
+	}
+}
+
+// When no session can be compared, the text says why.
+func TestReconcileSectionGivesReasons(t *testing.T) {
+	var b strings.Builder
+	reconcileSection(&b, detectors.Reconciliation{Unpriced: 1, Behind: 2}, 10)
+	out := b.String()
+	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") || !strings.Contains(out, "2 sessions went on") {
+		t.Errorf("got %q", out)
 	}
 }

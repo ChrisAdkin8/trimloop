@@ -573,7 +573,7 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P04 Oversized and noisy tool output | `response.tool_calls` | `content.local`, `harness.compaction` |
 | P05 Tool-call loops | `response.tool_calls` | `outcome.git` |
 | P06 Unused tool definitions | `response.tool_calls`, and `request.full_body` **or** `harness.config` | `context.repo` |
-| P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `harness.injected_context`, `content.local` |
+| P07 Bloated standing and injected context | `request.full_body` **or** `context.repo` | `harness.config`, `harness.injected_context`, `content.local` |
 | P09 Resume bloat | `usage.cache_write`, `timing.per_turn` | — |
 | P10 Compaction thrash | `harness.compaction` **or** `request.full_body` | — |
 | P12 Retry storms | `harness.retries` **or** `request.full_body` | `timing.per_turn` |

@@ -41,6 +41,11 @@ type Turn struct {
 	// last recorded; nil if the harness recorded none.
 	Standing *Standing
 
+	// Prompted is true when the user sent a message since the previous turn
+	// (rather than a tool result, a background-task notice or a message the
+	// harness wrote). Only the fact is kept, not the text.
+	Prompted bool
+
 	// CompactedBefore is true when the session was compacted just before
 	// this turn: earlier tool results are no longer in the context.
 	// Compaction describes it, as far as the harness recorded it.

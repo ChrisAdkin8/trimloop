@@ -18,6 +18,7 @@ import (
 	"github.com/ChrisAdkin8/trimloop/internal/history"
 	"github.com/ChrisAdkin8/trimloop/internal/live"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
+	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
@@ -150,6 +151,9 @@ func analyse() {
 		}
 		// Keep what was read even if the log failed partway.
 		data = append(data, d)
+		if info, err := os.Stat(l.Path); err == nil && (st.oldest.IsZero() || info.ModTime().Before(st.oldest)) {
+			st.oldest = info.ModTime()
+		}
 	}
 	st.logs = len(logs)
 	oldestFirst(data)
@@ -176,7 +180,7 @@ func analyse() {
 		if path == "" {
 			path = filepath.Join(home, ".trimloop", "history.json")
 		}
-		keepHistory(&r, path)
+		keepHistory(&r, path, st.oldest)
 	}
 	if err := write(r, *format, *out); err != nil {
 		log.Fatal(err)
@@ -186,13 +190,17 @@ func analyse() {
 // keepHistory merges this run's weekly figures into the history file at path
 // and gives the report every week kept there. A history that cannot be read
 // or written is reported and skipped: the report still runs.
-func keepHistory(r *report.Results, path string) {
+func keepHistory(r *report.Results, path string, oldest time.Time) {
 	h, err := history.Load(path)
 	if err != nil {
 		log.Printf("history not used: %v", err)
 		return
 	}
-	r.Weeks = history.Merge(&h, r.Weeks, r.Prices)
+	partial := ""
+	if !oldest.IsZero() {
+		partial = detectors.WeekOf(oldest.Local())
+	}
+	r.Weeks = history.Merge(&h, r.Weeks, r.Prices, partial)
 	if err := history.Save(path, h); err != nil {
 		log.Printf("history not saved: %v", err)
 	}
@@ -248,6 +256,7 @@ func write(r report.Results, format, path string) error {
 // stats counts what was read.
 type stats struct {
 	logs, failed, badLines int
+	oldest                 time.Time // the oldest log's last change: older logs may have been deleted
 }
 
 // logData is everything read from one log.
@@ -319,6 +328,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
 	callAt := map[string][2]int{} // tool-use id -> turn index, call index
 	compacted := false            // a compaction since the last new turn
+	prompted := false             // a message from the user since the last new turn
 	var compaction event.Compaction
 	customTitle := false                     // the user named the session: generated titles no longer replace it
 	var injected []event.Injected            // added since the last new turn
@@ -364,6 +374,11 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				runs[m.RunID] = rec // a run's records are running totals
 			}
 			continue
+		case source.KindPrompt:
+			if !copiedLine(m, seen) {
+				prompted = true
+			}
+			continue
 		case source.KindTitle:
 			if m.CustomTitle || !customTitle {
 				s.Title, customTitle = m.Title, m.CustomTitle
@@ -403,10 +418,11 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Project:         m.Project,
 				Attribution:     m.Attribution,
 				CompactedBefore: compacted,
+				Prompted:        prompted,
 				Injected:        injected,
 				Standing:        standing,
 			}
-			injected = nil
+			injected, prompted = nil, false
 			if compacted {
 				t.Compaction = compaction
 			}
@@ -443,6 +459,9 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 		}
 	}
 	s.Harness = sumRuns(runs)
+	if s.Kind == "subagent" && s.AgentType == "" {
+		s.AgentType = claudecode.AgentType(d.log.Path)
+	}
 	return s
 }
 

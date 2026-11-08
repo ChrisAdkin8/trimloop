@@ -236,9 +236,11 @@ cache_write_1h`. The cache-hit ratio used by P01 and P02 is
 Rules:
 
 - Usage is counted **once per provider response** (response or message id).
-  Harness logs that repeat it — Claude Code writes the same usage block on
-  every line of a multi-block message — are de-duplicated, across all logs a
-  run reads, not per log ([ADR 0026](adr/0026-usage-dedup-across-logs.md)).
+  Harness logs that repeat it — Claude Code writes a usage block on every
+  line of a multi-block message — are de-duplicated, across all logs a run
+  reads, not per log ([ADR 0026](adr/0026-usage-dedup-across-logs.md)).
+  Within a log, the fullest of those blocks counts: an early line can carry
+  a partial output count ([ADR 0035](adr/0035-measurement-corrections.md)).
 - For streamed responses, only the final usage is used.
 - Where the harness keeps its own cost record (`harness.cost_record`), calls
   it billed but did not log as turns — Claude Code's title generation, for

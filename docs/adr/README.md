@@ -44,6 +44,7 @@ and M4 automatic fixes).
 | [0034](0034-live-nudges.md) | Live nudges in Claude Code | Live nudges (M0) | Yes |
 | [0035](0035-measurement-corrections.md) | Measurement corrections and how actions are ranked | Measurements (M0) | Yes |
 | [0036](0036-prices-reconciliation-status.md) | Prices checked against the pricing page; reconciliation reports the gap in M0 | Measurements (M0) | Yes |
+| [0037](0037-partial-weeks-prompts-compaction-nudges.md) | Partly deleted weeks, breaks the user took, nudges after a compaction | Measurements, live nudges (M0) | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

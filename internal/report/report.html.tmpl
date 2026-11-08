@@ -198,7 +198,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
     <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">Compactions</th><th class="barcell"></th></tr></thead>
     <tbody>
     {{range .Weeks}}<tr>
-      <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
+      <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{if $.Older .}} <span class="muted small">(older prices or method)</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
       <td class="n">{{dollars .Spend}}</td><td class="n">{{thousands .Turns}}</td>
       <td class="n">{{pct .LargeContext .Spend}}</td><td class="n">{{pct .SubAgents .Spend}}</td>
       <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{.Compactions}}</td>
@@ -206,7 +206,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
     </tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "Kept": weeks from earlier runs, after Claude Code deleted their logs.</p>
+  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
 </div>
 </details>
 </section>
@@ -236,7 +236,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
   {{with .Pause}}
   <h3>Long breaks</h3>
-  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).</p>
+  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) followed no message from you: Claude was waiting on a tool, a sub-agent or a timer, so starting fresh does not apply to them.{{end}}</p>
   {{end}}
 </div>
 </details>

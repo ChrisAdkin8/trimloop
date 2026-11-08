@@ -97,7 +97,21 @@ You need only Go 1.27.3 or later. The prototype reads the Claude Code session lo
 go run ./cmd/trimloop/                          # short summary: spend, period, top three actions
 go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html
 go run ./cmd/trimloop/ --format text            # the full report as text
-go run ./cmd/trimloop/ --format json --out r.json   # every figure, for scripts
+go run ./cmd/trimloop/ --format json --out ~/trimloop.json   # every figure, for scripts
+```
+
+Reports name your sessions and projects, so keep them out of shared places:
+`.gitignore` covers `trimloop-report.html` in this folder, and `--out` can
+put a report anywhere.
+
+No Claude Code logs on this machine? Try the sample session instead.
+`CLAUDE_CONFIG_DIR` points the reader at another folder laid out like
+`~/.claude`:
+
+```bash
+mkdir -p /tmp/trimloop-demo/projects/demo
+cp testdata/sessions/tools.jsonl /tmp/trimloop-demo/projects/demo/
+CLAUDE_CONFIG_DIR=/tmp/trimloop-demo go run ./cmd/trimloop/ --no-history --format text
 ```
 
 The HTML page is one self-contained file: styles, charts and script are
@@ -173,8 +187,10 @@ problems to the maintainer privately rather than in an issue.
 
 ## Development setup
 
-The prototype needs only Go. The script below installs everything the
-planned stack needs:
+Running the prototype needs only Go. Its checks (`scripts/check.sh`) also
+need `golangci-lint` and `govulncheck`; `scripts/bootstrap.sh --skip-node
+--skip-python` is enough for them (it leaves out Node.js and Python). The script below installs
+everything the planned stack needs:
 
 Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or
 Debian/Ubuntu):

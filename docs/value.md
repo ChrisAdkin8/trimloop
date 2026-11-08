@@ -39,7 +39,7 @@ more than it needs to.
 | Rank | Lever | Patterns | Why this rank |
 |---|---|---|---|
 | 1 | **Fix broken caching** | P01 cache-prefix churn, P02 cache TTL expiry | Applies to almost every turn; moving the cache-hit rate from ~70 % to ~95 % roughly halves the cost of a turn (§3) |
-| 2 | **Trim bloated or stale context** | P04 oversized tool output, P07 bloated standing context, P08 stale context, P19 large working context | Shrinks the base that every later turn pays for; research reports 40–60 % input-token reductions (§4) |
+| 2 | **Trim bloated or stale context** | P04 oversized tool output, P07 bloated standing and injected context, P08 stale context, P19 large working context | Shrinks the base that every later turn pays for; research reports 40–60 % input-token reductions (§4) |
 | 3 | **Stop loops and wasted runs** | P05 tool-call loops, P11 post-failure burn | Rarer, but each occurrence wastes a whole run's tokens and the developer's time |
 | 4 | **Use cheaper models for easy steps** | P13 model over-provisioning | Large per-turn saving, but needs outcome data and carries the most quality risk |
 | 5 | **Reuse repeated work** | P15 duplicated exploration, P16 repeated workflow, P17 repeated instructions, P18 hot documentation | Saves developer time as well as tokens, via skills, summaries and documentation retrieval ([ADR 0007](adr/0007-recommend-skills-and-doc-retrieval.md)). Savings show up as fewer turns per task, which takes longer to measure, so it ranks last |

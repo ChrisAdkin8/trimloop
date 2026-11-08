@@ -1,0 +1,9 @@
+# Reports hold session titles and project names (ADR 0032): keep them out of git.
+trimloop-report.html
+*.report.html
+*.report.json
+/r.json
+/report.json
+
+# Local build output.
+/trimloop

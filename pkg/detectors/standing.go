@@ -152,13 +152,20 @@ type injectedCost struct {
 
 // toolDefGroup groups tool definitions: MCP tools by server, the rest as the
 // harness's built-in tools.
+// appServers are MCP servers the Claude desktop app adds itself, besides
+// those named "ccd_" or "Claude_": `claude mcp remove` cannot remove them.
+var appServers = map[string]bool{
+	"visualize": true, "terminal": true, "claude-artifacts": true, "claude-in-chrome": true,
+	"mcp-registry": true, "scheduled-tasks": true,
+}
+
 // mcpSource sorts a tool-definition group by what can be done about it.
 // Servers a plugin brings are turned off with the plugin; servers the
-// desktop app builds in (named "ccd_") have no setting to change.
+// desktop app adds have no setting this report can point to.
 func mcpSource(group string) string {
 	server, ok := strings.CutPrefix(group, "mcp__")
 	switch {
-	case !ok, strings.HasPrefix(server, "ccd_"):
+	case !ok, strings.HasPrefix(server, "ccd_"), strings.HasPrefix(server, "Claude_"), appServers[server]:
 		return SourceHarness
 	case strings.HasPrefix(server, "plugin_"):
 		return SourceSkills

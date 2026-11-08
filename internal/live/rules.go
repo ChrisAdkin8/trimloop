@@ -38,6 +38,11 @@ type Reply struct {
 	Fast    bool
 	USOnly  bool
 	Context int // tokens the request sent
+
+	// Compacted is true when the session was compacted after this reply;
+	// Context and Time are then the compaction's. The next message writes
+	// the summary to the cache whenever it is sent, so waiting costs nothing.
+	Compacted bool
 }
 
 // CacheLife is how long the reply's cache lasts: an hour if it wrote with the
@@ -108,7 +113,7 @@ func (s Settings) Status(r Reply, now time.Time, cost float64, effort string) St
 	if effort == "max" || effort == "xhigh" {
 		p.Effort = effort + " effort"
 	}
-	if r.Time.IsZero() {
+	if r.Time.IsZero() || r.Compacted {
 		return p
 	}
 	left := r.Time.Add(r.CacheLife()).Sub(now)
@@ -147,7 +152,7 @@ func (s Settings) AfterReply(r Reply, crossed map[int]bool) (string, int) {
 // break (pausedFor is the reply time a pause was already shown for). It
 // returns the reason to show, or "" to let the message through.
 func (s Settings) BeforeSend(r Reply, now time.Time, pausedFor time.Time) string {
-	if r.Time.IsZero() || r.Context <= s.VeryLarge || !pausedFor.IsZero() && pausedFor.Equal(r.Time) {
+	if r.Time.IsZero() || r.Compacted || r.Context <= s.VeryLarge || !pausedFor.IsZero() && pausedFor.Equal(r.Time) {
 		return ""
 	}
 	away := now.Sub(r.Time)

@@ -50,12 +50,21 @@ func readInput(in io.Reader) (Input, Reply, error) {
 	if err := json.NewDecoder(in).Decode(&inp); err != nil {
 		return inp, Reply{}, err
 	}
-	m, w, err := claudecode.LastResponses(inp.TranscriptPath)
+	t, err := claudecode.ReadTail(inp.TranscriptPath)
 	if err != nil {
 		return inp, Reply{}, err
 	}
-	return inp, Reply{Time: m.Time, Model: m.Model, Usage: m.Usage, Writer: w.Usage, Fast: m.Fast, USOnly: m.USOnly,
-		Context: m.Usage.InputTotal()}, nil
+	m := t.Latest
+	r := Reply{Time: m.Time, Model: m.Model, Usage: m.Usage, Writer: t.Writer.Usage, Fast: m.Fast, USOnly: m.USOnly,
+		Context: m.Usage.InputTotal()}
+	if c := t.Compaction; c != nil && c.Compaction.After > 0 {
+		// Compacted since the latest reply: the session is now the summary.
+		r.Compacted, r.Context = true, c.Compaction.After
+		if !c.Time.IsZero() {
+			r.Time = c.Time
+		}
+	}
+	return inp, r, nil
 }
 
 // ANSI colours for the status line.

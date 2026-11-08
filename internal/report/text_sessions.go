@@ -81,7 +81,9 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 	fmt.Fprintf(w, "  %d sessions passed %s tokens and were never compacted; they cost %s (%.0f%%).\n",
 		g.Uncompacted, thousands(g.Limit), dollars(g.UncompactedCost), pct(g.UncompactedCost, all))
 	if rec != nil {
-		fmt.Fprintf(w, "\n  %s (part of P19's saving): %s\n", rec.Title, savingText(*rec, all))
+		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(*rec, all))
+		fmt.Fprintln(w, "  This overlaps P19's saving but can be larger: compacting shrinks a session")
+		fmt.Fprintln(w, "  to a short summary, well under the limit P19 measures against.")
 		printFixes(w, *rec)
 	}
 }

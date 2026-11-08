@@ -30,9 +30,9 @@ neutral, so P01 and P02 describe each provider cache model.
 | P07 | Bloated standing and injected context | M0 | Go ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) | 1 |
 | P08 | Stale context | M3 | Go | 3 |
 | P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
-| P10 | Compaction thrash | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |
+| P10 | Compaction thrash | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0035](adr/0035-measurement-corrections.md)); M3 full | Go | 1 |
 | P11 | Post-failure burn | M3 | Go | 0 |
-| P12 | Retry storms | M0 ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 1 |
+| P12 | Retry storms | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md)), not built yet; M3 full | Go | 1 |
 | P13 | Model over-provisioning | M0 sub-agents, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); M4 full | Go | 3 |
 | P14 | Thinking-budget overspend | M0 reduced, M4 full ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 3 |
 | P15 | Duplicated exploration across a team | M4 | SQL | 1 |
@@ -344,7 +344,10 @@ activity in the session's log. Saving: the cache-write cost of those turns,
 an upper bound (a compacted or new session still writes its smaller
 context). A main session also goes idle while a subagent runs; such gaps are
 not breaks, and the advice must allow for them
-([ADR 0027](adr/0027-measured-m0-findings.md)).
+([ADR 0027](adr/0027-measured-m0-findings.md)): the report counts the waits
+no message from the user ended (a tool, a sub-agent, a timer or a background
+task), and the "start fresh" saving leaves them out
+([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)).
 
 **Fix:** L1 — report the cost of cold resumes and recommend continuing within
 the cache lifetime or starting fresh. (No automatic fix: rewriting a resumed
@@ -355,7 +358,8 @@ from pricing each post-pause turn as a new session's first request
 ([ADR 0032](adr/0032-readable-reports.md)). Live nudges show the cache
 countdown and, once it has expired, the cost of the next message; over
 500k tokens the first message back is held once
-([ADR 0034](adr/0034-live-nudges.md)).
+([ADR 0034](adr/0034-live-nudges.md)); after a `/compact` they use the
+compacted size and hold nothing (ADR 0037).
 
 ## P10 — Compaction thrash
 
@@ -398,8 +402,8 @@ retries, each re-sending the full request.
 seconds; or, where the harness records retries (`harness.retries`), retry
 attempts, delays and causes per turn, and time spent retrying.
 
-**Detection:** From harness retry records (M0), else from repeated request
-fingerprints.
+**Detection:** From harness retry records (M0, reduced fidelity; not built
+yet), else from repeated request fingerprints (M3).
 
 **Fix:** L1 — recommend backoff or concurrency settings; alert on rate-limit
 headroom.
@@ -433,7 +437,9 @@ agent type's outcome signals (ADR 0030). Agent types that continue the main
 conversation and read its cache (Claude Code's `fork`) get no suggestion,
 since another model would lose that cache. In the founder's sample, no Agent
 call set a model; sub-agents were 26 % of spend, and their Opus 5.5 and
-Fable turns would have cost $271 (13 % of all spend) less on Sonnet 5.5.
+Fable turns would have cost $271 (13 % of all spend) less on Sonnet 5.5
+(2026-11-08; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance)
+has the current figure).
 
 ## P14 — Thinking-budget overspend
 

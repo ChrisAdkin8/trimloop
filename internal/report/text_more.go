@@ -10,20 +10,23 @@ import (
 // reconcileSection compares the totals with Claude Code's own records.
 func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	fmt.Fprintln(w, "\nCHECKED AGAINST CLAUDE CODE'S OWN RECORDS")
-	if c.Sessions == 0 {
-		fmt.Fprintln(w, "  No session has a cost record from Claude Code to check against.")
-		return
-	}
-	fmt.Fprintf(w, "  For %d sessions with a record, Claude Code recorded %s and the logs show %s:\n",
+	compared := fmt.Sprintf("  For %d sessions with a record, Claude Code recorded %s and the logs show %s:\n",
 		c.Sessions, money(c.Harness), money(c.Ours))
-	if c.Gap >= 0 {
+	switch {
+	case c.Sessions == 0 && c.Unpriced+c.Behind == 0:
+		fmt.Fprintln(w, "  No session has a cost record from Claude Code to check against.")
+	case c.Sessions == 0:
+		fmt.Fprintln(w, "  No session could be checked; the reasons follow.")
+	case c.Gap >= 0:
+		fmt.Fprint(w, compared)
 		fmt.Fprintf(w, "  %s (%.1f%%) was spent on requests the logs do not record, such as\n", money(c.Gap), pct(c.Gap, c.Ours))
 		fmt.Fprintln(w, "  session titles, summaries after a break, compactions and web searches.")
-	} else {
+	default:
+		fmt.Fprint(w, compared)
 		fmt.Fprintf(w, "  the logs show %s more than the records; some records may predate the session's end.\n", money(-c.Gap))
 	}
 	if c.Unpriced > 0 {
-		fmt.Fprintf(w, "  %d sessions used a model with no known price and are left out.\n", c.Unpriced)
+		fmt.Fprintf(w, "  %d sessions have usage with no known price, in the logs or in the record, and are left out.\n", c.Unpriced)
 	}
 	if c.WebSearches > 0 {
 		fmt.Fprintf(w, "  %d web searches cost about %s on top of their tokens.\n", c.WebSearches, money(c.WebSearchCost))
@@ -34,6 +37,9 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	}
 	if c.Behind > 0 {
 		fmt.Fprintf(w, "  %d sessions went on after their record was written and are left out.\n", c.Behind)
+	}
+	if c.Sessions == 0 {
+		return
 	}
 	fmt.Fprintf(w, "\n    %-10s %-10s %-10s %s\n", "recorded", "in logs", "gap", "model")
 	for _, m := range c.ByModel {
@@ -58,7 +64,7 @@ func standingSection(w io.Writer, s detectors.StandingContext, all float64) {
 }
 
 // weeksSection prints the figures week by week.
-func weeksSection(w io.Writer, weeks []detectors.Week) {
+func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 	if len(weeks) == 0 {
 		return
 	}
@@ -69,8 +75,17 @@ func weeksSection(w io.Writer, weeks []detectors.Week) {
 		if k.Kept {
 			kept = "  (kept from an earlier run)"
 		}
+		if olderFigures(k, prices) {
+			kept += "  (older prices or method)"
+		}
 		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%%%s\n", k.Week, money(k.Spend), thousands(k.Turns),
 			pct(k.LargeContext, k.Spend), pct(k.SubAgents, k.Spend), money(k.ToolOutput),
 			pct(float64(k.Rereads), float64(k.FileViews)), kept)
 	}
+}
+
+// olderFigures reports whether a week's figures were worked out with another
+// price list or an older analysis than this run's, so they may not compare.
+func olderFigures(k detectors.Week, prices string) bool {
+	return k.Prices != "" && k.Prices != prices || k.Analysis != 0 && k.Analysis < detectors.AnalysisVersion
 }

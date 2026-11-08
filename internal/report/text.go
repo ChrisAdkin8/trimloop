@@ -51,7 +51,7 @@ func WriteText(out io.Writer, r Results) error {
 	}
 
 	reconcileSection(w, r.Reconciliation, all)
-	weeksSection(w, r.Weeks)
+	weeksSection(w, r.Weeks, r.Prices)
 	attributionSection(w, r.Attribution)
 
 	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
@@ -70,6 +70,11 @@ func WriteText(out io.Writer, r Results) error {
 	fmt.Fprintf(w, "  The cache had expired, so the whole context was written again: %s (%.0f%% of all spend).\n",
 		dollars(pause.Cost), pct(pause.Cost, all))
 	fmt.Fprintf(w, "  Up to %s of that could be saved.\n", dollars(pause.Saving))
+	if pause.Unprompted > 0 {
+		fmt.Fprintf(w, "  %d of these waits (%s) followed no message from you: Claude was waiting on a\n",
+			pause.Unprompted, dollars(pause.UnpromptedCost))
+		fmt.Fprintln(w, "  tool, a sub-agent or a timer, so starting fresh does not apply to them.")
+	}
 	fmt.Fprintln(w, "  Action: after a long break, compact the session or start a new one before carrying on.")
 	sessionTable(w, pause.Top, "pauses", "context at resume")
 	if r.PauseFix != nil {
@@ -167,9 +172,17 @@ func thousands2(v float64) string {
 	return fmt.Sprintf("%s.%02d", thousands(cents/100), cents%100)
 }
 
+// count writes n with its noun: "1 log", "2,000 logs".
+func count(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return thousands(n) + " " + noun + "s"
+}
+
 // readLine prints what was read: "Read 3 logs: 2 sessions, 10 turns."
 func readLine(w io.Writer, r Read) {
-	fmt.Fprintf(w, "Read %s logs: %s sessions, %s turns", thousands(r.Logs), thousands(r.Sessions), thousands(r.Turns))
+	fmt.Fprintf(w, "Read %s: %s, %s", count(r.Logs, "log"), count(r.Sessions, "session"), count(r.Turns, "turn"))
 	if r.Failed > 0 {
 		fmt.Fprintf(w, ", %d logs failed", r.Failed)
 	}

@@ -23,6 +23,7 @@ type record struct {
 	SessionID string `json:"sessionId"`
 	UUID      string `json:"uuid"` // the line's own id; copied lines keep it
 	Cwd       string `json:"cwd"`
+	IsMeta    bool   `json:"isMeta"` // user lines the harness wrote, not the user
 
 	// Assistant lines: what the harness says caused the turn.
 	AttributionSkill     string `json:"attributionSkill"`
@@ -70,7 +71,7 @@ type record struct {
 }
 
 // block is one content block: a tool call on an assistant line, a tool
-// result on a user line. Other block types are ignored.
+// result on a user line, and text. Other block types are ignored.
 type block struct {
 	Type string `json:"type"`
 
@@ -78,6 +79,9 @@ type block struct {
 	ID    string          `json:"id"`
 	Name  string          `json:"name"`
 	Input json.RawMessage `json:"input"`
+
+	// text: read only to tell a typed message from a harness notice
+	Text string `json:"text"`
 
 	// tool_result
 	ToolUseID string          `json:"tool_use_id"`
@@ -183,6 +187,9 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			}
 		}
 		if len(results) == 0 {
+			if typedPrompt(rec) {
+				return source.Message{Kind: source.KindPrompt, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID}, true, nil
+			}
 			return source.Message{}, false, nil
 		}
 		return source.Message{Kind: source.KindToolResults, SessionID: rec.SessionID, Time: ts, Results: results}, true, nil
@@ -429,4 +436,30 @@ func replyUsage(top anthropic.Usage, steps []anthropic.Usage) event.Usage {
 		sum = sum.Add(anthropic.NormalizeUsage(s))
 	}
 	return sum
+}
+
+// typedPrompt reports whether a user line with no tool results is a message
+// the user sent, rather than one the harness wrote for them: lines marked
+// isMeta, and notices that a background task finished. Only the answer is
+// kept; the text is not.
+func typedPrompt(rec record) bool {
+	if rec.IsMeta {
+		return false
+	}
+	text := ""
+	c := rec.Message.Content
+	if len(c) > 0 && c[0] == '"' {
+		if json.Unmarshal(c, &text) != nil {
+			return false
+		}
+	} else {
+		for _, b := range blocks(c) {
+			if b.Type == "text" {
+				text = b.Text
+				break
+			}
+		}
+	}
+	text = strings.TrimSpace(text)
+	return text != "" && !strings.HasPrefix(text, "<task-notification")
 }

@@ -29,6 +29,8 @@ func TestFindReconciliation(t *testing.T) {
 			Turns: []event.Turn{turn("opus", 9, at), turn("opus", 1, at.Add(time.Hour))}},
 		// A turn with no price: the logs would show it as free.
 		{ID: "d", Kind: "main", Harness: record(30, at.Add(time.Hour), 0), Turns: []event.Turn{{Model: "new-model", Time: at}}},
+		// Sub-agents whose main session's log is gone: no record.
+		{ID: "gone/x", Kind: "subagent", ParentID: "gone", Turns: []event.Turn{turn("opus", 3, at)}},
 		// The harness could not price some of its usage: its total is short.
 		{ID: "u", Kind: "main", Harness: &event.HarnessRecord{Cost: 1, At: at.Add(time.Hour), UnknownCost: true},
 			Turns: []event.Turn{turn("opus", 5, at)}},
@@ -37,7 +39,7 @@ func TestFindReconciliation(t *testing.T) {
 	if f.Sessions != 1 || f.Harness != 12 || f.Ours != 10 || f.Gap != 2 || f.Unpriced != 2 {
 		t.Errorf("compared: got %+v", f)
 	}
-	if f.Behind != 2 || f.BehindCost != 19 || f.Unrecorded != 1 || f.UnrecordedCost != 4 {
+	if f.Behind != 2 || f.BehindCost != 19 || f.Unrecorded != 2 || f.UnrecordedCost != 7 {
 		t.Errorf("left out: got behind %d ($%v), unrecorded %d ($%v)", f.Behind, f.BehindCost, f.Unrecorded, f.UnrecordedCost)
 	}
 	if f.WebSearches != 100 || !near(f.WebSearchCost, 1) {
@@ -140,6 +142,8 @@ func TestStandingSources(t *testing.T) {
 		"mcp__gh":                       SourceMCP,
 		"mcp__plugin_engineering_slack": SourceSkills,
 		"mcp__ccd_session":              SourceHarness,
+		"mcp__Claude_Browser":           SourceHarness,
+		"mcp__visualize":                SourceHarness,
 		"Built-in tool definitions":     SourceHarness,
 	} {
 		if got := mcpSource(group); got != want {

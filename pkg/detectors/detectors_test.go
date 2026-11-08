@@ -82,6 +82,10 @@ func TestFindLongPauses(t *testing.T) {
 	if len(f.Top) != 1 || f.Top[0].SessionID != "b" || f.Top[0].Peak != 9000 {
 		t.Errorf("top 1: got %+v, want b with peak 9000", f.Top)
 	}
+	// turn() makes turns no message from the user started.
+	if f.Unprompted != 3 || !near(f.UnpromptedCost, 9.1) {
+		t.Errorf("unprompted: got %d ($%v), want 3 ($9.1)", f.Unprompted, f.UnpromptedCost)
+	}
 }
 
 func TestTotalCost(t *testing.T) {

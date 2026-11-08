@@ -48,25 +48,29 @@ func Load(path string) (File, error) {
 }
 
 // Merge adds this run's weeks to the history and returns every week, oldest
-// first. A week in this run replaces the kept one unless the kept one has
-// more turns and was worked out by the same analysis and prices: the harness
-// deletes old logs, so a week at the edge of what is left is only partly in
-// the logs, but figures from an older analysis or price list are replaced
-// while the logs still hold the week. Weeks only in the history are marked Kept.
-func Merge(f *File, current []detectors.Week, prices string) []detectors.Week {
-	inLogs := map[string]bool{}
+// first. The harness deletes old logs, oldest first, so only weeks up to
+// partialUpTo (the week of the oldest log still on disk) can be partly
+// deleted. For those, the stored copy stays when it has more turns, even if
+// an older analysis or price list worked it out; every later week in the
+// logs is complete there and replaces the stored copy. partialUpTo "" means
+// no week is treated as partial. Weeks whose figures come from the history
+// file are marked Kept.
+func Merge(f *File, current []detectors.Week, prices, partialUpTo string) []detectors.Week {
+	fromLogs := map[string]bool{}
 	for _, w := range current {
-		inLogs[w.Week] = true
 		w.Prices = prices
 		w.Analysis = detectors.AnalysisVersion
 		w.Kept = false
-		if old, ok := f.Weeks[w.Week]; !ok || w.Turns >= old.Turns || old.Analysis < detectors.AnalysisVersion || old.Prices != prices {
-			f.Weeks[w.Week] = w
+		old, ok := f.Weeks[w.Week]
+		if ok && w.Week <= partialUpTo && old.Turns > w.Turns {
+			continue // partly deleted: the stored copy is fuller
 		}
+		f.Weeks[w.Week] = w
+		fromLogs[w.Week] = true
 	}
 	out := make([]detectors.Week, 0, len(f.Weeks))
 	for k, w := range f.Weeks {
-		w.Kept = !inLogs[k]
+		w.Kept = !fromLogs[k]
 		out = append(out, w)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Week < out[j].Week })
