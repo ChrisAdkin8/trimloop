@@ -68,6 +68,7 @@ type Compaction struct {
 	After    int           // context tokens after; 0 if not recorded
 	Manual   bool          // the user asked for it, rather than the harness
 	Duration time.Duration // how long it took; 0 if not recorded
+	At       time.Time     // when it was logged as happening; zero if not known
 }
 
 // Context is the number of input tokens the turn sent, cached or not.
@@ -97,9 +98,10 @@ type Session struct {
 	// conversation, so they come from content and are shown locally only.
 	Title string
 
-	// Trailing is a compaction logged after the session's last turn (the
-	// session ended, or the log was read, before another reply), or nil.
-	Trailing *Compaction
+	// Unreplied are compactions no reply of the session followed: one after
+	// its last reply (the session ended, or the log was read, before another
+	// reply), or one followed straight away by another.
+	Unreplied []Compaction
 }
 
 // Start and End are the times of the session's first and last turns, zero

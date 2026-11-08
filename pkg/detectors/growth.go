@@ -1,7 +1,6 @@
 package detectors
 
 import (
-	"math"
 	"sort"
 	"time"
 
@@ -140,8 +139,8 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 				f.Longest = max(f.Longest, t.Compaction.Duration)
 			}
 		}
-		if tc := s.Trailing; tc != nil {
-			// Compacted after the last reply: counted, with no reply to measure.
+		for _, tc := range s.Unreplied {
+			// No reply followed it: counted, with no reply to measure.
 			compacted = true
 			f.Compactions++
 			if tc.Manual {
@@ -204,14 +203,14 @@ func median(xs []int) int {
 	return s[len(s)/2]
 }
 
-// quantile returns the nearest-rank value at fraction q of xs (the smallest
-// value with at least q of them at or below it), or 0 for none.
+// quantile returns the value at position q·n of the sorted xs, the same
+// rule as median (q 0.5), so the median always lies between the quartiles;
+// 0 for none.
 func quantile(xs []int, q float64) int {
 	if len(xs) == 0 {
 		return 0
 	}
 	s := append([]int(nil), xs...)
 	sort.Ints(s)
-	i := int(math.Ceil(q*float64(len(s)))) - 1
-	return s[min(len(s)-1, max(0, i))]
+	return s[min(len(s)-1, int(q*float64(len(s))))]
 }

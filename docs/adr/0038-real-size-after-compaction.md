@@ -1,6 +1,6 @@
 # ADR 0038: The real size after a compaction, and who ended a wait
 
-- Status: Accepted — built in the M0 prototype; decisions 1 and 3–6 amended by [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0040](0040-position-pricing-and-one-method-page.md)
+- Status: Accepted — built in the M0 prototype; decisions 1 and 3–6 amended by [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md), [ADR 0040](0040-position-pricing-and-one-method-page.md) and [ADR 0041](0041-compaction-edges-and-quartile-rule.md)
 - Date: 2026-11-08
 - Amends: [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (decisions 1–4), [ADR 0035](0035-measurement-corrections.md) and [ADR 0032](0032-readable-reports.md) (the compaction replay), [ADR 0034](0034-live-nudges.md) (status line and re-arming), [ADR 0033](0033-reconciliation-history-standing-context.md) (P07 sources, history file), [data-model.md](../data-model.md) (Turn, Week), [patterns.md P09](../patterns.md#p09--resume-bloat)
 

@@ -310,7 +310,7 @@ methods changed. How each figure is worked out today is in [measurements.md](mea
 | Read only the lines you need (P03/P04) | about $76 of carried cost → card up to $48 → **$58** (rebuilt-cache turns as writes, ADR 0039) | 11-07 → 11-08 | $76 was the carried cost of file-view output the fix aims at; $48 is the card's upper bound, keeping each file-view result under the 2k-token target |
 | Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | $0.18 of it is Claude Code pricing Sonnet 5.5 cache reads at $0.20, where the pricing page says $0.10 (ADR 0036). The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
 | Re-writes after breaks: earlier quotes | about $314–340 | 11-07 | The first message back after more than an hour, sessions over 200k; the same money as the P09 row |
-| Spend in the costliest sessions | top 1: 23–24 %, top 5: 59 %, top 10: 75 % | 11-07 → 11-08 | Main session with its sub-agents |
+| Spend in the costliest sessions | top 1: 23–24 % → **22 %**, top 5: 59 % → **60 %**, top 10: 75 % → **76 %** | 11-07 → 11-08 | Main session with its sub-agents; the logs kept growing |
 | Sessions past 500k that never compacted | 6, about $292 | 11-07 → 11-08 | |
 | Costliest project | 22 % → 32 % | 11-07 | 22 % used each session's starting folder; 32 % counts each turn's own project, with worktrees under their project |
 | Lower effort (P14), at most | about $67 (3 %) | 11-07 | Output of max and xhigh turns priced at high's mean |

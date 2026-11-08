@@ -378,10 +378,16 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			if copiedLine(m, seen) {
 				continue
 			}
+			if compacted {
+				// Another compaction with no reply in between: keep the first.
+				c := compaction
+				c.At = compactedAt
+				s.Unreplied = append(s.Unreplied, c)
+			}
 			compacted, compaction, compactedAt = true, m.Compaction, m.Time
 			// What came before the marker belongs to the request before the
 			// compaction; what follows it, to the first one after.
-			preInjected, prePrompted = injected, prePrompted || prompted
+			preInjected, prePrompted = append(preInjected, injected...), prePrompted || prompted
 			injected, prompted = nil, false
 			continue
 		case source.KindInjected:
@@ -456,7 +462,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Attribution:     m.Attribution,
 				CompactedBefore: compacted && !before,
 				Prompted:        prompted || prePrompted,
-				Injected:        injected,
+				Injected:        append(preInjected, injected...),
 				Standing:        standing,
 			}
 			if before {
@@ -510,7 +516,8 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	}
 	if compacted {
 		c := compaction
-		s.Trailing = &c
+		c.At = compactedAt
+		s.Unreplied = append(s.Unreplied, c)
 	}
 	return s
 }

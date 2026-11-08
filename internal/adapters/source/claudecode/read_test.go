@@ -367,13 +367,15 @@ func TestReadTailSeesCompaction(t *testing.T) {
 	if tl, err := ReadTail(p); err != nil || tl.Compaction != nil {
 		t.Errorf("got %+v, %v; want no compaction after the reply", tl, err)
 	}
-	// As in the real logs: zero counts but a stray cache-write split, so it
-	// reads as a reply that wrote to the cache.
+	// As in the real logs: zero top-level counts, and a step that read the
+	// session and wrote a little to the cache, so it reads as a reply that
+	// wrote. A reader that stopped at such a reply would miss the compaction.
 	early := `{"type":"assistant","timestamp":"2026-11-01T09:00:30Z","message":{"id":"m0","usage":{"input_tokens":0,"output_tokens":0,` +
-		`"cache_creation_input_tokens":0,"cache_creation":{"ephemeral_1h_input_tokens":862},"iterations":[{"cache_read_input_tokens":552000}]}}}` + "\n"
+		`"cache_creation_input_tokens":0,"cache_creation":{"ephemeral_1h_input_tokens":862},"iterations":[{"cache_read_input_tokens":552000,` +
+		`"cache_creation_input_tokens":862,"cache_creation":{"ephemeral_1h_input_tokens":862}}]}}}` + "\n"
 	writeFile(t, p, compact+early) // the triggering reply, logged after the compaction
-	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "m0" {
-		t.Errorf("got %+v, %v; want the compaction seen after m0", tl, err)
+	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "m0" || tl.Latest.Usage.CacheWrite1h == 0 {
+		t.Errorf("got %+v, %v; want the compaction seen after m0, a reply that wrote", tl, err)
 	}
 	writeFile(t, p, compact)
 	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "" {

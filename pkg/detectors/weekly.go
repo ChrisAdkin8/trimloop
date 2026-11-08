@@ -86,8 +86,14 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 				w.Compactions++
 			}
 		}
-		if s.Trailing != nil && len(s.Turns) > 0 && !s.Turns[len(s.Turns)-1].Time.IsZero() {
-			get(s.Turns[len(s.Turns)-1].Time).Compactions++ // after the last reply, in its week
+		for _, c := range s.Unreplied {
+			at := c.At
+			if at.IsZero() && len(s.Turns) > 0 {
+				at = s.Turns[len(s.Turns)-1].Time // not known: the last reply's week
+			}
+			if !at.IsZero() {
+				get(at).Compactions++
+			}
 		}
 		for _, cc := range carry(s) {
 			if cc.at.IsZero() {

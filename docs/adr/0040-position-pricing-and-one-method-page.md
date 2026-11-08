@@ -1,8 +1,8 @@
 # ADR 0040: Removed history priced by position, and one page for the current method
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; decision 4 amended by [ADR 0041](0041-compaction-edges-and-quartile-rule.md)
 - Date: 2026-11-08
-- Amends: [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) (decisions 1, 2 and 5), [ADR 0034](0034-live-nudges.md) (status line after a compaction), [ADR 0038](0038-real-size-after-compaction.md) (decisions 5 and 6, through ADR 0039)
+- Amends: [ADR 0035](0035-measurement-corrections.md) decision 2 (as built), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) (decisions 1, 2 and 5), [ADR 0034](0034-live-nudges.md) (status line after a compaction), [ADR 0038](0038-real-size-after-compaction.md) (decisions 5 and 6, through ADR 0039)
 
 ## Context
 
@@ -12,7 +12,8 @@ two agree on the founder's logs to within $7. It also found:
 
 1. **ADR 0039's rule is all-or-nothing.** A turn that read a long cached
    history and wrote large new output (several big tool results) would
-   have its removed history priced as written, about 20 times too high.
+   have its removed history priced as written: 25–40 times too high on Opus
+   5.5 (write against read price), 50–80 times on Fable 5.1.
    Nothing like it is in these logs, but nothing stops it.
 2. **The status line still missed the compaction** when the reply that
    triggered it wrote a few tokens to the cache, as the real one did: the

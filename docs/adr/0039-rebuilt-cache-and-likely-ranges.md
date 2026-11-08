@@ -1,6 +1,6 @@
 # ADR 0039: Removed history on a rebuilt cache, and likely savings as a range
 
-- Status: Accepted — built in the M0 prototype; decisions 1, 2 and 5 amended by [ADR 0040](0040-position-pricing-and-one-method-page.md)
+- Status: Accepted — built in the M0 prototype; decisions 1, 2 and 5 amended by [ADR 0040](0040-position-pricing-and-one-method-page.md); decision 3 by [ADR 0041](0041-compaction-edges-and-quartile-rule.md)
 - Date: 2026-11-08
 - Amends: [ADR 0035](0035-measurement-corrections.md) decision 2 (as built), [ADR 0038](0038-real-size-after-compaction.md) (decisions 1 and 3–6), [ADR 0034](0034-live-nudges.md) (status line), [ADR 0033](0033-reconciliation-history-standing-context.md) (P07 rates), [patterns.md P09](../patterns.md#p09--resume-bloat) and [P19](../patterns.md#p19--large-working-context)
 

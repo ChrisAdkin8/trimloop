@@ -48,16 +48,15 @@ Other patterns (P03, P06, P09, P10, P12, P14) add to these but are
 expected to be smaller individually. The ranking is a starting hypothesis; M0
 will re-rank by measured waste.
 
-**First measurement (2026-11-07, figures corrected 2026-11-08; one developer):** on the founder's Claude
-Code sessions the order was different. Large working context (P19) and
-re-caching after long pauses (P09) were the largest levers: keeping turns
-under 200k could save up to about 31% of spend (measured 31%, then 19%,
-then 31% again once rebuilt-cache turns were priced as ADR 0035 says, see
-[ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)), with compacting
-earlier likely to save about $531 ($511–$640) of $2,191, and fresh starts after the breaks the
-user took up to 14% ($306; the other long waits were on tools, sub-agents,
-timers or other agents, [ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)); cache churn (P01) was about
-1.5% and P02 below zero. One heavy user of a 1M-context model is not
+**First measurement (one developer, 2026-11-06 to 11-08):** on the founder's
+Claude Code sessions the order was different. Large working context (P19)
+and re-caching after long breaks (P09) were the largest levers: keeping
+turns under 200k could save up to about 31 % of spend, compacting earlier
+somewhat less as a likely figure, and starting fresh after the breaks the
+user took up to about 14 %; cache churn (P01) was about 1.5 % and P02 below
+zero. Current figures are in
+[log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance), and how
+each is worked out in [measurements.md](measurements.md). One heavy user of a 1M-context model is not
 representative, so the table above is re-ranked only after §8 step 2. Details
 and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
 

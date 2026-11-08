@@ -580,20 +580,22 @@ Also report where spend piles up ([ADR 0031](adr/0031-m0-order-from-measured-spe
 the share in the costliest 1, 5 and 10 conversations (a main session with
 its sub-agents), the mean cost of a turn by context size (under 50 k, to
 200 k, to 500 k, over 500 k), and sessions past 500 k that never compacted.
-In the founder's sample the costliest five conversations made 59 % of
-spend, and a turn over 500 k cost $0.28 against $0.06 under 50 k.
+In the founder's sample (2026-11-07) the costliest five conversations made
+59 % of spend, and a turn over 500 k cost $0.28 against $0.06 under 50 k.
 
-**Saving:** The cost of the tokens above the threshold, priced at what
-history cost on that turn: the cache-read price, or the write price when
-the cache was rebuilt ([ADR 0035](adr/0035-measurement-corrections.md)). An
+**Saving:** The cost of the tokens above the threshold. They are the oldest
+history, so each is priced by where it sat in that turn's request: read
+from the cache, or written where the cache was rebuilt
+([ADR 0035](adr/0035-measurement-corrections.md),
+[ADR 0040](adr/0040-position-pricing-and-one-method-page.md);
+[measurements.md](measurements.md) §2). An
 upper bound for keeping every turn under the threshold: some context is
 needed. Overlaps P09; the two are never added. The compaction card's
 figures differ because they measure another change: compacting down to
 the typical size of the first request after a compaction (about 92k on the
 founder's logs: the summary, the system prompt and re-attached files)
 whenever a session passes the threshold, which removes more than the part
-above it. Removed history is priced as a cache read, or as a write on a turn
-where the cache was rebuilt ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)).
+above it, priced the same way.
 
 **Fix:** L1 — compact when a session passes the threshold or between tasks
 (Claude Code: `/compact`; it compacts on its own only near the context

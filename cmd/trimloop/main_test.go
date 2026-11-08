@@ -409,11 +409,11 @@ func TestBuildSessionCountsCopiedLinesOnce(t *testing.T) {
 	seen := map[string]bool{}
 	skills := source.Message{Kind: source.KindInjected, LineID: "u1", Injected: []event.Injected{{Kind: "skill_listing", Bytes: 40}}}
 	compact := source.Message{Kind: source.KindCompaction, LineID: "u2"}
-	first := buildSession(logData{log: source.Log{Path: "/p/a.jsonl"}, msgs: []source.Message{compact, skills, {ID: "a"}}}, seen)
+	first := buildSession(logData{log: source.Log{Path: "/p/a.jsonl"}, msgs: []source.Message{skills, compact, {ID: "a"}}}, seen)
 	if len(first.Turns[0].Injected) != 1 || !first.Turns[0].CompactedBefore {
 		t.Fatalf("original: got %+v", first.Turns[0])
 	}
-	second := buildSession(logData{log: source.Log{Path: "/p/b.jsonl"}, msgs: []source.Message{compact, skills, {ID: "b"},
+	second := buildSession(logData{log: source.Log{Path: "/p/b.jsonl"}, msgs: []source.Message{skills, compact, {ID: "b"},
 		{ID: "c", Model: "<synthetic>"}}}, seen)
 	if len(second.Turns) != 1 || len(second.Turns[0].Injected) != 0 || second.Turns[0].CompactedBefore {
 		t.Errorf("resumed: got %+v, want one turn with nothing copied counted again", second.Turns)
@@ -550,5 +550,25 @@ func TestBuildSessionReplyLoggedAfterItsCompaction(t *testing.T) {
 	if len(s.Turns[1].Injected) != 0 || len(s.Turns[2].Injected) != 1 {
 		t.Errorf("re-attached text: got %d on the triggering reply, %d after; want 0 and 1",
 			len(s.Turns[1].Injected), len(s.Turns[2].Injected))
+	}
+}
+
+// Two compactions with no reply between them are both kept, and one after
+// the last reply too.
+func TestBuildSessionKeepsUnrepliedCompactions(t *testing.T) {
+	marker := func(at string) string {
+		return `{"type":"system","subtype":"compact_boundary","timestamp":"` + at + `","compactMetadata":{"preTokens":500000,"postTokens":30000}}` + "\n"
+	}
+	l := writeLog(t, "s.jsonl", ""+
+		`{"type":"assistant","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","usage":{"cache_read_input_tokens":500000}}}`+"\n"+
+		marker("2026-11-01T09:01:00Z")+marker("2026-11-01T09:02:00Z")+
+		`{"type":"assistant","timestamp":"2026-11-01T09:03:00Z","message":{"id":"m2","usage":{"cache_read_input_tokens":80000}}}`+"\n"+
+		marker("2026-11-01T09:04:00Z"))
+	s, _, err := readSession(cc, l, map[string]bool{})
+	if err != nil || len(s.Turns) != 2 || !s.Turns[1].CompactedBefore {
+		t.Fatalf("got %+v, %v", s.Turns, err)
+	}
+	if len(s.Unreplied) != 2 || s.Unreplied[0].At.Minute() != 1 || s.Unreplied[1].At.Minute() != 4 {
+		t.Errorf("unreplied: got %+v, want the 09:01 and 09:04 compactions", s.Unreplied)
 	}
 }

@@ -21,8 +21,9 @@ import (
 //
 // It replays each main session (sub-agents cannot be compacted by the user):
 // from a simulated compaction on, every turn sends the tokens the compaction
-// removed fewer, priced at what history cost on that turn (historyRate: a
-// cache read, or a write when the cache was rebuilt). The turn still writes
+// removed fewer, each removed token priced by where it sat in that turn's
+// request (removedCost: read from the cache, or written when the cache was
+// rebuilt). The turn still writes
 // its own new tokens, so those are not counted as saved. A simulated
 // compaction happens before the turn that would pass at, at the session's
 // size after the previous turn, and costs a summary request (reading that

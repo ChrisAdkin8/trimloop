@@ -109,7 +109,7 @@ func TestFindGrowth(t *testing.T) {
 
 	// A compaction after the last reply is counted, and the session no
 	// longer counts as never compacted.
-	sessions[0].Trailing = &event.Compaction{Before: 700_000, After: 40_000}
+	sessions[0].Unreplied = []event.Compaction{{Before: 700_000, After: 40_000}}
 	f = FindGrowth(sessions, 500_000, 2)
 	if f.Compactions != 2 || f.Uncompacted != 0 || f.MedianResume != 30_000 {
 		t.Errorf("trailing compaction: got %d compactions, %d uncompacted, resume %d", f.Compactions, f.Uncompacted, f.MedianResume)
@@ -299,8 +299,8 @@ func TestRemovedCostByPosition(t *testing.T) {
 
 func TestQuantile(t *testing.T) {
 	xs := []int{40, 10, 30, 20} // sorted: 10 20 30 40
-	if q1, q3 := quantile(xs, 0.25), quantile(xs, 0.75); q1 != 10 || q3 != 30 {
-		t.Errorf("n=4: got %d and %d, want 10 and 30 (nearest rank)", q1, q3)
+	if q1, q3 := quantile(xs, 0.25), quantile(xs, 0.75); q1 != 20 || q3 != 40 || median(xs) != 30 {
+		t.Errorf("n=4: got %d, %d, %d; want 20 < 30 < 40, the median between the quartiles", q1, median(xs), q3)
 	}
 	fifteen := make([]int, 15)
 	for i := range fifteen {

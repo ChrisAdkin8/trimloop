@@ -202,8 +202,8 @@ Numbers only: no names, titles, paths or session ids.
 | `spend` / `turns` | number / int | |
 | `large_context` | number | Input cost of turns over the P19 threshold |
 | `sub_agents` | number | Spend in sub-agents |
-| `pause_rewrite` | number | Cache re-writes after long breaks the user took (P09; analysis version 3; a stored week from an earlier version counted every long wait, and reports mark it as older) |
-| `tool_output` | number | Carried cost of tool output added that week (P04) |
+| `pause_rewrite` | number | Cache re-writes after long breaks the user took, in main sessions (P09; analysis version 4; a stored week from an earlier version counted other waits too, and reports mark it as older) |
+| `tool_output` | number | Carried cost of tool output added that week (P04; since version 4, carried history on rebuilt-cache turns is priced as a write) |
 | `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
 | `compactions` | int | |
 | `prices` | string | Price catalogue version the figures used |

@@ -84,7 +84,7 @@ func TestFindWeekly(t *testing.T) {
 		t.Errorf("second week: got %+v", w2)
 	}
 	// A compaction after the last reply counts in that reply's week.
-	sessions[0].Trailing = &event.Compaction{Before: 300_000, After: 20_000}
+	sessions[0].Unreplied = []event.Compaction{{Before: 300_000, After: 20_000}}
 	sessions[0].Turns = sessions[0].Turns[:2]
 	if w2 := FindWeekly(sessions, 200_000, time.Hour, time.UTC)[1]; w2.Compactions != 2 {
 		t.Errorf("trailing compaction: got %d compactions, want 2", w2.Compactions)

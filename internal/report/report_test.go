@@ -361,9 +361,11 @@ func TestOlderFigures(t *testing.T) {
 // The likely compaction saving comes with a range from the quartiles of the
 // size after a compaction: a smaller size saves more, and likely lies inside.
 func TestCompactionLikelyRange(t *testing.T) {
+	// History at $5 per million tokens (as on a turn that rebuilt its cache),
+	// so a compaction pays for itself within a few turns.
 	turn := func(ctx int) event.Turn {
 		return event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
-			Cost: event.Cost{CacheRead: float64(ctx) / 1e6}, Priced: true}
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: true}
 	}
 	var sessions []event.Session
 	// Four sessions compacted once each, sending 40k to 100k afterwards.
@@ -390,11 +392,11 @@ func TestCompactionLikelyRange(t *testing.T) {
 		t.Errorf("range: got %v ≤ %v ≤ %v", f.LikelyLow, f.Likely, f.LikelyHigh)
 	}
 	g := r.Growth
-	if g.ResumeLow != 40_000 || g.ResumeHigh != 80_000 || g.Resumes != 4 {
+	if g.ResumeLow != 60_000 || g.ResumeHigh != 100_000 || g.Resumes != 4 {
 		t.Errorf("quartiles: got %d–%d of %d", g.ResumeLow, g.ResumeHigh, g.Resumes)
 	}
 	// The smaller size pairs with the larger saving.
-	if want := "at 40k the likely saving is " + money(f.LikelyHigh); !strings.Contains(f.LikelyNote, want) {
+	if want := "at 60k the likely saving is " + money(f.LikelyHigh); !strings.Contains(f.LikelyNote, want) {
 		t.Errorf("note %q has no %q", f.LikelyNote, want)
 	}
 }
