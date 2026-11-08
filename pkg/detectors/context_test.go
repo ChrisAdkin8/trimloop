@@ -29,9 +29,12 @@ func TestFindReconciliation(t *testing.T) {
 			Turns: []event.Turn{turn("opus", 9, at), turn("opus", 1, at.Add(time.Hour))}},
 		// A turn with no price: the logs would show it as free.
 		{ID: "d", Kind: "main", Harness: record(30, at.Add(time.Hour), 0), Turns: []event.Turn{{Model: "new-model", Time: at}}},
+		// The harness could not price some of its usage: its total is short.
+		{ID: "u", Kind: "main", Harness: &event.HarnessRecord{Cost: 1, At: at.Add(time.Hour), UnknownCost: true},
+			Turns: []event.Turn{turn("opus", 5, at)}},
 	}
 	f := FindReconciliation(sessions)
-	if f.Sessions != 1 || f.Harness != 12 || f.Ours != 10 || f.Gap != 2 || f.Unpriced != 1 {
+	if f.Sessions != 1 || f.Harness != 12 || f.Ours != 10 || f.Gap != 2 || f.Unpriced != 2 {
 		t.Errorf("compared: got %+v", f)
 	}
 	if f.Behind != 2 || f.BehindCost != 19 || f.Unrecorded != 1 || f.UnrecordedCost != 4 {
@@ -129,5 +132,27 @@ func TestStandingRecordedAgainIsNotRewritten(t *testing.T) {
 	}
 	if sameStanding(a, &event.Standing{SystemBytes: 1}) || !sameStanding(nil, nil) || sameStanding(a, nil) {
 		t.Error("sameStanding is wrong")
+	}
+}
+
+func TestStandingSources(t *testing.T) {
+	for group, want := range map[string]string{
+		"mcp__gh":                       SourceMCP,
+		"mcp__plugin_engineering_slack": SourceSkills,
+		"mcp__ccd_session":              SourceHarness,
+		"Built-in tool definitions":     SourceHarness,
+	} {
+		if got := mcpSource(group); got != want {
+			t.Errorf("mcpSource(%q) = %q, want %q", group, got, want)
+		}
+	}
+	for kind, want := range map[string]string{
+		"skill_listing":  SourceSkills,
+		"invoked_skills": SourceHarness,
+		"memory_file":    SourceMemory,
+	} {
+		if got := injectedSource(kind); got != want {
+			t.Errorf("injectedSource(%q) = %q, want %q", kind, got, want)
+		}
 	}
 }

@@ -41,7 +41,7 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 	}
 	fmt.Fprintln(w, "\n  Recommended fixes, largest saving first:")
 	for i, r := range recs {
-		fmt.Fprintf(w, "\n  %d. %s: up to %s", i+1, r.Title, dollars(r.Saving))
+		fmt.Fprintf(w, "\n  %d. %s: %s", i+1, r.Title, savingText(r, all))
 		if len(r.Examples) > 0 {
 			fmt.Fprintf(w, " (mostly %s)", printable(strings.Join(r.Examples, ", ")))
 		}

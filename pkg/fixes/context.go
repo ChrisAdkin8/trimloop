@@ -56,7 +56,8 @@ var contextFixes = map[string]Recommendation{
 	detectors.SourceSkills: {
 		Title: "Turn off skills and plugins you don't use",
 		Finding: "Claude Code lists every available skill near the start of each session, and the list stays " +
-			"in the session: %s. Each plugin you install adds its skills to the list.",
+			"in the session; MCP servers that plugins bring send their tool definitions with each request: %s. " +
+			"Each plugin you install adds to both.",
 		Primary: Fix{Source,
 			"Disable plugins and remove skills you don't use.",
 			"Run /plugin to disable plugins you don't use, and delete unused skills from ~/.claude/skills " +

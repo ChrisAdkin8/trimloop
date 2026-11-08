@@ -32,19 +32,19 @@ func TestMergeAndSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	weeks = Merge(&f, []detectors.Week{{Week: "2026-10-05", Turns: 40, Spend: 4}, {Week: "2026-10-12", Turns: 70}, {Week: "2026-10-19", Turns: 5}}, "p2")
+	weeks = Merge(&f, []detectors.Week{{Week: "2026-10-05", Turns: 40, Spend: 4}, {Week: "2026-10-12", Turns: 70}, {Week: "2026-10-19", Turns: 5}}, "p1")
 	if len(weeks) != 3 {
 		t.Fatalf("got %d weeks, want 3", len(weeks))
 	}
 	if w := weeks[0]; w.Turns != 100 || w.Spend != 10 || w.Kept {
 		t.Errorf("partly deleted week: got %+v, want the fuller kept copy, still in the logs", w)
 	}
-	if weeks[1].Turns != 70 || weeks[1].Prices != "p2" {
+	if weeks[1].Turns != 70 || weeks[1].Prices != "p1" {
 		t.Errorf("grown week: got %+v", weeks[1])
 	}
 
 	// A run after the first week's logs are gone entirely.
-	weeks = Merge(&f, []detectors.Week{{Week: "2026-10-19", Turns: 9}}, "p2")
+	weeks = Merge(&f, []detectors.Week{{Week: "2026-10-19", Turns: 9}}, "p1")
 	if !weeks[0].Kept || weeks[2].Kept {
 		t.Errorf("got %+v, want the old weeks marked kept", weeks)
 	}
@@ -63,6 +63,18 @@ func TestLoadRejectsOtherVersions(t *testing.T) {
 	}
 	if _, err := Load(path); err == nil {
 		t.Error("got no error for a damaged file")
+	}
+}
+
+// Figures at older prices are replaced while the logs still hold the week,
+// even when the old figures counted more turns.
+func TestMergeReplacesOlderPrices(t *testing.T) {
+	f := File{Version: Version, Weeks: map[string]detectors.Week{
+		"2026-10-05": {Week: "2026-10-05", Turns: 120, Spend: 50, Prices: "old", Analysis: detectors.AnalysisVersion},
+	}}
+	weeks := Merge(&f, []detectors.Week{{Week: "2026-10-05", Turns: 100, Spend: 45}}, "new")
+	if weeks[0].Turns != 100 || weeks[0].Prices != "new" {
+		t.Errorf("got %+v, want this run's figures", weeks[0])
 	}
 }
 

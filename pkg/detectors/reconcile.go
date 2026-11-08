@@ -30,8 +30,8 @@ type Reconciliation struct {
 	UnrecordedCost float64 `json:"unrecorded_cost"`
 
 	// Unpriced counts sessions with turns the price catalogue has no price
-	// for. The logs would show those as free, so the whole of them would
-	// look like unobserved spend; they are left out of the comparison.
+	// for, or whose record says the harness could not price some usage.
+	// One side of the comparison would be incomplete, so they are left out.
 	Unpriced int `json:"unpriced"`
 
 	WebSearches   int        `json:"web_searches"`    // in the compared sessions
@@ -102,7 +102,7 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 			f.UnrecordedCost += mine
 			continue
 		}
-		if unpriced[s.ID] {
+		if unpriced[s.ID] || s.Harness.UnknownCost {
 			f.Unpriced++
 			continue
 		}

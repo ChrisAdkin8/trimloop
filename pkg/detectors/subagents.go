@@ -19,6 +19,10 @@ type SubAgents struct {
 	// price.Cheaper suggests, counting only turns that have one.
 	Saving float64 `json:"saving"`
 
+	// Costly is their spend on a model that has a cheaper choice, in agent
+	// types that may move to it.
+	Costly float64 `json:"costly"`
+
 	// Cache use, sub-agents against main sessions: cache writes as a share of
 	// spend, and how many times each written token was read again.
 	WriteShare        float64 `json:"write_share"`
@@ -31,6 +35,15 @@ type SubAgents struct {
 	LargeCost  float64 `json:"large_cost"`  // what those runs cost
 
 	ByType []AgentGroup `json:"by_type"` // by agent type, largest spend first
+}
+
+// CostlyShare is the share of sub-agent spend, 0 to 1, on a model that has a
+// cheaper choice.
+func (f SubAgents) CostlyShare() float64 {
+	if f.Cost <= 0 {
+		return 0
+	}
+	return f.Costly / f.Cost
 }
 
 // AgentGroup is the spend of one agent type.
@@ -86,6 +99,9 @@ func FindSubAgents(sessions []event.Session, largeAbove int) SubAgents {
 			g.Turns++
 			f.Turns++
 			modelCost[typ][t.Model] += t.Cost.Total()
+			if _, ok := price.Cheaper(t.Model); ok && !sharesCache[typ] {
+				f.Costly += t.Cost.Total()
+			}
 			if saving := cheaperSaving(t); saving > 0 && !sharesCache[typ] {
 				g.Saving += saving
 				f.Saving += saving

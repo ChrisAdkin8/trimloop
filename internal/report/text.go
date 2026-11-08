@@ -42,6 +42,14 @@ func WriteText(out io.Writer, r Results) error {
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
 
+	if len(r.Actions) > 0 {
+		fmt.Fprintln(w, "\nWHAT TO DO FIRST (the savings overlap, so do not add them)")
+		for i, a := range r.Actions {
+			fmt.Fprintf(w, "  %d. %s: %s\n", i+1, a.Title, savingText(a, all))
+		}
+		fmt.Fprintln(w, "  Each is explained, with how to do it, in its section below.")
+	}
+
 	reconcileSection(w, r.Reconciliation, all)
 	weeksSection(w, r.Weeks)
 	attributionSection(w, r.Attribution)
@@ -64,6 +72,10 @@ func WriteText(out io.Writer, r Results) error {
 	fmt.Fprintf(w, "  Up to %s of that could be saved.\n", dollars(pause.Saving))
 	fmt.Fprintln(w, "  Action: after a long break, compact the session or start a new one before carrying on.")
 	sessionTable(w, pause.Top, "pauses", "context at resume")
+	if r.PauseFix != nil {
+		fmt.Fprintf(w, "\n  %s: %s\n", r.PauseFix.Title, savingText(*r.PauseFix, all))
+		printFixes(w, *r.PauseFix)
+	}
 
 	toolOutputSection(w, r.Tools, r.ToolFixes, all)
 	subAgentSection(w, r.SubAgents, r.SubAgentFix, all)
@@ -71,13 +83,14 @@ func WriteText(out io.Writer, r Results) error {
 	if len(r.StandingFixes) > 0 {
 		fmt.Fprintln(w, "\n  Recommended fixes:")
 		for _, f := range r.StandingFixes {
-			fmt.Fprintf(w, "\n  %s: up to %s\n", f.Title, money(f.Saving))
+			fmt.Fprintf(w, "\n  %s: %s\n", f.Title, savingText(f, all))
 			printFixes(w, f)
 		}
 	}
 
-	fmt.Fprintln(w, "\nSavings are upper bounds: some context is needed, and a compacted or new")
-	fmt.Fprintln(w, "session still pays for what it keeps. The findings overlap, so do not add them.")
+	fmt.Fprintln(w, "\n\"Up to\" figures are upper bounds: some context is needed, and a compacted or")
+	fmt.Fprintln(w, "new session still pays for what it keeps. \"Likely\" figures replay the logs with")
+	fmt.Fprintln(w, "the fix applied. The findings overlap, so do not add them.")
 	return w.Flush()
 }
 

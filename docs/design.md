@@ -5,6 +5,7 @@
 | Status | Draft |
 | Last updated | 2026-11-08 |
 | Scope | Whole system, MVP through auto-fix |
+| Built | Only the M0 prototype: `trimloop analyse` (reports from Claude Code's logs) and the live nudges (`statusline`, `hook`, `setup`). Everything else here is design; [ROADMAP.md](../ROADMAP.md) and the Built column of the [ADR index](adr/README.md) say what exists |
 
 ## 1. Goals and non-goals
 
@@ -333,8 +334,8 @@ the transform version, the sent request can be reproduced exactly.
 | Secrets stored locally | Redaction before storage; by default the store holds only keyed hashes and is protected by file permissions. Encryption at rest becomes required when full-content capture is enabled ([ADR 0015](adr/0015-defer-local-store-encryption.md)) |
 | API keys captured by the proxy | Auth headers are never parsed, logged or stored |
 | Malicious use of the local CA | CA private key generated per machine, stored in the OS keychain, scoped to harness processes via env var, 90-day rotation |
-| Tampered policies pushing harmful transforms | Policies signed with a customer-held policy key the collector never holds; sidecars and proxies verify against that trust anchor; level 3 needs local opt-in as well as policy ([ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)) |
-| Provider terms of service | Trimloop changes request *structure* (order, cache markers) but never impersonates a client or bypasses limits. Review each provider's terms before shipping level 2+ for it — see open questions |
+| Tampered policies pushing harmful transforms | Policies signed with a customer-held policy key the collector never holds; sidecars and proxies verify against that trust anchor; L3 needs local opt-in as well as policy ([ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)) |
+| Provider terms of service | Trimloop changes request *structure* (order, cache markers) but never impersonates a client or bypasses limits. Review each provider's terms before shipping L2 and above for it — see open questions |
 
 ## 9. Deployment modes
 
@@ -368,7 +369,7 @@ one Helm chart, one Python package) is in [packaging.md](packaging.md).
 | Harness traffic formats change without notice | Taps break | Fixture-based contract tests per harness version; fail open |
 | Proxy adds latency or breaks streaming | Developers uninstall it | p99 latency budget, fail-open, transcript-only mode needs no proxy |
 | Savings estimates are wrong | Loss of trust | Show method and confidence; reconcile against invoices where supplied |
-| Optimisation hurts agent quality | Loss of trust | Outcome signals, canary, auto-rollback, level 3 opt-in only |
+| Optimisation hurts agent quality | Loss of trust | Outcome signals, canary, auto-rollback, L3 opt-in only |
 | Funded competitors move from spend tracking into optimisation | Market | Ship the transcript analyser fast; open-source the detectors to build distribution |
 
 ## 12. Open questions

@@ -31,6 +31,18 @@ func TestNormalizeUsage(t *testing.T) {
 			want: event.Usage{InputUncached: 10, CacheRead: 200, CacheWrite5m: 50, Output: 7},
 		},
 		{
+			name: "split with a zero total: the split counts",
+			json: `{"cache_creation_input_tokens":0,
+				"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":862}}`,
+			want: event.Usage{CacheWrite1h: 862},
+		},
+		{
+			name: "split short of the total: the rest counts as 5m",
+			json: `{"cache_creation_input_tokens":50,
+				"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0}}`,
+			want: event.Usage{CacheWrite5m: 50},
+		},
+		{
 			name: "thinking tokens reported",
 			json: `{"input_tokens":1,"output_tokens":90,
 				"output_tokens_details":{"thinking_tokens":60}}`,

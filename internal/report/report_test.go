@@ -169,7 +169,7 @@ func TestSummary(t *testing.T) {
 }
 
 func TestApprox(t *testing.T) {
-	for n, want := range map[int]string{0: "0", 999: "999", 50_000: "50k", 967_437: "967k", 13_259_634: "13.3M"} {
+	for n, want := range map[int]string{0: "0", 999: "999", 50_000: "50k", 967_437: "967k", 999_499: "999k", 999_500: "1.0M", 13_259_634: "13.3M"} {
 		if got := approx(n); got != want {
 			t.Errorf("approx(%d) = %q, want %q", n, got, want)
 		}

@@ -38,8 +38,11 @@ func WriteSummary(out io.Writer, r Results, path string, actions int) error {
 func periodLine(w io.Writer, r Results) {
 	fmt.Fprintf(w, "Spent %s at list prices", money(r.Total))
 	if p := r.Period; p.Days > 0 {
-		fmt.Fprintf(w, " from %s to %s (%d days), about %s a week",
-			p.From.Local().Format("2 Jan"), p.To.Local().Format("2 Jan 2006"), p.Days, money(p.PerWeek))
+		fmt.Fprintf(w, " from %s to %s (%d days)",
+			p.From.Local().Format("2 Jan"), p.To.Local().Format("2 Jan 2006"), p.Days)
+		if p.PerWeek > 0 {
+			fmt.Fprintf(w, ", about %s a week", money(p.PerWeek))
+		}
 	}
 	fmt.Fprintln(w, ".")
 }

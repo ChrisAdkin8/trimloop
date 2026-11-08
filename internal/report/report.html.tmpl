@@ -10,7 +10,7 @@
 :root {
   --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #66665f; --line: #e4e3de;
   --accent: #2f6f5e; --accent-soft: #d9ebe4; --warn: #9c4a22; --warn-soft: #f6e3d8;
-  --bar: #2f6f5e; --bar2: #9cc8b8; --bar3: #c98a5e; --bar4: #8d8c86; --code: #f1f0ec;
+  --bar: #2f6f5e; --bar2: #9cc8b8; --bar3: #c98a5e; --bar4: #8d8c86; --bar5: #d6c27a; --code: #f1f0ec;
   --size1: #0ca30c; --size2: #1baf7a; --size3: #eda100; --size4: #d03b3b;
   --kind1: #2a78d6; --kind2: #eb6834; --kind3: #1baf7a; --kind4: #eda100;
 }
@@ -18,7 +18,7 @@
   :root {
     --bg: #161715; --panel: #1f201e; --text: #ecebe6; --muted: #a9a8a1; --line: #34352f;
     --accent: #7cc4a9; --accent-soft: #24392f; --warn: #f0a07a; --warn-soft: #3d2a20;
-    --bar: #7cc4a9; --bar2: #3f6b5b; --bar3: #c98a5e; --bar4: #77766f; --code: #2a2b27;
+    --bar: #7cc4a9; --bar2: #3f6b5b; --bar3: #c98a5e; --bar4: #77766f; --bar5: #8a7a3a; --code: #2a2b27;
     --size1: #0ca30c; --size2: #199e70; --size3: #c98500; --size4: #e66767;
     --kind1: #3987e5; --kind2: #d95926; --kind3: #199e70; --kind4: #c98500;
   }
@@ -102,7 +102,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 <h1>Where your Claude Code tokens went</h1>
 <p class="lead">
-{{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.Days}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{thousands .Read.Sessions}} sessions · list prices as of {{.Prices}}
+{{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.PerWeek}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{thousands .Read.Sessions}} sessions · list prices as of {{.Prices}}
 {{if .Read.Failed}}<br><span class="note">{{.Read.Failed}} log files could not be read to the end.</span>{{end}}
 {{if .Read.BadLines}}<br><span class="note">{{.Read.BadLines}} lines could not be read; Claude Code's log format may have changed.</span>{{end}}
 {{if .Read.Unpriced}}<br><span class="muted small">{{.Read.Unpriced}} turns used a model with no known price and are left out.</span>{{end}}
@@ -144,7 +144,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 <section class="area">
 <h2 id="money">Where the money went</h2>
-<p class="lead">{{with .TopProject}}{{.Name}} was the costliest project, at {{dollars .Cost}} ({{pct .Cost $.Total}}).{{end}} Most of the spend paid for re-reading the session from the cache, Claude's cheaper saved copy of it.</p>
+<p class="lead">{{with .TopProject}}{{.Name}} was the costliest project, at {{dollars .Cost}} ({{pct .Cost $.Total}}).{{end}}{{with .Largest}} {{if ge .Share 0.5}}Most{{else}}The largest part{{end}} of the spend ({{share .Share}}) paid for {{.What}}.{{end}}</p>
 <details><summary>Show details</summary>
 <div class="panel">
   <h3 style="margin-top:0">What the money paid for</h3>
@@ -154,11 +154,13 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
     <span style="width: {{width .CacheWrite1h $.Total}}%; background: var(--bar2)" title="Saving the session to the cache, kept 1 hour"></span>
     <span style="width: {{width .CacheWrite5m $.Total}}%; background: var(--bar3)" title="Saving the session to the cache, kept 5 minutes"></span>
     <span style="width: {{width .Output $.Total}}%; background: var(--bar4)" title="Claude's replies"></span>
+    <span style="width: {{width .InputUncached $.Total}}%; background: var(--bar5)" title="New input sent without the cache"></span>
   </div>
   <p class="legend"><i style="background:var(--bar)"></i>Re-reading from the cache {{dollars .CacheRead}} ({{pct .CacheRead $.Total}})
     <i style="background:var(--bar2)"></i>Saving to the cache, kept 1 hour {{dollars .CacheWrite1h}} ({{pct .CacheWrite1h $.Total}})
     <i style="background:var(--bar3)"></i>Saving to the cache, kept 5 minutes {{dollars .CacheWrite5m}} ({{pct .CacheWrite5m $.Total}})
-    <i style="background:var(--bar4)"></i>Claude's replies {{dollars .Output}} ({{pct .Output $.Total}})</p>
+    <i style="background:var(--bar4)"></i>Claude's replies {{dollars .Output}} ({{pct .Output $.Total}})
+    <i style="background:var(--bar5)"></i>New input sent without the cache {{dollars .InputUncached}} ({{pct .InputUncached $.Total}})</p>
   {{end}}
 
   <h3>By project</h3>
@@ -298,7 +300,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <h2 id="subagents">Sub-agents</h2>
 {{with .SubAgents}}
 {{if .Runs}}
-<p class="lead">Sub-agents are helpers Claude starts for side tasks. {{thousands .Runs}} runs cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend), mostly on the main session's model.</p>
+<p class="lead">Sub-agents are helpers Claude starts for side tasks. {{thousands .Runs}} runs cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend){{if $.SubCostly}}; {{share $.SubCostly}} of that was on a model with a cheaper choice{{end}}.</p>
 <details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table class="sortable">

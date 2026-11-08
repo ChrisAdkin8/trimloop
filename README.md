@@ -73,8 +73,8 @@ cost and findings. Detail in
 
 | Part | Language | Why |
 |---|---|---|
-| Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One binary to install (glibc-linked, built per OS); strong HTTP, TLS and streaming support; one codebase for every tap to feed |
-| Detectors | Go per-turn state machines; SQL only for cross-session aggregates | One implementation serves batch analysis and live traffic ([ADR 0010](docs/adr/0010-go-detectors-sql-aggregates.md)) |
+| Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One binary to install (built per OS; the prototype is pure Go, the planned DuckDB driver will link the C library); strong HTTP, TLS and streaming support; one codebase for every tap to feed |
+| Detectors | Go; SQL only for cross-session aggregates. Planned as per-turn state machines; the prototype's are plain functions over finished sessions | One implementation will serve batch analysis and live traffic ([ADR 0010](docs/adr/0010-go-detectors-sql-aggregates.md)) |
 | LiteLLM gateway plugin | Python, kept thin | LiteLLM plugins must be Python. The plugin only captures events and forwards them to a `trimloop serve` sidecar on loopback, which does all parsing, redaction and fingerprinting; it applies transforms the core has decided on but contains no detection logic |
 | Envoy and Kong gateways (later) | Go | Envoy's external processing and Kong's Go plugin server let the core plug in directly — no third language |
 | Web UI | TypeScript | Embedded in the Go binary |
@@ -184,7 +184,7 @@ scripts/bootstrap.sh --check   # see what is missing; changes nothing; exit 1 if
 scripts/bootstrap.sh           # install what is missing (asks first)
 ```
 
-It installs Go (≥ 1.27) and a C toolchain for the DuckDB driver; `buf`,
+It installs Go (≥ 1.27.3) and a C toolchain for the DuckDB driver; `buf`,
 `protoc-gen-go`, `protoc-gen-go-grpc`, `golangci-lint` and `govulncheck`;
 `uv` with Python 3.12 for the LiteLLM plugin; Node.js (≥ 22) for the web UI;
 and the DuckDB CLI. `--with-collector` also checks Docker for the team

@@ -50,11 +50,11 @@ func readInput(in io.Reader) (Input, Reply, error) {
 	if err := json.NewDecoder(in).Decode(&inp); err != nil {
 		return inp, Reply{}, err
 	}
-	m, err := claudecode.LastResponse(inp.TranscriptPath)
+	m, w, err := claudecode.LastResponses(inp.TranscriptPath)
 	if err != nil {
 		return inp, Reply{}, err
 	}
-	return inp, Reply{Time: m.Time, Model: m.Model, Usage: m.Usage, Fast: m.Fast, USOnly: m.USOnly,
+	return inp, Reply{Time: m.Time, Model: m.Model, Usage: m.Usage, Writer: w.Usage, Fast: m.Fast, USOnly: m.USOnly,
 		Context: m.Usage.InputTotal()}, nil
 }
 
@@ -107,7 +107,9 @@ func StatusLine(in io.Reader, out io.Writer, env Env) {
 // Hook runs one hook: "stop" after Claude replies, "prompt" when the user
 // sends a message. It writes Claude Code's JSON hook output when a nudge is
 // due and nothing otherwise, and never fails: a problem means no nudge.
-// Nothing it writes is added to Claude's conversation.
+// It uses only fields shown to the user (systemMessage, and the reason for
+// holding a prompt); whether systemMessage also reaches the model is not
+// documented (ADR 0034).
 func Hook(event string, in io.Reader, out io.Writer, env Env) {
 	inp, r, err := readInput(in)
 	if err != nil || inp.SessionID == "" {

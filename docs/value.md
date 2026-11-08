@@ -48,7 +48,7 @@ Other patterns (P03, P06, P09, P10, P12, P14) add to these but are
 expected to be smaller individually. The ranking is a starting hypothesis; M0
 will re-rank by measured waste.
 
-**First measurement (2026-11-07, one developer):** on the founder's Claude
+**First measurement (2026-11-07, figures corrected 2026-11-08; one developer):** on the founder's Claude
 Code sessions the order was different. Large working context (P19) and
 re-caching after long pauses (P09) were the largest levers: keeping turns
 under 200k could save up to about 19% of spend (first measured as 31%, see

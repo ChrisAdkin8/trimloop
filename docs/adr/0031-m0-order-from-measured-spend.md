@@ -1,6 +1,6 @@
 # ADR 0031: Re-rank M0 from measured spend; sub-agent model fit in M0
 
-- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do); amended by [ADR 0035](0035-measurement-corrections.md)
+- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md)
 - Date: 2026-11-07
 - Amends: [ADR 0029](0029-m0-build-order-by-user-value.md) (M0 build order), [patterns.md](../patterns.md) (P13, P14 milestones)
 
@@ -71,7 +71,7 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 | 2 | **Sub-agent economics and P13 reduced fidelity** (Decision 1) | ≈ $271 (13 %) | Done |
 | 3 | **P19 concentration and compaction point; P10 reduced** (Decision 2) | Top 5 conversations 59 %; $292 in never-compacted sessions past 500 k | Done |
 | 4 | **Attribution** by project, skill, plugin and MCP server (Decision 3) | Top project 32 % of spend | Done |
-| 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Done ([ADR 0033](0033-reconciliation-history-standing-context.md)): about 13 % on 409 sessions after [ADR 0035](0035-measurement-corrections.md) |
+| 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Done ([ADR 0033](0033-reconciliation-history-standing-context.md)): about 13 % on 409 sessions after [ADR 0035](0035-measurement-corrections.md); the gap is reported, ADR 0028's 2 % test is not passed ([ADR 0036](0036-prices-reconciliation-status.md)) |
 | 6 | **P07 with injected context by kind**, priced by carried cost | $88 (4.3 %) | Done (ADR 0033), with the system prompt and tool definitions: $221 (11 %) |
 | 7 | **Results kept between runs** (ADR 0029 item 4) | Needed to measure any fix | Weekly figures kept (ADR 0033); saved offsets to do |
 | 8 | **Command-line options**: `--since`, `--repo`, `--format` | Filters for item 4's groups | `--format` (text, HTML, JSON) and `--out` done |
@@ -91,6 +91,8 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 - A sub-agent model recommendation can lower quality; it is offered with
   its outcome check, never as a pure saving.
 - Totals stay unreconciled with the harness until item 5; the report's
-  figures may be about 4 % low.
+  figures may be about 4 % low. (Corrected 2026-11-08: item 5 reports the
+  gap, which is about 13 %; the logs cannot match the record until
+  auxiliary turns are built, after M0. See [ADR 0036](0036-prices-reconciliation-status.md).)
 - The price catalogue gains per-request charges for server tools (web
   search) with item 5, as log-signals §4 proposed.

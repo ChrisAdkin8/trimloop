@@ -5,6 +5,7 @@
 | Status | Draft |
 | Last updated | 2026-11-08 |
 | Decision | [ADR 0008](adr/0008-packaging-and-distribution.md) |
+| Built | Little yet: the prototype binary has the `analyse`, `setup`, `statusline` and `hook` commands, is pure Go, and is built from source. The other commands, the DuckDB store, release builds and CI checks below are planned |
 | Related | [analyzer.md](analyzer.md) (shapes and repo layout), [design.md §9](design.md#9-deployment-modes) (deployment modes) |
 
 ## 1. Principles
@@ -29,7 +30,7 @@
 
 | # | Artefact | Contents | Channel | Audience | Milestone |
 |---|---|---|---|---|---|
-| 1 | **`trimloop` binary** | All modes (§3); aggregate SQL, profiles, price catalogue, fix templates; embedded web UI from M1 | Homebrew tap, GitHub Releases (archives + checksums), `.deb` / `.rpm` | Developers; servers without containers | M0 |
+| 1 | **`trimloop` binary** | All modes (§3); aggregate SQL, profiles, price catalogue, fix templates; embedded web UI from M1 | Homebrew tap, GitHub Releases (archives + checksums), `.deb` / `.rpm` | Developers; servers without containers | M0: an installable release; the signed pipeline in M0 or M1 ([ADR 0029](adr/0029-m0-build-order-by-user-value.md) item 10) |
 | 2 | **Container image** `ghcr.io/<org>/trimloop` | The same binary, multi-arch | GitHub Container Registry | Gateway sidecar, team collector | M1 |
 | 3 | **Helm chart** `trimloop` | Sidecar mode and collector mode (§6) | Helm repository (OCI, on GHCR) | Platform teams on Kubernetes | M1 (sidecar), M2 (collector) |
 | 4 | **Docker Compose example** | LiteLLM + plugin + sidecar; the sidecar shares LiteLLM's network namespace (`network_mode: "service:litellm"`) so loopback works | `deploy/compose/` in the repo | Evaluators; teams not on Kubernetes | M1 |

@@ -81,7 +81,7 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 	fmt.Fprintf(w, "  %d sessions passed %s tokens and were never compacted; they cost %s (%.0f%%).\n",
 		g.Uncompacted, thousands(g.Limit), dollars(g.UncompactedCost), pct(g.UncompactedCost, all))
 	if rec != nil {
-		fmt.Fprintf(w, "\n  %s (part of P19's saving):\n", rec.Title)
+		fmt.Fprintf(w, "\n  %s (part of P19's saving): %s\n", rec.Title, savingText(*rec, all))
 		printFixes(w, *rec)
 	}
 }
@@ -114,7 +114,7 @@ func subAgentSection(w io.Writer, f detectors.SubAgents, rec *fixes.Recommendati
 			g.Runs, thousands(g.Turns), dollars(g.Saving), models, printable(g.Type))
 	}
 	if rec != nil {
-		fmt.Fprintln(w)
+		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(*rec, all))
 		printFixes(w, *rec)
 	}
 }

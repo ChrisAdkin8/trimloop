@@ -54,6 +54,9 @@ func TestCacheLife(t *testing.T) {
 	if (Reply{Usage: event.Usage{CacheWrite5m: 5}}).CacheLife() != 5*time.Minute {
 		t.Error("a 5-minute write should give a 5-minute cache")
 	}
+	if (Reply{Usage: event.Usage{CacheRead: 5}, Writer: event.Usage{CacheWrite5m: 9}}).CacheLife() != 5*time.Minute {
+		t.Error("a reply that wrote nothing should keep the lifetime of the last reply that wrote")
+	}
 	if (Reply{Usage: event.Usage{CacheRead: 5}}).CacheLife() != time.Hour {
 		t.Error("no write should assume the hour")
 	}

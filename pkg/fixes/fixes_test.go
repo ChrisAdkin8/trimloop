@@ -87,8 +87,8 @@ func TestForCompaction(t *testing.T) {
 	if !ok || r.Saving != 7 || r.Likely != 3 || r.Expected() != 7 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
-	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 0.5}, 200_000, 7, 3, 30_000, 1); ok {
-		t.Error("a cost under the minimum should give no recommendation")
+	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 0.5, 0.2, 30_000, 1); ok {
+		t.Error("a saving under the minimum should give no recommendation")
 	}
 	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567"} {
 		if got := thousandsInt(n); got != want {

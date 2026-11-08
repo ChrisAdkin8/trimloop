@@ -1,6 +1,6 @@
 # ADR 0028: Use the signals harnesses record — accounting, injected context, effort, retries, outcomes
 
-- Status: Accepted — partly built (cost records, compaction, injected context, attribution) — amended by [ADR 0033](0033-reconciliation-history-standing-context.md)
+- Status: Accepted — partly built (cost records, compaction, injected context, attribution; auxiliary turns not built) — amended by [ADR 0033](0033-reconciliation-history-standing-context.md) and [ADR 0036](0036-prices-reconciliation-status.md)
 - Date: 2026-11-07
 - Amends: [analyzer.md §10](../analyzer.md#10-extensibility-harnesses-and-providers) (capabilities), [data-model.md](../data-model.md) (Turn, Session, usage normalisation, price catalogue, labels), [design.md §6.3](../design.md#63-outcome-signals), [patterns.md](../patterns.md) (P07 scope; P10, P12, P14 milestones), [ROADMAP.md](../../ROADMAP.md) M0, [ADR 0027](0027-measured-m0-findings.md) (M0 detector list)
 
@@ -59,6 +59,9 @@ per field by the conformance kit.
 - The reader's acceptance test is reconciliation: per session and per token
   class, Trimloop's totals match the harness record within 2 %, auxiliary
   calls included. Reports show **unobserved spend** where they do not.
+  (2026-11-08: auxiliary turns are not built, so M0 reports the gap, about
+  13 %, and does not pass this test; it stays the target. See
+  [ADR 0036](0036-prices-reconciliation-status.md).)
 
 **Turn and Session fields** (data-model.md): Turn gains `effort`, `origin`,
 `requested_model`, `stop_reason`, `shape_hash`, `cache_ttl_requested`,

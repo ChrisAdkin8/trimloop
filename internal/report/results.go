@@ -63,7 +63,7 @@ type Period struct {
 	From    time.Time `json:"from"`
 	To      time.Time `json:"to"`
 	Days    int       `json:"days"`
-	PerWeek float64   `json:"per_week"` // spend per week over the period
+	PerWeek float64   `json:"per_week"` // spend per week over the period; 0 if under a week
 }
 
 // Label names a session for people.
@@ -196,7 +196,9 @@ func period(sessions []event.Session, total float64) Period {
 		return p
 	}
 	p.Days = int(p.To.Sub(p.From).Hours()/24) + 1
-	p.PerWeek = total / (float64(p.Days) / 7)
+	if p.Days >= 7 {
+		p.PerWeek = total / (float64(p.Days) / 7)
+	}
 	return p
 }
 
@@ -214,13 +216,22 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 		want[c.ID] = true
 	}
 	byID := map[string]event.Session{}
+	child := map[string]event.Session{} // a conversation's first sub-agent, for one whose main log is gone
 	for _, s := range sessions {
 		byID[s.ID] = s
+		if c, ok := child[s.ParentID]; s.ParentID != "" && (!ok || s.Start().Before(c.Start())) {
+			child[s.ParentID] = s
+		}
 	}
 	out := map[string]Label{}
 	for id := range want {
 		s, ok := byID[id]
 		if !ok {
+			// Only the conversation's sub-agents are left: name it by the
+			// first of them, with no title.
+			if c, ok := child[id]; ok {
+				out[id] = Label{Project: c.Project, Start: c.Start()}
+			}
 			continue
 		}
 		l := Label{Project: s.Project, Start: s.Start()}

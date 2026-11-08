@@ -34,8 +34,9 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 	return Recommendation{
 		Pattern: "P13",
 		Title:   "Run sub-agents on a cheaper model",
-		Finding: fmt.Sprintf("Sub-agents (helpers Claude starts for side tasks) cost %s, and most ran on "+
-			"the same model as the main session. The saving assumes all of those moved to %s.", dollars(f.Cost), alt),
+		Finding: fmt.Sprintf("Sub-agents (helpers Claude starts for side tasks) cost %s, and %.0f%% of that "+
+			"was on a model with a cheaper choice. The saving assumes all of those moved to %s.",
+			dollars(f.Cost), 100*f.CostlyShare(), alt),
 		Saving:   f.Saving,
 		Examples: examples,
 		Primary: Fix{Structure,
@@ -55,11 +56,11 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 
 // ForCompaction recommends compacting earlier when sessions grew past the
 // limit without compacting (P19's fix, with P10's records; ADR 0031), or
-// returns false if they cost less than minCost. threshold is the context
+// returns false if compacting would save less than minCost. threshold is the context
 // size, in tokens, at which to compact; likely and upTo come from
 // detectors.LikelyCompactionSaving, and after is the size it assumed.
 func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
-	if g.UncompactedCost < minCost {
+	if upTo < minCost {
 		return Recommendation{}, false
 	}
 	return Recommendation{

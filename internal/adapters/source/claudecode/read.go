@@ -43,6 +43,7 @@ type record struct {
 	// cost-state lines: the harness's running cost record for one run.
 	StartTime    json.RawMessage       `json:"startTime"`
 	TotalCostUSD *float64              `json:"totalCostUSD"`
+	UnknownCost  bool                  `json:"hasUnknownModelCost"`
 	ModelUsage   map[string]modelUsage `json:"modelUsage"`
 
 	// compact_boundary lines.
@@ -196,7 +197,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 
 	case rec.Type == "cost-state" && rec.TotalCostUSD != nil:
 		m := source.Message{Kind: source.KindCostRecord, SessionID: rec.SessionID, Time: ts,
-			RunID: string(rec.StartTime), Record: event.HarnessRecord{Cost: *rec.TotalCostUSD, ByModel: map[string]event.ModelRecord{}, At: ts}}
+			RunID: string(rec.StartTime), Record: event.HarnessRecord{Cost: *rec.TotalCostUSD, ByModel: map[string]event.ModelRecord{}, At: ts, UnknownCost: rec.UnknownCost}}
 		var startMs int64
 		if json.Unmarshal(rec.StartTime, &startMs) == nil && startMs > 0 {
 			m.Record.Start = time.UnixMilli(startMs).UTC()

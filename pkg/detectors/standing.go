@@ -49,8 +49,10 @@ const (
 // injectedSource sorts an injected kind by what can be done about it.
 func injectedSource(kind string) string {
 	switch kind {
-	case "skill_listing", "invoked_skills":
+	case "skill_listing":
 		return SourceSkills
+	// "invoked_skills" is a skill that was used, not the listing: turning
+	// off unused skills does not remove it, so it falls through.
 	case "mcp_instructions_delta", "mcp_instructions":
 		return SourceMCP
 	case "memory_file", "instructions":
@@ -103,10 +105,7 @@ func FindStandingContext(sessions []event.Session) StandingContext {
 				for g, b := range byGroup {
 					c := float64(tokens(b)) * rate
 					f.ToolDefinitions += c
-					src := SourceHarness
-					if strings.HasPrefix(g, "mcp__") {
-						src = SourceMCP
-					}
+					src := mcpSource(g)
 					p := part(g, src)
 					p.Cost += c
 					p.sum += tokens(b)
@@ -153,6 +152,20 @@ type injectedCost struct {
 
 // toolDefGroup groups tool definitions: MCP tools by server, the rest as the
 // harness's built-in tools.
+// mcpSource sorts a tool-definition group by what can be done about it.
+// Servers a plugin brings are turned off with the plugin; servers the
+// desktop app builds in (named "ccd_") have no setting to change.
+func mcpSource(group string) string {
+	server, ok := strings.CutPrefix(group, "mcp__")
+	switch {
+	case !ok, strings.HasPrefix(server, "ccd_"):
+		return SourceHarness
+	case strings.HasPrefix(server, "plugin_"):
+		return SourceSkills
+	}
+	return SourceMCP
+}
+
 func toolDefGroup(name string) string {
 	if strings.HasPrefix(name, "mcp__") {
 		return toolGroup(name)

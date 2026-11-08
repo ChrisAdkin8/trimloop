@@ -476,6 +476,7 @@ func sumRuns(runs map[string]event.HarnessRecord) *event.HarnessRecord {
 	total := &event.HarnessRecord{ByModel: map[string]event.ModelRecord{}}
 	for _, r := range runs {
 		total.Cost += r.Cost
+		total.UnknownCost = total.UnknownCost || r.UnknownCost
 		if r.At.After(total.At) {
 			total.At = r.At
 		}

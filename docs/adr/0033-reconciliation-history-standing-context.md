@@ -1,6 +1,6 @@
 # ADR 0033: Reconciliation, weekly history, and pricing standing context
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md)
 - Date: 2026-11-07
 - Amends: [ADR 0028](0028-harness-recorded-signals.md) (how reconciliation is done), [ADR 0029](0029-m0-build-order-by-user-value.md) item 4 (results kept between runs), [patterns.md P07](../patterns.md#p07--bloated-standing-and-injected-context)
 
@@ -54,10 +54,10 @@ them raised three questions the earlier ADRs left open.
 
 ## Consequences
 
-- On the founder's logs: Claude Code recorded $52 (3 %) more than the logs
-  (corrected by [ADR 0035](0035-measurement-corrections.md): about 13 %, once
-  records written partway through a session are left out)
-  show for 412 sessions; 14 % of spend has no record. Standing and injected
+- On the founder's logs, Claude Code recorded $52 (3 %) more than the logs
+  show for 412 sessions; 14 % of spend has no record. (Corrected by
+  [ADR 0035](0035-measurement-corrections.md): about 13 %, once records
+  written partway through a session are left out.) Standing and injected
   context cost $221 (11 %), of which built-in tool definitions are $102,
   the skill listing $36 and MCP servers $18.
 - The report can show a week-by-week table, so the effect of a fix is

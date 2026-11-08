@@ -21,8 +21,12 @@ findings report with estimated savings. No proxy, no server.
 - Detectors P01–P07, P09, P10, P12, P14 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
   [ADR 0028](docs/adr/0028-harness-recorded-signals.md)), and P13 for
   sub-agents in reduced fidelity ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
-- Reader also takes the harness's own cost and compaction records;
-  reconciliation with them is the reader's acceptance test (ADR 0028).
+- Reader also takes the harness's own cost and compaction records. Done in
+  the prototype: reconciliation reports the gap with them (about 13 %).
+  ADR 0028's acceptance test, within 2 % with auxiliary turns added, is not
+  yet passed: auxiliary turns come after M0 ([ADR 0036](docs/adr/0036-prices-reconciliation-status.md)).
+- Live nudges in Claude Code: status line, after-reply and before-send hooks
+  ([ADR 0034](docs/adr/0034-live-nudges.md)). Done in the prototype.
 - CLI report (terminal + static HTML). Done in the prototype: a summary, the
   full text, a self-contained HTML page and JSON (`--format`, `--out`,
   `--no-titles`), with sessions named by title and likely savings beside the
@@ -48,7 +52,8 @@ Done: reader, usage de-duplication, pricing, P19 and P09; P04 (context
 composition by tool and command shape, with fixes from the ADR 0030
 ladder); sub-agent economics and P13 in reduced fidelity; P19 concentration
 and compaction point, with P10 from compaction records; spend by project,
-skill, plugin and MCP server; reconciliation with the harness cost record;
+skill, plugin and MCP server; reconciliation with the harness cost record
+(the gap is reported; the 2 % test waits for auxiliary turns);
 P07 priced by carried cost, including the system prompt and tool
 definitions; weekly figures kept between runs
 ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md));

@@ -13,8 +13,12 @@ import (
 
 // Version identifies the catalogue. Every cost figure should record it.
 // Source: https://platform.claude.com/docs/en/about-claude/pricing, list
-// prices read on 2026-11-07.
-const Version = "anthropic-list-2026-11-07"
+// prices read on 2026-11-07 and checked again on 2026-11-08, when the
+// still-served 4.6-and-later models were added. Cache reads on Opus 5.5 and
+// Sonnet 5.5 are 0.05x the input price and on Fable 5.1 0.025x (the page's
+// footnotes), not the usual 0.1x: Claude Code's own cost records price
+// Sonnet 5.5 reads at 0.1x, which shows up as reconciliation gap.
+const Version = "anthropic-list-2026-11-08"
 
 // Rates are prices in US dollars per million tokens.
 type Rates struct {
@@ -48,8 +52,13 @@ var catalogue = map[string]Model{
 	"claude-opus-5-5":   {Rates: Rates{4, 5, 8, 0.20, 20}, Fast: 2, USOnly: 1.1},
 	"claude-opus-5":     {Rates: Rates{5, 6.25, 10, 0.50, 25}, Fast: 2, USOnly: 1.1},
 	"claude-fable-5-1":  {Rates: Rates{10, 12.50, 20, 0.25, 50}, USOnly: 1.1},
+	"claude-fable-5":    {Rates: Rates{10, 12.50, 20, 1, 50}, USOnly: 1.1},
+	"claude-opus-4-8":   {Rates: Rates{5, 6.25, 10, 0.50, 25}, Fast: 2, USOnly: 1.1},
+	"claude-opus-4-7":   {Rates: Rates{5, 6.25, 10, 0.50, 25}, USOnly: 1.1},
+	"claude-opus-4-6":   {Rates: Rates{5, 6.25, 10, 0.50, 25}, USOnly: 1.1},
 	"claude-sonnet-5-5": {Rates: Rates{2, 2.50, 4, 0.10, 10}, USOnly: 1.1},
 	"claude-sonnet-5":   {Rates: Rates{2, 2.50, 4, 0.20, 10}, USOnly: 1.1},
+	"claude-sonnet-4-6": {Rates: Rates{3, 3.75, 6, 0.30, 15}, USOnly: 1.1},
 	"claude-haiku-5-5": {
 		Rates:     Rates{0.10, 0.125, 0.20, 0.01, 0.50},
 		LongAbove: 100_000,
@@ -57,6 +66,7 @@ var catalogue = map[string]Model{
 		USOnly:    1.1,
 	},
 	"claude-haiku-4-5-20251001": {Rates: Rates{1, 1.25, 2, 0.10, 5}}, // before 4.6: no US-only surcharge
+	"claude-haiku-4-5":          {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 }
 
 // Options are the request settings that change the price.

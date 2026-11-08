@@ -83,9 +83,22 @@ type view struct {
 
 	Summary summaryView // the two bars at the top of the page
 
+	// Largest is the kind of token that took the most spend.
+	Largest *costPart
+
+	// SubCostly is the share of sub-agent spend on a model that has a
+	// cheaper choice, 0 to 1.
+	SubCostly float64
+
 	Busiest    detectors.Week // the week with the most spend
 	TopProject *detectors.Spend
 	TopFive    float64 // share of spend in the five costliest sessions, 0 to 1
+}
+
+// costPart is one kind of token and its share of spend.
+type costPart struct {
+	What  string
+	Share float64
 }
 
 // sessionRow joins one session's P19 and P09 figures.
@@ -157,6 +170,23 @@ func newView(r Results) view {
 			v.Busiest = w
 		}
 	}
+	if r.Total > 0 {
+		parts := []costPart{
+			{"re-reading the session from the cache, Claude's cheaper saved copy of it", r.Cost.CacheRead},
+			{"saving the session to the cache", r.Cost.CacheWrite1h + r.Cost.CacheWrite5m},
+			{"Claude's replies", r.Cost.Output},
+			{"new input sent without the cache", r.Cost.InputUncached},
+		}
+		big := parts[0]
+		for _, p := range parts[1:] {
+			if p.Share > big.Share {
+				big = p
+			}
+		}
+		big.Share /= r.Total
+		v.Largest = &big
+	}
+	v.SubCostly = r.SubAgents.CostlyShare()
 	if len(r.Attribution.ByProject) > 0 {
 		v.TopProject = &r.Attribution.ByProject[0]
 	}
@@ -172,7 +202,7 @@ func newView(r Results) view {
 // 13259634 -> "13.3M".
 func approx(n int) string {
 	switch {
-	case n >= 1_000_000:
+	case n >= 999_500: // would round to "1000k"
 		return fmt.Sprintf("%.1fM", float64(n)/1e6)
 	case n >= 1_000:
 		return fmt.Sprintf("%dk", (n+500)/1000)

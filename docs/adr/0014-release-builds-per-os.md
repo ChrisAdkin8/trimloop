@@ -36,13 +36,14 @@ one draft found by tag; a distinct `checksum.name_template` per job
 is hand-written, not GoReleaser: it concatenates and signs the checksum files,
 creates the multi-arch manifest with `docker buildx imagetools create`,
 generates the Homebrew formula from the uploaded archives, and publishes the
-draft. The M0 dry-run also runs `objdump -T` on Linux binaries to confirm no
+draft. The release dry-run also runs `objdump -T` on Linux binaries to confirm no
 `GLIBC_`/`GLIBCXX_` symbol is newer than the baseline.
 
 ## Consequences
 
 - No GoReleaser Pro licence and no Apple SDK on Linux.
 - The release workflow has more jobs and a hand-written final merge step;
-  M0 includes a release dry-run to prove it end to end.
+  a release dry-run proves it end to end before the signed pipeline ships,
+  in M0 or M1 (ADR 0029 item 10 puts an installable release first).
 - If the merge step proves fragile, GoReleaser Pro's split/merge is the
   fallback.

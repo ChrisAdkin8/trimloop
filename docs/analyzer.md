@@ -194,8 +194,8 @@ trimloop analyse [--harness claude-code|codex|all] [--since 30d]
 4. Sessions and findings are written to `~/.trimloop/trimloop.duckdb`;
    aggregates run over the store.
 5. A report is rendered. No network access at any point. Text, HTML and
-   JSON render the same results (a short summary is the default in a
-   terminal; [ADR 0032](adr/0032-readable-reports.md)): the HTML page is one self-contained file
+   JSON render the same results (a short summary is the default output;
+   [ADR 0032](adr/0032-readable-reports.md)): the HTML page is one self-contained file
    (inline styles, charts and script; a content security policy that
    forbids loading anything), and the JSON layout is versioned
    (`trimloop-report/1`; adding fields keeps the version, removing or

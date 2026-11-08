@@ -205,6 +205,8 @@ Numbers only: no names, titles, paths or session ids.
 | `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
 | `compactions` | int | |
 | `prices` | string | Price catalogue version the figures used |
+| `analysis` | int | Analysis version that worked the figures out; a week from an older analysis or catalogue is replaced while the logs still hold it |
+| `kept` | bool | Shown, not stored: the week came from the history file because its logs are gone |
 
 ## Usage normalisation
 
@@ -244,7 +246,9 @@ Rules:
   model. The reader's acceptance test is **reconciliation**: per session and
   token class, Trimloop's totals match the harness record within 2 %,
   auxiliary calls included; the report shows unobserved spend where they do
-  not ([ADR 0028](adr/0028-harness-recorded-signals.md)).
+  not ([ADR 0028](adr/0028-harness-recorded-signals.md)). Not built in M0:
+  the prototype has no auxiliary turns, and reports the gap (about 13 %)
+  instead of passing the test ([ADR 0036](adr/0036-prices-reconciliation-status.md)).
 - The Anthropic row was confirmed against usage blocks in local Claude Code
   transcripts (2026-11-05). The OpenAI and Gemini rows are from provider
   documentation and must be confirmed by recorded fixtures (conformance kit).
@@ -290,8 +294,9 @@ Where fingerprints are required, and where they are a choice:
 
 ### Specification
 
-The single specification. `pkg/fingerprint` (Go) implements it; the Python
-plugin implements it only in remote mode (ADR 0006). Both must pass the shared
+The single specification. `pkg/fingerprint` (Go) will implement it; it is
+not built yet (the prototype hashes nothing it stores). The Python plugin
+implements it only in remote mode (ADR 0006). Both must pass the shared
 vectors in `pkg/fingerprint/testdata/vectors.json`. Every turn records the spec
 version (`fp_version`, currently `fp1`) so hashes made under different rules
 are never compared.

@@ -31,10 +31,18 @@ func TestFindSubAgents(t *testing.T) {
 	if f.Runs != 3 || f.Turns != 4 || !near(f.Cost, wantCost) {
 		t.Errorf("totals: got %d runs, %d turns, $%v; want 3, 4, $%v", f.Runs, f.Turns, f.Cost, wantCost)
 	}
-	// Sonnet 5.5 costs half of Opus 5.5 in every class, so the saving is
-	// half the general-purpose spend; the fork is left out.
-	if want := (gp[0].Cost.Total() + gp[1].Cost.Total()) / 2; !near(f.Saving, want) {
+	// The saving is the general-purpose turns priced on Sonnet 5.5; the
+	// fork is left out.
+	want := 0.0
+	for _, turn := range gp {
+		c, _ := price.Cost("claude-sonnet-5-5", turn.Usage, price.Options{})
+		want += turn.Cost.Total() - c.Total()
+	}
+	if !near(f.Saving, want) {
 		t.Errorf("saving: got %v, want %v", f.Saving, want)
+	}
+	if costly := gp[0].Cost.Total() + gp[1].Cost.Total(); !near(f.Costly, costly) {
+		t.Errorf("costly: got %v, want %v", f.Costly, costly)
 	}
 	if f.Large != 1 || !near(f.LargeCost, gp[0].Cost.Total()+gp[1].Cost.Total()) {
 		t.Errorf("large runs: got %d costing %v", f.Large, f.LargeCost)

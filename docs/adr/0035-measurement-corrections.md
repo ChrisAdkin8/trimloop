@@ -1,6 +1,6 @@
 # ADR 0035: Measurement corrections and how actions are ranked
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md)
 - Date: 2026-11-08
 - Amends: [ADR 0026](0026-usage-dedup-across-logs.md) (which line of a message counts), [ADR 0027](0027-measured-m0-findings.md) (how P19's saving is priced), [ADR 0031](0031-m0-order-from-measured-spend.md) (P10 in M0), [ADR 0032](0032-readable-reports.md) (ranking), [ADR 0033](0033-reconciliation-history-standing-context.md) (reconciliation rule, history)
 

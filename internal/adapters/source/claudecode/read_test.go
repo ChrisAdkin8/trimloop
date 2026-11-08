@@ -300,6 +300,22 @@ func TestLastResponse(t *testing.T) {
 	}
 }
 
+// A reply that wrote nothing to the cache comes with the latest one that did.
+func TestLastResponsesFindsLastWriter(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.jsonl")
+	writeFile(t, p, ""+
+		`{"type":"assistant","message":{"id":"m1","usage":{"cache_creation_input_tokens":50,"cache_creation":{"ephemeral_5m_input_tokens":50}}}}`+"\n"+
+		`{"type":"assistant","message":{"id":"m2","usage":{"cache_read_input_tokens":200}}}`+"\n")
+	m, w, err := LastResponses(p)
+	if err != nil || m.ID != "m2" || w.ID != "m1" || w.Usage.CacheWrite5m != 50 {
+		t.Errorf("got %+v, %+v, %v; want m2 with writer m1", m, w, err)
+	}
+	writeFile(t, p, `{"type":"assistant","message":{"id":"m3","usage":{"cache_creation_input_tokens":5}}}`+"\n")
+	if m, w, err := LastResponses(p); err != nil || m.ID != "m3" || w.ID != "" {
+		t.Errorf("got %+v, %+v, %v; want m3 with no separate writer", m, w, err)
+	}
+}
+
 // Only the end of a large log is read; a line cut by the start is skipped.
 func TestLastResponseLargeLog(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "big.jsonl")

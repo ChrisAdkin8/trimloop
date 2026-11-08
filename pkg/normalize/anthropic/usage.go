@@ -36,12 +36,14 @@ func NormalizeUsage(u Usage) event.Usage {
 		Output:        u.OutputTokens,
 	}
 
-	// Prefer the split by lifetime. Without it, all cache writes count as 5m.
+	// Prefer the split by lifetime: some records give the split with a zero
+	// total. Writes the split does not cover count as 5m, the cheaper rate.
 	if u.CacheCreation != nil {
 		out.CacheWrite5m = u.CacheCreation.Ephemeral5mInputTokens
 		out.CacheWrite1h = u.CacheCreation.Ephemeral1hInputTokens
-	} else {
-		out.CacheWrite5m = u.CacheCreationInputTokens
+	}
+	if rest := u.CacheCreationInputTokens - out.CacheWrite5m - out.CacheWrite1h; rest > 0 {
+		out.CacheWrite5m += rest
 	}
 
 	if u.OutputTokensDetails != nil && u.OutputTokensDetails.ThinkingTokens != nil {

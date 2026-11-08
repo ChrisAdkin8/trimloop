@@ -38,8 +38,12 @@ log (93 in this sample, median 40 KB); only their sizes are needed.
 The design and prototype use: `usage` by token class (de-duplicated per
 message id, [ADR 0026](adr/0026-usage-dedup-across-logs.md)), timestamps and
 idle gaps, `cache_creation` by TTL, `model`, sub-agent linkage, and — in the
-design but not yet the code — tool calls and results, request shapes, and
-compaction boundaries. The prototype reports cost by token class, P19 and P09.
+design — tool calls and results, command shapes, compaction boundaries,
+harness cost records, injected context and attribution. The prototype now
+reports cost by token class, P19, P09, P04, P07, P10 (from compaction
+records), P13 for sub-agents, reconciliation and weekly figures; §8 has the
+current measured figures. (Updated 2026-11-08; this section first listed
+only P19 and P09.)
 
 ## 3. Opportunities, ranked by expected value
 
@@ -70,7 +74,10 @@ What to do:
 - Count `ai-title` (and similar) records as `auxiliary` turns with the
   harness's figures, so session kinds (ADR 0012) are complete.
 - Make "within 2 % of `cost-state` per token class, auxiliary models
-  included" the M0 acceptance test for the reader and price catalogue. The
+  included" the M0 acceptance test for the reader and price catalogue.
+  (2026-11-08: not passed in M0; auxiliary turns are not built, and the
+  report shows the gap, about 13 %. See
+  [ADR 0036](adr/0036-prices-reconciliation-status.md).) The
   prototype's $2,021 and `cost-state`'s $1,867 cover different session sets;
   per-session reconciliation is the comparison that matters.
 - Expect the gap to be a `harness.cost_record` capability that only some
@@ -289,15 +296,16 @@ methods changed. This table is the reference for figures other documents quote; 
 
 | Figure | Value | When | Method |
 |---|---|---|---|
-| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
+| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 → $2,149 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
 | Spend in turns over 200k tokens (P19) | 57–58 % | 11-06 → 11-08 | Input cost of those turns |
 | P19 saving, keeping turns under 200k | 31 % → **19 %** ($415) | 11-06 → 11-08 | First priced at the turn's average input price; corrected to price the removed history at the cache-read price (or write price when the cache was rebuilt) |
 | Compact earlier, likely saving | $820–840 → **$463** (up to $688) | 11-07 → 11-08 | Replay of compacting at 200k; corrected as above ([ADR 0035](adr/0035-measurement-corrections.md)) |
 | Re-writes after a break of over an hour (P09) | 17 % ($353–368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
 | Tool output (P04) | 2.2 % above 8k tokens per result; **12 %** carried in all | 11-06; 11-07 | 2.2 % is the saving from capping each result at 8k tokens (ADR 0027); 12 % is the cost of carrying all tool output; the report now uses a 2k target (about 3 %) |
 | What every request carries (P07) | 4.3 % injected text → **11 %** with system prompt and tool definitions | 11-07 | Carried like tool output (ADR 0033) |
-| Sub-agents on a cheaper model (P13) | $235 → **$271–274** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out |
-| Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
+| Sub-agents on a cheaper model (P13) | $235 → $271–274 → **$281** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)) |
+| Read only the lines you need (P03/P04) | about $76 of carried cost → card up to **$48** | 11-07 → 11-08 | $76 was the carried cost of file-view output the fix aims at; $48 is the card's upper bound, keeping each file-view result under the 2k-token target |
+| Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | $0.18 of it is Claude Code pricing Sonnet 5.5 cache reads at $0.20, where the pricing page says $0.10 (ADR 0036). The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
 | Re-writes after breaks: earlier quotes | about $314–340 | 11-07 | The first message back after more than an hour, sessions over 200k; the same money as the P09 row |
 | Spend in the costliest sessions | top 1: 23–24 %, top 5: 59 %, top 10: 75 % | 11-07 → 11-08 | Main session with its sub-agents |
 | Sessions past 500k that never compacted | 6, about $292 | 11-07 → 11-08 | |

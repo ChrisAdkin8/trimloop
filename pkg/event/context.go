@@ -53,6 +53,9 @@ type HarnessRecord struct {
 	// Start is when the earliest recorded run of the harness began; zero if
 	// not known. Work before it has no record.
 	Start time.Time
+	// UnknownCost is true when the harness said it could not price some of
+	// its usage, so Cost is incomplete.
+	UnknownCost bool
 }
 
 // ModelRecord is the harness's account of one model's usage in a session.

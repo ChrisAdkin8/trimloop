@@ -1,9 +1,9 @@
 // Package detectors finds waste patterns in sessions.
 //
-// The first two findings here, P19 (large working context) and P09 (resume
-// bloat, in reduced fidelity), work from usage and timestamps alone
-// (ADR 0027). They are plain functions over finished sessions, not yet the
-// incremental Detector interface in docs/analyzer.md §4.
+// The detectors work from usage, timestamps, tool results and the harness's
+// own records (ADRs 0027, 0028). They are plain functions over finished
+// sessions, not yet the incremental Detector interface in docs/analyzer.md
+// §4.
 package detectors
 
 import (

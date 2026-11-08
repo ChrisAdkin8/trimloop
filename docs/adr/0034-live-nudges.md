@@ -1,6 +1,6 @@
 # ADR 0034: Live nudges in Claude Code
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown)
 - Date: 2026-11-08
 - Amends: [ROADMAP.md](../../ROADMAP.md) (M0 scope), [packaging.md §3](../packaging.md#3-the-trimloop-binary) (commands)
 
@@ -30,7 +30,9 @@ findings shaped the design:
 
 ## Decision
 
-Trimloop gives five nudges through three commands Claude Code runs:
+Trimloop gives five nudges (on the status line: size, effort, and the
+cache countdown with the next message's cost; after a reply: compact; before
+sending: the hold after a break) through three commands Claude Code runs:
 
 1. **`trimloop statusline`**, always visible: the conversation's size in
    colour (green, amber over 200k, red over 500k), the session's cost as
@@ -56,8 +58,9 @@ Rules every nudge follows:
   Code adds it to the conversation. Whether `systemMessage` also reaches the
   model is not documented, so it is to be checked on each Claude Code
   version.
-- **Once only.** Each nudge appears once per session (per break for the
-  pause), tracked in `~/.trimloop/live/<session>.json`, which holds
+- **Once only.** Each after-reply nudge appears once per session, and again
+  only after the session has shrunk below 200k (compacted or cleared) and
+  grown past the threshold again; the hold appears once per break. Tracked in `~/.trimloop/live/<session>.json`, which holds
   thresholds and times only; files untouched for 30 days are removed.
 - **Measured.** Each shown nudge is appended to `~/.trimloop/nudges.jsonl`
   (time, nudge, context size), so the report can later show what followed.

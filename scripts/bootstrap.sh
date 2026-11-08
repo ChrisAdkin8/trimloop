@@ -20,7 +20,7 @@
 set -euo pipefail
 
 ORIG_PATH="$PATH"
-GO_MIN="1.27"
+GO_MIN="1.27.3"
 PYTHON_VERSION="3.12"   # pinned for the LiteLLM plugin
 NODE_MIN="22"
 # Pinned tool versions. DUCKDB_VERSION should match the DuckDB bundled by the Go

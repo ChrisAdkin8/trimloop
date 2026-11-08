@@ -224,7 +224,8 @@ Until `truncate_tool_result` ships, P04's fixes are L1.
 sample, the primary fix is `advise` (Read with ranges) with `structure`
 (sub-agents for exploration) and `enforce` (a hook on `cat` and `sed -n`) as
 alternatives — together aimed at about $76 of carried cost and much of the
-38 % of repeat file views.
+38 % of repeat file views (2026-11-07; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance)
+has the current figure).
 
 **Cautions** (ADR 0030):
 - **Keep failures visible.** A filter or cap that hides the failing line
@@ -325,6 +326,8 @@ with a marker; behaviour-changing and harness-specific, opt-in, canary-gated
 ([ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)).
 
 ## P09 — Resume bloat
+
+Reports call it "long pauses" or "start fresh after a long break".
 
 **What happens:** A session is picked up again after the cache has expired —
 by a resume, or simply by carrying on after a long break — and re-sends its

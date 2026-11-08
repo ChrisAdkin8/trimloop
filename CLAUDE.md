@@ -10,7 +10,9 @@ report code is in `internal/report`; all formats render one
 (`internal/history`; pass `--no-history` or `--history FILE` when testing
 against real logs). Live nudges (`trimloop statusline`, `hook`, `setup`)
 are in `internal/live`; they write under `~/.trimloop`, so set `HOME` to a
-scratch folder when trying them by hand. Before a commit, run `scripts/check.sh` (gofmt, vet,
+scratch folder when trying them by hand. `setup` writes the path of the
+running program into Claude Code's settings, so run it from a built binary
+(`go build -o ~/.local/bin/trimloop ./cmd/trimloop`), not `go run`. Before a commit, run `scripts/check.sh` (gofmt, vet,
 golangci-lint per `.golangci.yml`, race tests, govulncheck; `--offline` skips
 govulncheck) and keep it passing.
 
@@ -24,7 +26,9 @@ govulncheck) and keep it passing.
   plugin), TypeScript (web UI). See ADR 0010 for the detector model.
 - Privacy default is keyed hashes only (ADRs 0004, 0011): HMAC with a
   customer-held key; names are hashed too. Any feature that needs raw content
-  must say so explicitly and run locally.
+  must say so explicitly and run locally. Exception (ADR 0032): local
+  reports show session titles and project names (`--no-titles` hides them);
+  stored files (history, nudge state) hold numbers only.
 - Dev environment: `scripts/bootstrap.sh` installs the SDKs; run it with
   `--check` first. Keep its tool list in step with the planned stack.
 - Packaging and releases: `docs/packaging.md` (ADR 0008). Release tooling

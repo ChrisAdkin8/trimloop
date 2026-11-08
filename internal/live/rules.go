@@ -1,8 +1,10 @@
 // Package live gives nudges inside Claude Code while a session runs: a status
 // line, a message after a reply that makes the session large, and a one-time
 // pause before an expensive message after a long break (ADR 0034). It reads
-// only the end of the current session's log and never adds text to Claude's
-// conversation.
+// only the end of the current session's log. Its output is meant for the
+// user: it prints nothing on events where Claude Code adds plain output to
+// the conversation, and uses hook fields shown to the user (whether
+// systemMessage also reaches the model is not documented; ADR 0034).
 package live
 
 import (
@@ -32,16 +34,22 @@ type Reply struct {
 	Time    time.Time
 	Model   string
 	Usage   event.Usage
+	Writer  event.Usage // the latest earlier reply that wrote to the cache, if this one wrote nothing
 	Fast    bool
 	USOnly  bool
 	Context int // tokens the request sent
 }
 
 // CacheLife is how long the reply's cache lasts: an hour if it wrote with the
-// long lifetime, else five minutes if it wrote with the short one; an hour
-// if it wrote nothing (Claude Code asks for the hour for main sessions).
+// long lifetime, else five minutes if it wrote with the short one. A reply
+// that wrote nothing keeps the lifetime of the latest one that did; with
+// none, an hour (Claude Code asks for the hour for main sessions).
 func (r Reply) CacheLife() time.Duration {
-	if r.Usage.CacheWrite5m > 0 && r.Usage.CacheWrite1h == 0 {
+	u := r.Usage
+	if u.CacheWrite5m+u.CacheWrite1h == 0 {
+		u = r.Writer
+	}
+	if u.CacheWrite5m > 0 && u.CacheWrite1h == 0 {
 		return 5 * time.Minute
 	}
 	return time.Hour
@@ -158,7 +166,7 @@ func (s Settings) BeforeSend(r Reply, now time.Time, pausedFor time.Time) string
 // tokens writes a token count briefly: 312k, 1.2M.
 func tokens(n int) string {
 	switch {
-	case n >= 1_000_000:
+	case n >= 999_500: // would round to "1000k"
 		return fmt.Sprintf("%.1fM", float64(n)/1e6)
 	case n >= 1_000:
 		return fmt.Sprintf("%dk", (n+500)/1000)
