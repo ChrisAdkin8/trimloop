@@ -39,6 +39,7 @@ type record struct {
 	AttributionPlugin    string `json:"attributionPlugin"`
 	AttributionMcpServer string `json:"attributionMcpServer"`
 	AttributionAgent     string `json:"attributionAgent"`
+	Effort               string `json:"effort"` // the effort level the request asked for
 
 	// ai-title and custom-title lines. An AI title is written from the
 	// conversation, so it is derived from content: shown locally only.
@@ -190,6 +191,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			Usage:     replyUsage(u.Usage, u.Iterations),
 			Fast:      u.Speed == "fast",
 			USOnly:    u.InferenceGeo == "us",
+			Effort:    rec.Effort,
 			ToolCalls: toolCalls(blocks(rec.Message.Content), rec.Cwd),
 			Attribution: event.Attribution{
 				Skill:     rec.AttributionSkill,

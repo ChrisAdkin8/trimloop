@@ -1,6 +1,6 @@
 # ADR 0028: Use the signals harnesses record — accounting, injected context, effort, retries, outcomes
 
-- Status: Accepted — partly built: cost records, compaction and injected context are read; not built: auxiliary turns, P12 from retry records, P14 from effort levels, the outcome signals and the new Turn fields — amended by [ADR 0033](0033-reconciliation-history-standing-context.md) and [ADR 0036](0036-prices-reconciliation-status.md)
+- Status: Accepted — partly built: cost records, compaction and injected context are read; P14 from effort levels ([ADR 0042](0042-p02-p14-and-main-session-models.md)); not built: auxiliary turns, P12 from retry records, the outcome signals and the other new Turn fields — amended by [ADR 0033](0033-reconciliation-history-standing-context.md), [ADR 0036](0036-prices-reconciliation-status.md) and [ADR 0042](0042-p02-p14-and-main-session-models.md)
 - Date: 2026-11-07
 - Amends: [analyzer.md §10](../analyzer.md#10-extensibility-harnesses-and-providers) (capabilities), [data-model.md](../data-model.md) (Turn, Session, usage normalisation, price catalogue, labels), [design.md §6.3](../design.md#63-outcome-signals), [patterns.md](../patterns.md) (P07 scope; P10, P12, P14 milestones), [ROADMAP.md](../../ROADMAP.md) M0, [ADR 0027](0027-measured-m0-findings.md) (M0 detector list)
 

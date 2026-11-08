@@ -67,8 +67,8 @@ and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)).
 1. Saved offsets, so a re-run reads only new lines.
 2. Command-line options: `--since`, `--repo` (`analyse`, `--format` and
    `--out` are done).
-3. P14 in reduced fidelity: spend by effort level.
-4. P02 cache-lifetime fit.
+3. P14 in reduced fidelity: spend by effort level. Done in the prototype ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)).
+4. P02 cache-lifetime fit. Done in the prototype, with P13 for main sessions ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)).
 5. P03, P06 (with the DuckDB store, numbers only until item 7), P01; then P05, and P12 in reduced fidelity from harness
    records (its full fidelity, and P10's, stays in M3).
 6. Distribution: installable release, minimal conformance runner, profiles.

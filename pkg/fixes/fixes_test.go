@@ -138,3 +138,26 @@ func TestForStandingContext(t *testing.T) {
 		t.Errorf("MCP: got %+v", recs[1])
 	}
 }
+
+func TestNewFindingCards(t *testing.T) {
+	if _, ok := ForCacheLife(detectors.CacheLife{Saving: 0.5}, 1); ok {
+		t.Error("P02 under the minimum should give no card")
+	}
+	if r, ok := ForCacheLife(detectors.CacheLife{Waits: 3, SubAgent: 2, Saving: 5}, 1); !ok || r.Pattern != "P02" || !strings.Contains(r.Finding, "2 in sub-agents") {
+		t.Errorf("P02: got %+v", r)
+	}
+	m := detectors.MainModels{Newer: 3, LowerTier: 4, NewerTurns: 2, TierTurns: 1, ByModel: []detectors.ModelSpend{
+		{Model: "claude-opus-5", Newer: "claude-opus-5-5", NewerSave: 3},
+		{Model: "claude-fable-5-1", Tier: "claude-opus-5-5", TierSave: 4},
+	}}
+	recs := ForMainModels(m, 1)
+	if len(recs) != 2 || !strings.Contains(recs[0].Primary.What, "from Opus 5 to Opus 5.5") || recs[1].Check == "" {
+		t.Errorf("P13 main: got %+v", recs)
+	}
+	if len(ForMainModels(m, 10)) != 0 {
+		t.Error("P13 main under the minimum should give no card")
+	}
+	if r, ok := ForEffort(detectors.Effort{Saving: 2, Turns: 5, HighMean: 1000}, 1); !ok || r.Pattern != "P14" || !strings.Contains(r.Finding, "1,000") {
+		t.Errorf("P14: got %+v", r)
+	}
+}

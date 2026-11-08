@@ -60,7 +60,7 @@ One model request and its response.
 | `provider_request_id` | string? | Provider or gateway request id, where available — de-duplicates the same turn seen by two taps |
 | `response_id` | string? | Provider response or message id — usage is counted once per response |
 | `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`). Built so far only as a yes/no: the prototype's `Prompted` is true when the user sent a message, answered Claude's question or decided on a permission since the previous turn; the text is not kept ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
-| `effort` | string? | Reasoning effort or budget requested (`request.effort`) |
+| `effort` | string? | Reasoning effort or budget requested (`request.effort`). Built: the prototype reads Claude Code's `effort` on each turn (P14, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
 | `repo` | string? | Where the turn ran, when it differs from the session's: sessions can move between repos ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); keyed like Session `repo` |
 | `attribution` | json? | Skill, plugin, MCP server and agent type the harness names as the turn's cause (`harness.attribution`); keyed with `skill`, `plugin`, `mcp` and `agent` unless opted in |
 | `requested_model` | string? | Model asked for, where it differs from `model` (fallbacks) |

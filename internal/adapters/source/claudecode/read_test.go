@@ -47,6 +47,12 @@ func TestParseLine(t *testing.T) {
 			wantOK: true,
 		},
 		{
+			name:   "the effort level the request asked for",
+			line:   `{"type":"assistant","effort":"max","message":{"id":"m1","usage":{"output_tokens":1}}}`,
+			want:   source.Message{ID: "m1", Usage: event.Usage{Output: 1}, Effort: "max"},
+			wantOK: true,
+		},
+		{
 			name:   "bad timestamp keeps the usage, with no time",
 			line:   `{"type":"assistant","timestamp":"30/10/2026 08:06","message":{"id":"m1","usage":{"output_tokens":1}}}`,
 			want:   source.Message{ID: "m1", Usage: event.Usage{Output: 1}},

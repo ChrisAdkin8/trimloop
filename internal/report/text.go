@@ -41,6 +41,10 @@ func WriteText(out io.Writer, r Results) error {
 		fmt.Fprintf(w, "  %-22s %10s  %5.1f%%\n", row.name, dollars(row.cost), pct(row.cost, all))
 	}
 	fmt.Fprintf(w, "  %-22s %10s\n", "Total", dollars(all))
+	if c := r.CacheLife; c.HourAsShort > c.HourActual {
+		fmt.Fprintf(w, "  Keeping the cache for an hour cost %s less than the 5-minute cache would have\n", dollars(c.HourAsShort-c.HourActual))
+		fmt.Fprintln(w, "  (on the turns that used it): the hour pays for itself on these logs.")
+	}
 
 	if len(r.Actions) > 0 {
 		fmt.Fprintln(w, "\nWHAT TO DO FIRST (the savings overlap, so do not add them)")
@@ -82,8 +86,11 @@ func WriteText(out io.Writer, r Results) error {
 		printFixes(w, *r.PauseFix)
 	}
 
+	cacheLifeSection(w, r.CacheLife, r.CacheLifeFix, all)
 	toolOutputSection(w, r.Tools, r.ToolFixes, all)
 	subAgentSection(w, r.SubAgents, r.SubAgentFix, all)
+	mainModelSection(w, r.MainModels, r.ModelFixes, all)
+	effortSection(w, r.Effort, r.EffortFix, all)
 	standingSection(w, r.Standing, all)
 	if len(r.StandingFixes) > 0 {
 		fmt.Fprintln(w, "\n  Recommended fixes:")

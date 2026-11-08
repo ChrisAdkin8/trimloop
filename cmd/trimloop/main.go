@@ -457,6 +457,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				First:           last.IsZero(),
 				Usage:           m.Usage,
 				Fast:            m.Fast,
+				Effort:          m.Effort,
 				USOnly:          m.USOnly,
 				Project:         m.Project,
 				Attribution:     m.Attribution,

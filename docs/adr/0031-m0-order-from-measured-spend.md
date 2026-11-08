@@ -1,6 +1,6 @@
 # ADR 0031: Re-rank M0 from measured spend; sub-agent model fit in M0
 
-- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md)
+- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md)
 - Date: 2026-11-07
 - Amends: [ADR 0029](0029-m0-build-order-by-user-value.md) (M0 build order), [patterns.md](../patterns.md) (P13, P14 milestones)
 

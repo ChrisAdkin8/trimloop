@@ -131,6 +131,37 @@ func Cheaper(model string) (string, bool) {
 	return m, ok
 }
 
+// successor lists, for older models, the newer model in the same line that
+// costs no more per token and counts tokens the same way (same tokenizer), so
+// the same work costs no more on it.
+var successor = map[string]string{
+	"claude-opus-5":   "claude-opus-5-5",
+	"claude-opus-4-8": "claude-opus-5-5",
+	"claude-opus-4-7": "claude-opus-5-5",
+	"claude-fable-5":  "claude-fable-5-1",
+	"claude-sonnet-5": "claude-sonnet-5-5",
+}
+
+// Successor returns the newer model to suggest in place of model, and false
+// if there is none.
+func Successor(model string) (string, bool) {
+	m, ok := successor[model]
+	return m, ok
+}
+
+// lowerTier lists, for main sessions, the model one tier down to suggest for
+// routine work (ADR 0042). A trade-off: untested for quality.
+var lowerTier = map[string]string{
+	"claude-fable-5-1": "claude-opus-5-5",
+}
+
+// LowerTier returns the model one tier down from model for main sessions, and
+// false if there is none.
+func LowerTier(model string) (string, bool) {
+	m, ok := lowerTier[model]
+	return m, ok
+}
+
 // DisplayName is a model's name as people write it: "claude-opus-5-5"
 // becomes "Opus 5.5", "claude-haiku-4-5-20251001" becomes "Haiku 4.5". Names
 // it does not recognise are returned unchanged.

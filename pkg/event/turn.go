@@ -18,9 +18,10 @@ type Turn struct {
 
 	Usage  Usage
 	Cost   Cost
-	Priced bool // false if the price catalogue has no price for Model
-	Fast   bool // fast mode, which changes the price
-	USOnly bool // US-only inference, which changes the price
+	Priced bool   // false if the price catalogue has no price for Model
+	Fast   bool   // fast mode, which changes the price
+	USOnly bool   // US-only inference, which changes the price
+	Effort string // effort level requested; "" if not recorded
 
 	// Project is the name of the project folder the turn ran in; "" if not
 	// known. A session can move between projects.

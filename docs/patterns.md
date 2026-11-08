@@ -22,7 +22,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | ID | Pattern | Milestone | Kind | Max fix level |
 |---|---|---|---|---|
 | P01 | Cache-prefix churn | M0 | Go | 3 |
-| P02 | Cache TTL expiry | M0 | Go | 2 |
+| P02 | Cache TTL expiry | M0 (reduced built, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) | Go | 2 |
 | P03 | Repeated file reads | M0 | Go | 1 |
 | P04 | Oversized and noisy tool output | M0 | Go | 3 |
 | P05 | Tool-call loops | M0 | Go | 0 |
@@ -33,8 +33,8 @@ neutral, so P01 and P02 describe each provider cache model.
 | P10 | Compaction thrash | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0035](adr/0035-measurement-corrections.md)); M3 full | Go | 1 |
 | P11 | Post-failure burn | M3 | Go | 0 |
 | P12 | Retry storms | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md)), not built yet; M3 full | Go | 1 |
-| P13 | Model over-provisioning | M0 sub-agents, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); M4 full | Go | 3 |
-| P14 | Thinking-budget overspend | M0 reduced, M4 full ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 3 |
+| P13 | Model over-provisioning | M0 sub-agents and main sessions, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)); M4 full | Go | 3 |
+| P14 | Thinking-budget overspend | M0 reduced (built, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)), M4 full ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 3 |
 | P15 | Duplicated exploration across a team | M4 | SQL | 1 |
 | P16 | Repeated workflow (skill candidate) | M4 | Go + SQL | 1 |
 | P17 | Repeated instructions | M4 | SQL | 1 |
@@ -91,6 +91,11 @@ fidelity and cannot name the cause.
 `usage.cache_write`, `request.cache_markers`.
 
 ## P02 — Cache TTL expiry
+
+**In M0 (reduced fidelity):** turns in sessions on the 5-minute cache
+(Claude Code's sub-agents) after a wait of 5 minutes to an hour, priced
+against the hour's cache; and, the other way, what the hour saved the
+sessions that used it ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md); [measurements.md](measurements.md)).
 
 **What happens:** The developer pauses longer than the cache lives, so the
 next turn pays again for a prefix that was cached moments before the pause.
@@ -419,6 +424,10 @@ headroom.
 
 ## P13 — Model over-provisioning
 
+**In M0:** sub-agents on a cheaper model ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)),
+and main sessions on a newer model in the same line or, as a trade-off,
+one tier down ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)).
+
 **What happens:** The most capable (and most expensive) model handles turns
 that a smaller model handles just as well, such as file listing, grep-and-read,
 or formatting.
@@ -448,6 +457,9 @@ Fable turns would have cost $271 (13 % of all spend) less on Sonnet 5.5
 has the current figure).
 
 ## P14 — Thinking-budget overspend
+
+**In M0 (reduced fidelity, built):** spend by effort level and the output
+above a typical high-effort turn on xhigh and max turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)).
 
 **What happens:** Extended reasoning tokens are spent on trivial turns.
 

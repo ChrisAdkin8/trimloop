@@ -77,6 +77,7 @@ type Message struct {
 	Usage     event.Usage
 	Fast      bool             // fast mode, which changes the price
 	USOnly    bool             // US-only inference, which changes the price
+	Effort    string           // effort level requested ("medium", "high", "xhigh", "max"); "" if not recorded
 	ToolCalls []event.ToolCall // tools called on this line, with no results yet
 	// Attribution is what the harness says caused the turn.
 	Attribution event.Attribution

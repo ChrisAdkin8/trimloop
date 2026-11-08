@@ -43,6 +43,13 @@ type Results struct {
 	CompactFix  *fixes.Recommendation  `json:"p19_compaction_fix,omitempty"`
 	PauseFix    *fixes.Recommendation  `json:"p09_fix,omitempty"`
 
+	CacheLife    detectors.CacheLife    `json:"p02_cache_life"`
+	CacheLifeFix *fixes.Recommendation  `json:"p02_fix,omitempty"`
+	MainModels   detectors.MainModels   `json:"p13_main_models"`
+	ModelFixes   []fixes.Recommendation `json:"p13_main_fixes"`
+	Effort       detectors.Effort       `json:"p14_effort"`
+	EffortFix    *fixes.Recommendation  `json:"p14_fix,omitempty"`
+
 	Reconciliation detectors.Reconciliation  `json:"reconciliation"`
 	Standing       detectors.StandingContext `json:"p07_standing_context"`
 	StandingFixes  []fixes.Recommendation    `json:"p07_fixes"`
@@ -172,6 +179,18 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 		r.PauseFix = &f
 	}
 
+	r.CacheLife = detectors.FindCacheLife(sessions, s.TopSessions)
+	if f, ok := fixes.ForCacheLife(r.CacheLife, s.MinFixSaving); ok {
+		r.CacheLifeFix = &f
+	}
+	r.MainModels = detectors.FindMainModels(sessions)
+	r.ModelFixes = fixes.ForMainModels(r.MainModels, s.MinFixSaving)
+	r.Actions = append(r.Actions, r.ModelFixes...)
+	r.Effort = detectors.FindEffort(sessions)
+	if f, ok := fixes.ForEffort(r.Effort, s.MinFixSaving); ok {
+		r.EffortFix = &f
+	}
+
 	r.Reconciliation = detectors.FindReconciliation(sessions)
 	r.Standing = detectors.FindStandingContext(sessions)
 	r.StandingFixes = fixes.ForStandingContext(r.Standing, s.MinFixSaving)
@@ -182,7 +201,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	}
 	r.Weeks = detectors.FindWeekly(sessions, s.ContextThreshold, s.PauseGap, loc)
 
-	for _, f := range []*fixes.Recommendation{r.CompactFix, r.PauseFix} {
+	for _, f := range []*fixes.Recommendation{r.CompactFix, r.PauseFix, r.CacheLifeFix, r.EffortFix} {
 		if f != nil {
 			r.Actions = append(r.Actions, *f)
 		}

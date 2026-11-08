@@ -170,7 +170,7 @@ What exists today, and where:
 | `cmd/trimloop` | The command: reads logs, builds sessions, runs the report or a live command |
 | `internal/adapters/source` | Log readers: `claudecode` (Claude Code transcripts), `jsonl` (shared line reader) |
 | `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price catalogue, usage normalisation |
-| `pkg/detectors` | Findings: P19, P09, P04, P07, P13 (sub-agents), growth and compaction, attribution, reconciliation, weekly figures |
+| `pkg/detectors` | Findings: P19, P09, P02, P04, P07, P13 (sub-agents and main sessions), P14, growth and compaction, attribution, reconciliation, weekly figures |
 | `pkg/cmdshape` | Shell commands reduced to shapes, without values |
 | `pkg/fixes` | Recommendations, with the fix ladder of ADR 0030 |
 | `internal/report` | Results, rendered as summary, text, HTML and JSON |
