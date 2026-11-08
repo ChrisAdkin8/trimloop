@@ -1,6 +1,6 @@
 # ADR 0031: Re-rank M0 from measured spend; sub-agent model fit in M0
 
-- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do)
+- Status: Accepted — mostly built (items 1–7; saved offsets and later items to do); amended by [ADR 0035](0035-measurement-corrections.md)
 - Date: 2026-11-07
 - Amends: [ADR 0029](0029-m0-build-order-by-user-value.md) (M0 build order), [patterns.md](../patterns.md) (P13, P14 milestones)
 
@@ -71,13 +71,13 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 | 2 | **Sub-agent economics and P13 reduced fidelity** (Decision 1) | ≈ $271 (13 %) | Done |
 | 3 | **P19 concentration and compaction point; P10 reduced** (Decision 2) | Top 5 conversations 59 %; $292 in never-compacted sessions past 500 k | Done |
 | 4 | **Attribution** by project, skill, plugin and MCP server (Decision 3) | Top project 32 % of spend | Done |
-| 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Done ([ADR 0033](0033-reconciliation-history-standing-context.md)): 3 % on 412 sessions |
+| 5 | **Reconciliation** with the harness cost record: auxiliary and summary requests, web-search fees in the price catalogue | 4.2 % unobserved; 14 % unverifiable | Done ([ADR 0033](0033-reconciliation-history-standing-context.md)): about 13 % on 409 sessions after [ADR 0035](0035-measurement-corrections.md) |
 | 6 | **P07 with injected context by kind**, priced by carried cost | $88 (4.3 %) | Done (ADR 0033), with the system prompt and tool definitions: $221 (11 %) |
 | 7 | **Results kept between runs** (ADR 0029 item 4) | Needed to measure any fix | Weekly figures kept (ADR 0033); saved offsets to do |
 | 8 | **Command-line options**: `--since`, `--repo`, `--format` | Filters for item 4's groups | `--format` (text, HTML, JSON) and `--out` done |
 | 9 | **P14 in reduced fidelity** | ≤ $67 (3 %) | |
 | 10 | **P02 cache-lifetime fit** | Guards a false saving (ADR 0027) | |
-| 11 | **P03, P06, P01; then P05, P10 in full, P12** | P05, P11, P12 small in this sample (errors 3.3 %, retries 1.4 h of 52 h) | |
+| 11 | **P03, P06, P01; then P05, P12** (P10 in M0 is the reduced report, built; full fidelity stays in M3, [ADR 0035](0035-measurement-corrections.md)) | P05, P11, P12 small in this sample (errors 3.3 %, retries 1.4 h of 52 h) | |
 | 12 | **Distribution** (ADR 0029 item 10) | — | |
 | 13 | **Keyed fingerprints and related work** (ADR 0029 item 11) | — | |
 

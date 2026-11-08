@@ -65,3 +65,15 @@ func TestLoadRejectsOtherVersions(t *testing.T) {
 		t.Error("got no error for a damaged file")
 	}
 }
+
+// Figures from an older analysis are replaced while the logs still hold the
+// week, even when the old figures counted more turns.
+func TestMergeReplacesOlderAnalysis(t *testing.T) {
+	f := File{Version: Version, Weeks: map[string]detectors.Week{
+		"2026-10-05": {Week: "2026-10-05", Turns: 120, Spend: 50}, // no analysis version: older
+	}}
+	weeks := Merge(&f, []detectors.Week{{Week: "2026-10-05", Turns: 100, Spend: 45}}, "p")
+	if weeks[0].Turns != 100 || weeks[0].Analysis != detectors.AnalysisVersion {
+		t.Errorf("got %+v, want this run's figures", weeks[0])
+	}
+}

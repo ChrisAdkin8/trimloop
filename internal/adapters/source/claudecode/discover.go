@@ -11,6 +11,9 @@ import (
 // It implements source.Reader.
 type Reader struct {
 	Home string // the user's home directory
+	// ConfigDir is Claude Code\'s configuration folder when it was moved
+	// (CLAUDE_CONFIG_DIR); empty means Home/.claude.
+	ConfigDir string
 }
 
 var _ source.Reader = Reader{} // fails to compile if Reader stops meeting the interface
@@ -22,7 +25,11 @@ func (Reader) Name() string { return "claude-code" }
 // by subagents. Glob supports single '*' (not '**'), so each folder depth
 // needs its own pattern.
 func (r Reader) Discover() ([]source.Log, error) {
-	base := filepath.Join(r.Home, ".claude", "projects")
+	dir := r.ConfigDir
+	if dir == "" {
+		dir = filepath.Join(r.Home, ".claude")
+	}
+	base := filepath.Join(dir, "projects")
 	patterns := []string{
 		filepath.Join(base, "*", "*.jsonl"),                   // main sessions
 		filepath.Join(base, "*", "*", "subagents", "*.jsonl"), // subagents

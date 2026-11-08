@@ -123,7 +123,7 @@ func analyse() {
 
 	// The harnesses to read. Adding a harness is one line here.
 	readers := []source.Reader{
-		claudecode.Reader{Home: home},
+		claudecode.Reader{Home: home, ConfigDir: os.Getenv("CLAUDE_CONFIG_DIR")},
 	}
 
 	// 1. Find the logs, remembering which reader found each one.
@@ -226,6 +226,10 @@ func write(r report.Results, format, path string) error {
 	// titles, which summarise what was asked.
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil { // an existing file keeps its mode otherwise
+		_ = f.Close()
 		return err
 	}
 	if err := render(f, r); err != nil {
@@ -352,8 +356,12 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			standing = st
 			continue
 		case source.KindCostRecord:
-			if prev, ok := runs[m.RunID]; !ok || m.Record.Cost >= prev.Cost {
-				runs[m.RunID] = m.Record // a run's records are running totals
+			rec := m.Record
+			if rec.At.IsZero() {
+				rec.At = last // the record covers the turns logged before it
+			}
+			if prev, ok := runs[m.RunID]; !ok || rec.Cost >= prev.Cost {
+				runs[m.RunID] = rec // a run's records are running totals
 			}
 			continue
 		case source.KindTitle:
@@ -372,6 +380,13 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			continue
 		}
 		i, here := turnOf[m.ID]
+		if here && fuller(m.Usage, s.Turns[i].Usage) {
+			// Claude Code logs one line per content block; an early line can
+			// carry a partial count. Keep the fullest one and price it again.
+			t := &s.Turns[i]
+			t.Usage = m.Usage
+			t.Cost, t.Priced = price.Cost(t.Model, t.Usage, price.Options{Fast: t.Fast, USOnly: t.USOnly})
+		}
 		if m.ID == "" || !seen[m.ID] { // no id: nothing to match repeats on
 			if m.ID != "" {
 				seen[m.ID] = true
@@ -431,6 +446,12 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	return s
 }
 
+// fuller reports whether usage a counts more tokens than b, as a later line
+// of the same reply does when an earlier one held a partial count.
+func fuller(a, b event.Usage) bool {
+	return a.InputTotal()+a.Output > b.InputTotal()+b.Output
+}
+
 // copiedLine reports whether a line with this LineID was already counted in
 // an earlier log (it was copied into a resumed or forked session), and marks
 // it counted otherwise.
@@ -457,6 +478,9 @@ func sumRuns(runs map[string]event.HarnessRecord) *event.HarnessRecord {
 		total.Cost += r.Cost
 		if r.At.After(total.At) {
 			total.At = r.At
+		}
+		if !r.Start.IsZero() && (total.Start.IsZero() || r.Start.Before(total.Start)) {
+			total.Start = r.Start
 		}
 		for model, m := range r.ByModel {
 			total.ByModel[model] = total.ByModel[model].Add(m)

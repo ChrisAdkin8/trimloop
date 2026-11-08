@@ -134,16 +134,31 @@ func strip(w []string) []string {
 		case isAssignment(head):
 			w = w[1:]
 		case prefixes[head]:
-			w = w[1:]
-			// Drop the wrapper's own options, and the duration timeout takes.
-			for len(w) > 0 && strings.HasPrefix(w[0], "-") {
-				w = w[1:]
-			}
+			// Drop the wrapper's own options and their values, and the
+			// duration timeout takes.
+			w = skipOptions(w[1:], wrapperValueOpts[head])
 			if head == "timeout" && len(w) > 0 {
 				w = w[1:]
 			}
 		default:
 			return w
+		}
+	}
+	return w
+}
+
+// skipOptions drops leading options, and the value of each one listed in
+// valued, so a value (a user, a package, a variable name) is never taken for
+// the program. "--" ends the options.
+func skipOptions(w []string, valued []string) []string {
+	for len(w) > 0 && strings.HasPrefix(w[0], "-") && w[0] != "-" {
+		opt := w[0]
+		w = w[1:]
+		if opt == "--" {
+			break
+		}
+		if !strings.Contains(opt, "=") && slices.Contains(valued, opt) && len(w) > 0 {
+			w = w[1:]
 		}
 	}
 	return w
@@ -181,7 +196,9 @@ func shapeOf(pipe []pipePart) Shape {
 	prog := path.Base(words[0])
 	args := words[1:]
 
-	// Runners: the program that matters is the one they run.
+	// Runners: the program that matters is the one they run. raw is the
+	// word the program name came from, checked whole below.
+	raw := words[0]
 	for {
 		if subs, ok := runners[prog]; ok {
 			rest := args
@@ -191,24 +208,24 @@ func shapeOf(pipe []pipePart) Shape {
 				}
 				rest = rest[1:]
 			}
-			for len(rest) > 0 && strings.HasPrefix(rest[0], "-") {
-				rest = rest[1:]
-			}
+			rest = skipOptions(rest, runnerValueOpts[prog])
 			if len(rest) == 0 {
 				break
 			}
+			raw = rest[0]
 			prog, args = path.Base(rest[0]), rest[1:]
 			continue
 		}
 		// python -m pytest runs pytest.
 		if interpreters[prog] && len(args) >= 2 && args[0] == "-m" {
+			raw = args[1]
 			prog, args = args[1], args[2:]
 			continue
 		}
 		break
 	}
-	if strings.ContainsAny(prog[:min(1, len(prog))], "$`(") {
-		prog = "(computed command)" // never show what a substitution contains
+	if strings.ContainsAny(raw, "$`(") || !progName.MatchString(prog) {
+		prog = "(computed command)" // never show what a substitution or odd word contains
 	}
 	s.Program = prog
 
@@ -274,6 +291,9 @@ func subcommand(prog string, args []string) string {
 	}
 	return strings.Join(sub, " ")
 }
+
+// progName is what a program name looks like: "go", "python3.12", "check.sh".
+var progName = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
 
 // subWord is what a subcommand looks like: "test", "pr", "ls-files".
 var subWord = regexp.MustCompile(`^[a-z][a-z0-9-]{0,23}$`)

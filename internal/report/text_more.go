@@ -17,8 +17,8 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	fmt.Fprintf(w, "  For %d sessions with a record, Claude Code recorded %s and the logs show %s:\n",
 		c.Sessions, money(c.Harness), money(c.Ours))
 	if c.Gap >= 0 {
-		fmt.Fprintf(w, "  %s (%.1f%%) was spent on background requests the logs do not show,\n", money(c.Gap), pct(c.Gap, c.Ours))
-		fmt.Fprintln(w, "  such as session titles, summaries after a break and web searches.")
+		fmt.Fprintf(w, "  %s (%.1f%%) was spent on requests the logs do not record, such as\n", money(c.Gap), pct(c.Gap, c.Ours))
+		fmt.Fprintln(w, "  session titles, summaries after a break, compactions and web searches.")
 	} else {
 		fmt.Fprintf(w, "  the logs show %s more than the records; some records may predate the session's end.\n", money(-c.Gap))
 	}

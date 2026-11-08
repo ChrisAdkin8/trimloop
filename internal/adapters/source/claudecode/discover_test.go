@@ -52,3 +52,19 @@ func TestDiscoverNoProjectsFolder(t *testing.T) {
 		t.Errorf("got %+v, want no logs", got)
 	}
 }
+
+// A moved Claude Code configuration folder (CLAUDE_CONFIG_DIR) is followed.
+func TestDiscoverConfigDir(t *testing.T) {
+	cfg := t.TempDir()
+	p := filepath.Join(cfg, "projects", "proj", "s.jsonl")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	logs, err := Reader{Home: t.TempDir(), ConfigDir: cfg}.Discover()
+	if err != nil || len(logs) != 1 || logs[0].Path != p {
+		t.Errorf("got %+v, %v", logs, err)
+	}
+}

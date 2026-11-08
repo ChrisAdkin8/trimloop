@@ -139,7 +139,8 @@ type Detector interface {
     OnSessionEnd(st State, s *event.Session) []event.Finding
 }
 
-// An Aggregate runs across sessions in a Store (P06, P07, P15–P18).
+// An Aggregate runs across sessions in a Store (P06, P15–P18). P07 is a
+// per-session Go detector (ADR 0033).
 // Most are SQL (SQLAggregate wraps a query); P16's sequence miner is Go.
 // Like a Detector, it declares capabilities and reports coverage per group.
 type Aggregate interface {
@@ -573,8 +574,10 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P05 Tool-call loops | `response.tool_calls` | `outcome.git` |
 | P06 Unused tool definitions | `response.tool_calls`, and `request.full_body` **or** `harness.config` | `context.repo` |
 | P07 Bloated standing context | `request.full_body` **or** `context.repo` | `harness.config`, `harness.injected_context`, `content.local` |
+| P09 Resume bloat | `usage.cache_write`, `timing.per_turn` | — |
 | P10 Compaction thrash | `harness.compaction` **or** `request.full_body` | — |
 | P12 Retry storms | `harness.retries` **or** `request.full_body` | `timing.per_turn` |
+| P19 Large working context | `usage.cache_read` | `usage.cache_write`, `response.tool_calls` (what fills the context), `harness.compaction` |
 | P13 Model over-provisioning (sub-agents, reduced) | Sub-agent sessions (the profile's `sidechains`) | `harness.attribution` (agent type) |
 | P14 Thinking-budget overspend | `usage.reasoning` | `request.effort`, `outcome.git` (turn-complexity classes, M4) |
 | P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |

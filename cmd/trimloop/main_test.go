@@ -419,3 +419,44 @@ func TestBuildSessionCountsCopiedLinesOnce(t *testing.T) {
 		t.Errorf("resumed: got %+v, want one turn with nothing copied counted again", second.Turns)
 	}
 }
+
+// An early line of a reply can carry a partial count: the fullest one counts.
+func TestBuildSessionKeepsFullestUsage(t *testing.T) {
+	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
+		{ID: "a", Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: 100, Output: 4}},
+		{ID: "a", Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: 100, Output: 450}},
+	}}
+	s := buildSession(d, map[string]bool{})
+	if len(s.Turns) != 1 || s.Turns[0].Usage.Output != 450 || s.Turns[0].Cost.Output == 0 {
+		t.Errorf("got %+v", s.Turns)
+	}
+}
+
+// Claude Code's cost records carry no time: each is stamped with the last
+// turn logged before it, so a session that went on afterwards is seen.
+func TestBuildSessionStampsCostRecords(t *testing.T) {
+	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
+		{ID: "a", Time: t0},
+		{Kind: source.KindCostRecord, RunID: "r", Record: event.HarnessRecord{Cost: 1, Start: t0.Add(-time.Minute)}},
+		{ID: "b", Time: t0.Add(time.Hour)},
+	}}
+	s := buildSession(d, map[string]bool{})
+	if !s.Harness.At.Equal(t0) || !s.Harness.Start.Equal(t0.Add(-time.Minute)) {
+		t.Errorf("got At %v, Start %v", s.Harness.At, s.Harness.Start)
+	}
+}
+
+// Writing over an existing, readable report makes it private.
+func TestWriteMakesExistingReportPrivate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "r.json")
+	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := report.Analyse(nil, report.Read{}, report.DefaultSettings(), t0)
+	if err := write(r, "json", path); err != nil {
+		t.Fatal(err)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Errorf("got %v, want 0600", info.Mode().Perm())
+	}
+}

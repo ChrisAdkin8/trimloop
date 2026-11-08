@@ -118,6 +118,11 @@ func Hook(event string, in io.Reader, out io.Writer, env Env) {
 	var nudge string
 	switch event {
 	case "stop":
+		if r.Context <= env.Settings.Large && len(st.Crossed) > 0 {
+			// Compacted or cleared: the nudges can be useful again.
+			st.Crossed = map[int]bool{}
+			_ = env.Store.Save(inp.SessionID, st)
+		}
 		msg, threshold := env.Settings.AfterReply(r, st.Crossed)
 		if msg == "" {
 			return

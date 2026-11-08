@@ -96,7 +96,7 @@ func TestBeforeSend(t *testing.T) {
 		t.Errorf("not very large: got %q", r)
 	}
 	r := s.BeforeSend(big, t0.Add(3*time.Hour), time.Time{})
-	if !strings.Contains(r, "away 3 hours") || !strings.Contains(r, "610k tokens") || !strings.Contains(r, "Enter again") {
+	if !strings.Contains(r, "away 3 hours") || !strings.Contains(r, "610k tokens") || !strings.Contains(r, "Send your message again") {
 		t.Fatalf("got %q", r)
 	}
 	if r := s.BeforeSend(big, t0.Add(3*time.Hour), t0); r != "" {
@@ -116,7 +116,7 @@ func TestStore(t *testing.T) {
 	if !got.Crossed[200_000] || !got.PausedFor.Equal(t0) {
 		t.Errorf("got %+v", got)
 	}
-	if err := s.Save("../escape", st); err != nil || fileExists(filepath.Join(s.Dir, "..", "escape.json")) {
+	if err := s.Save("../escape", st); err == nil || fileExists(filepath.Join(s.Dir, "..", "escape.json")) {
 		t.Error("an unsafe session id must not write outside the folder")
 	}
 	old := filepath.Join(s.Dir, "old.json")
@@ -238,7 +238,7 @@ func TestWriteSettings(t *testing.T) {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		t.Fatal(err)
 	}
-	if cfg["model"] != "opus" || !strings.Contains(string(b), "say done") || !strings.Contains(string(b), `\"/bin/trimloop\" hook stop`) {
+	if cfg["model"] != "opus" || !strings.Contains(string(b), "say done") || !strings.Contains(string(b), `'/bin/trimloop' hook stop`) {
 		t.Errorf("settings lost or missing: %s", b)
 	}
 	// Running it again adds nothing twice.
@@ -332,5 +332,58 @@ func TestWriteSettingsSafety(t *testing.T) {
 func TestMoneyNegative(t *testing.T) {
 	if money(-4.1) != "-$4.10" || money(-12) != "-$12" {
 		t.Errorf("got %q and %q", money(-4.1), money(-12))
+	}
+}
+
+// A linked settings file is updated where it really lives, keeping its
+// permissions; a moved binary's entries are updated, not duplicated; paths
+// are quoted for the shell.
+func TestWriteSettingsLinksMovesAndQuoting(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "dotfiles", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(target, []byte(`{"model":"opus"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "settings.json")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteSettings(link, "/old/trimloop", false); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Error("the link was replaced by a file")
+	}
+	if fi, _ := os.Stat(target); fi.Mode().Perm() != 0o644 {
+		t.Errorf("mode: got %v, want 0644 kept", fi.Mode().Perm())
+	}
+
+	// The binary moved: the status line and hooks follow, with no duplicates.
+	if _, err := WriteSettings(link, "/new/trimloop", false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(target)
+	if strings.Contains(string(b), "/old/") || strings.Count(string(b), "hook stop") != 1 || strings.Count(string(b), "statusline") != 1 {
+		t.Errorf("after the move: %s", b)
+	}
+
+	if got := hookCommand("/p$x/tri'loop", "stop"); got != `'/p$x/tri'\''loop' hook stop` {
+		t.Errorf("quoting: got %s", got)
+	}
+}
+
+// After a session shrinks (compacted or cleared), the nudges re-arm.
+func TestHookStopRearmsAfterShrinking(t *testing.T) {
+	e := env(t, t0.Add(time.Minute))
+	var out bytes.Buffer
+	Hook("stop", strings.NewReader(session(t, 250_000, t0)), &out, e)
+	out.Reset()
+	Hook("stop", strings.NewReader(session(t, 40_000, t0)), &out, e)  // compacted
+	Hook("stop", strings.NewReader(session(t, 260_000, t0)), &out, e) // large again
+	if !strings.Contains(out.String(), "200k") {
+		t.Errorf("got %q, want the 200k nudge again", out.String())
 	}
 }

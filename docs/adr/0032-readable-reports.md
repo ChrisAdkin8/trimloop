@@ -1,6 +1,6 @@
 # ADR 0032: Readable reports — session titles, likely savings, plain language
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md)
 - Date: 2026-11-07
 - Amends: [ADR 0004](0004-local-first-hashes-only.md) (what a local report may show), [ADR 0030](0030-how-fixes-are-chosen.md) §2 (ranking)
 
@@ -49,7 +49,8 @@ content.
      an hour is priced as if it had started a new session of the typical
      first-request size.
    Actions are ranked by the likely saving where there is one, else by the
-   upper bound (amends ADR 0030 §2 until measured outcomes exist).
+   upper bound (amends ADR 0030 §2 until measured outcomes exist). Amended
+   by [ADR 0035](0035-measurement-corrections.md): ranked by the upper bound.
 3. **P09 gets an action.** "Start fresh after a long break", with compacting
    *before* the break as the alternative: compacting after it re-sends the
    whole conversation to an expired cache.

@@ -58,6 +58,15 @@ func TestParse(t *testing.T) {
 		{cmd: `git --no-pager log --oneline`, shape: "git log --oneline", noise: event.NoiseData},
 		{cmd: `npm -g install typescript`, shape: "npm install", noise: event.NoiseBuildTest},
 
+		{cmd: `sudo -u deploy-svc ./deploy.sh`, shape: "deploy.sh", noise: event.NoiseOther},
+		{cmd: `env -u SECRET_NAME make -s`, shape: "make -s", noise: event.NoiseBuildTest},
+		{cmd: `nice -n 10 make`, shape: "make", noise: event.NoiseBuildTest},
+		{cmd: `timeout -s KILL 30 go test ./...`, shape: "go test", noise: event.NoiseBuildTest},
+		{cmd: `npx -p acme-pkg acme`, shape: "acme", noise: event.NoiseOther},
+		{cmd: `uvx --from acme-tool acme`, shape: "acme", noise: event.NoiseOther},
+		{cmd: `$(cat /etc/secret-file) | head`, shape: "(computed command)", filtered: true, noise: event.NoiseOther},
+		{cmd: `/opt/x/$(whoami)/bin/tool`, shape: "(computed command)", noise: event.NoiseOther},
+
 		// Loops, groups, comments and other odd input
 		{cmd: `for f in a b; do cat "$f"; done`, shape: "cat", file: "$f", noise: event.NoiseFileView},
 		{cmd: "# list files\nls", shape: "ls", noise: event.NoiseSearch},

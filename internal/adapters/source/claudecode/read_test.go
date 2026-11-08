@@ -335,3 +335,17 @@ func TestParseLineKeepsLineID(t *testing.T) {
 		t.Errorf("attachment: got %q", m.LineID)
 	}
 }
+
+// A reply logged as steps with a zero top level is priced from its steps.
+func TestParseLineSumsIterations(t *testing.T) {
+	m, _, _ := parseLine([]byte(`{"type":"assistant","message":{"id":"m","usage":{"input_tokens":0,"output_tokens":0,` +
+		`"iterations":[{"cache_read_input_tokens":900,"output_tokens":5},{"cache_read_input_tokens":100,"output_tokens":7}]}}}`))
+	if m.Usage.CacheRead != 1000 || m.Usage.Output != 12 {
+		t.Errorf("got %+v", m.Usage)
+	}
+	m, _, _ = parseLine([]byte(`{"type":"assistant","message":{"id":"m","usage":{"output_tokens":3,` +
+		`"iterations":[{"output_tokens":99}]}}}`))
+	if m.Usage.Output != 3 {
+		t.Errorf("a non-zero top level should be kept: got %+v", m.Usage)
+	}
+}

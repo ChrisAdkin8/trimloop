@@ -24,6 +24,9 @@ func TestFindReconciliation(t *testing.T) {
 		{ID: "b", Kind: "main", Harness: record(1, at, 0), Turns: []event.Turn{turn("opus", 9, at.Add(time.Hour))}},
 		// No record.
 		{ID: "c", Kind: "main", Turns: []event.Turn{turn("opus", 4, at)}},
+		// A record whose earliest run began after the session did: partial.
+		{ID: "e", Kind: "main", Harness: &event.HarnessRecord{Cost: 2, At: at.Add(time.Hour), Start: at.Add(30 * time.Minute)},
+			Turns: []event.Turn{turn("opus", 9, at), turn("opus", 1, at.Add(time.Hour))}},
 		// A turn with no price: the logs would show it as free.
 		{ID: "d", Kind: "main", Harness: record(30, at.Add(time.Hour), 0), Turns: []event.Turn{{Model: "new-model", Time: at}}},
 	}
@@ -31,7 +34,7 @@ func TestFindReconciliation(t *testing.T) {
 	if f.Sessions != 1 || f.Harness != 12 || f.Ours != 10 || f.Gap != 2 || f.Unpriced != 1 {
 		t.Errorf("compared: got %+v", f)
 	}
-	if f.Behind != 1 || f.BehindCost != 9 || f.Unrecorded != 1 || f.UnrecordedCost != 4 {
+	if f.Behind != 2 || f.BehindCost != 19 || f.Unrecorded != 1 || f.UnrecordedCost != 4 {
 		t.Errorf("left out: got behind %d ($%v), unrecorded %d ($%v)", f.Behind, f.BehindCost, f.Unrecorded, f.UnrecordedCost)
 	}
 	if f.WebSearches != 100 || !near(f.WebSearchCost, 1) {

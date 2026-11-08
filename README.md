@@ -55,6 +55,8 @@ Trimloop is designed to do all four.
 
 ## Architecture
 
+The target design (M0 is the transcript reader and live nudges only):
+
 ![Trimloop high-level architecture: coding agents send traffic through Trimloop taps to model providers; a normaliser, local store, detectors and actuators run on the developer machine; an optional team collector receives hashes-only findings, including from a gateway sidecar beside LiteLLM, and ranks recommendations](docs/images/architecture.svg)
 
 Everything in the top box runs on the developer's machine; raw prompts and code
@@ -88,7 +90,7 @@ plugin), [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)
 
 ## Running the prototype
 
-You need only Go 1.27 or later. The prototype reads the Claude Code session logs on this machine
+You need only Go 1.27.3 or later. The prototype reads the Claude Code session logs on this machine
 (`~/.claude/projects`) and reports where tokens went and what to change:
 
 ```bash
@@ -102,7 +104,8 @@ The HTML page is one self-contained file: styles, charts and script are
 inline and it loads nothing from the network, so it works offline and the
 data stays on the machine. It names sessions by the titles Claude Code
 gives them, which summarise what you asked, and shows project and skill
-names: check it before sharing, or add `--no-titles`
+names: check it before sharing. `--no-titles` removes the titles; project,
+skill, plugin and MCP server names and command types stay
 ([ADR 0032](docs/adr/0032-readable-reports.md)).
 
 Each run also keeps week-by-week figures (numbers only) in
@@ -115,7 +118,8 @@ file; `--no-history` neither reads nor writes it
 
 Trimloop can also nudge you while you work: a status line showing the
 conversation's size, its cost and the cache countdown, a message when a
-session passes 200k and 500k tokens, and a one-time pause before an
+session passes 200k and 500k tokens, and, in sessions over 500k tokens
+whose cache has expired, a pause once per break before an
 expensive message after a long break
 ([ADR 0034](docs/adr/0034-live-nudges.md)). Build the binary, then add its
 settings to Claude Code:
@@ -138,7 +142,9 @@ Everything stays on your machine, readable by you only (mode 0600):
 | `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
 
 `trimloop setup --write` also edits the Claude Code settings file you name,
-after saving a backup next to it.
+after saving a backup next to it. It follows a link to the real file and
+keeps that file's permissions, updates its own entries if the binary moved,
+and leaves another status line alone unless you add `--replace-statusline`.
 
 ## Current state
 
@@ -156,7 +162,8 @@ What exists today, and where:
 | `internal/history` | Weekly figures kept between runs |
 | `internal/live` | Status line, hooks and `setup` for Claude Code |
 
-Not built yet: the store (DuckDB), other harnesses, the gateway plugin and
+Not built yet: keyed fingerprints and redaction (the prototype stores and
+sends nothing beyond the files above), the store (DuckDB), other harnesses, the gateway plugin and
 sidecar (M1), the team collector (M2) and automatic fixes (M3 onwards). The
 [ROADMAP](ROADMAP.md) has the order; [docs/adr/README.md](docs/adr/README.md)
 lists every decision with whether it is built.

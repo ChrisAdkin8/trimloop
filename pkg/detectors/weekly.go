@@ -24,10 +24,17 @@ type Week struct {
 	Compactions  int     `json:"compactions"`
 
 	Prices string `json:"prices,omitempty"` // price catalogue the figures used
+	// Analysis is the AnalysisVersion that worked the figures out.
+	Analysis int `json:"analysis,omitempty"`
 	// Kept is true when the week came from the history file and is no
 	// longer in the logs (the harness deletes old logs).
 	Kept bool `json:"kept,omitempty"`
 }
+
+// AnalysisVersion changes whenever a fix changes how the weekly figures are
+// worked out, so figures kept from an older version can be replaced.
+// Version 2 stopped counting made-up replies as turns and copied lines twice.
+const AnalysisVersion = 2
 
 // WeekOf returns the Monday that starts t's week, as YYYY-MM-DD in t's
 // location.

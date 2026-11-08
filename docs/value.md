@@ -50,9 +50,11 @@ will re-rank by measured waste.
 
 **First measurement (2026-11-07, one developer):** on the founder's Claude
 Code sessions the order was different. Large working context (P19) and
-re-caching after long pauses (P09) were the largest levers, with likely
-savings of up to about 31% and 17% of spend (31% priced removed history at
-the turn's average input price; at the cache-read price it is about 19%); cache churn (P01) was about
+re-caching after long pauses (P09) were the largest levers: keeping turns
+under 200k could save up to about 19% of spend (first measured as 31%, see
+[ADR 0035](adr/0035-measurement-corrections.md)), with compacting earlier
+likely to save about $463 of $2,134, and fresh starts after long breaks up
+to 17%; cache churn (P01) was about
 1.5% and P02 below zero. One heavy user of a 1M-context model is not
 representative, so the table above is re-ranked only after §8 step 2. Details
 and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
@@ -160,9 +162,10 @@ before/after measurement in the recommendation engine is what makes
 
 ## 8. Validation plan
 
-1. Run `trimloop analyse` (M0) on the founder's own Claude Code sessions.
-   Record actual cache-hit rate, token mix by class, and estimated waste per
-   pattern.
+1. ~~Run `trimloop analyse` (M0) on the founder's own Claude Code sessions.~~
+   Done 2026-11-06 to 11-08: token mix, waste per pattern and the check
+   against Claude Code's records are in
+   [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance).
 2. Repeat on 5–10 design-partner developers; add a second harness once the
    Codex reader ships (M1).
 3. Replace the hypotheses in §2, §3 and §6 with measured values: re-rank the

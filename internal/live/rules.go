@@ -151,7 +151,7 @@ func (s Settings) BeforeSend(r Reply, now time.Time, pausedFor time.Time) string
 		cost = fmt.Sprintf(" (about %s)", money(c))
 	}
 	return fmt.Sprintf("Paused once: you were away %s, so the saved copy of this conversation (the cache) has expired. "+
-		"Sending now re-sends all %s tokens%s. Press Enter again to send anyway, or run /clear and paste a short "+
+		"Sending now re-sends all %s tokens%s. Send your message again to go ahead, or run /clear and paste a short "+
 		"note of where things stand to start fresh.", awayText(away), tokens(r.Context), cost)
 }
 

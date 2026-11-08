@@ -22,6 +22,30 @@ var setup = set("cd", "pushd", "popd", "export", "set", "unset", "source", ".",
 var prefixes = set("sudo", "time", "nice", "nohup", "env", "command", "exec",
 	"builtin", "timeout", "do", "then", "else", "!", "if", "while", "until")
 
+// wrapperValueOpts are the options of each wrapper that take a value.
+var wrapperValueOpts = map[string][]string{
+	"sudo":    {"-u", "-g", "-C", "-h", "-p", "-U", "-r", "-t", "-D", "--user", "--group", "--host", "--prompt"},
+	"env":     {"-u", "-C", "-S", "--unset", "--chdir", "--split-string"},
+	"nice":    {"-n", "--adjustment"},
+	"timeout": {"-s", "-k", "--signal", "--kill-after"},
+	"time":    {"-o", "-f", "--output", "--format"},
+	"exec":    {"-a"},
+}
+
+// runnerValueOpts are the options of each runner that take a value.
+var runnerValueOpts = map[string][]string{
+	"npx":   {"-p", "--package", "-c", "--call"},
+	"bunx":  {"-p", "--package"},
+	"pnpx":  {"-p", "--package"},
+	"uvx":   {"--from", "--with", "-p", "--python", "--index", "--index-url"},
+	"xargs": {"-I", "-n", "-P", "-L", "-d", "-E", "-s", "-a"},
+	"watch": {"-n", "-d", "--interval"},
+	"uv":    {"--with", "-p", "--python", "--project", "--directory", "--package", "--extra", "--group", "--index"},
+	"pnpm":  {"--package"},
+	"npm":   {"-p", "--package", "-c", "--call"},
+	"pipx":  {"--spec", "--python"},
+}
+
 // filters reduce what reaches the model when output is piped into them.
 var filters = set("head", "tail", "grep", "egrep", "fgrep", "rg", "jq", "yq",
 	"wc", "sort", "uniq", "awk", "sed", "cut", "tr", "less", "more", "column",

@@ -1,6 +1,6 @@
 # ADR 0010: Detectors are Go state machines; SQL only for cross-session aggregates
 
-- Status: Proposed
+- Status: Accepted — partly built (detectors are Go; SQL aggregates not built); P07 built as a Go detector by [ADR 0033](0033-reconciliation-history-standing-context.md)
 - Date: 2026-11-05
 - Amends: [ADR 0003](0003-duckdb-local-clickhouse-team.md) (rationale for SQL detectors)
 

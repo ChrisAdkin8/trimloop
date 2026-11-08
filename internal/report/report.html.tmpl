@@ -319,7 +319,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 {{with .Reconciliation}}{{if .Sessions}}
 <section class="area">
 <h2 id="checks">Checking the totals</h2>
-<p class="lead">{{if ge .Gap 0.0}}Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs, for background requests the logs don't show, such as session titles and web searches.{{else}}The logs show {{dollars (neg .Gap)}} more than Claude Code's own records; its records may have been written before some sessions ended.{{end}}{{if .Unrecorded}} {{.Unrecorded}} sessions ({{pct .UnrecordedCost $.Total}} of spend) have no record to check against.{{end}}</p>
+<p class="lead">{{if ge .Gap 0.0}}Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs: requests the logs don't record, such as session titles, summaries after a break, compactions and web searches.{{else}}The logs show {{dollars (neg .Gap)}} more than Claude Code's own records; its records may have been written before some sessions ended.{{end}}{{if .Unrecorded}} {{.Unrecorded}} sessions ({{pct .UnrecordedCost $.Total}} of spend) have no record to check against.{{end}}</p>
 <details><summary>Show details</summary>
 <div class="panel">
   <p>For {{.Sessions}} sessions with a record, Claude Code recorded {{dollars .Harness}} and the logs show {{dollars .Ours}}.{{if .WebSearches}} {{.WebSearches}} web searches cost about {{dollars .WebSearchCost}} in search fees.{{end}}{{if .Behind}} {{.Behind}} sessions went on after their record was last written and are left out.{{end}}{{if .Unpriced}} {{.Unpriced}} sessions used a model with no known price and are left out.{{end}}</p>

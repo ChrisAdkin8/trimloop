@@ -61,6 +61,9 @@ type record struct {
 			anthropic.Usage
 			Speed        string `json:"speed"`         // "fast" in fast mode
 			InferenceGeo string `json:"inference_geo"` // "us" for US-only inference
+			// Iterations holds the usage of each step when the harness
+			// split one reply into several; the top level can then be zero.
+			Iterations []anthropic.Usage `json:"iterations"`
 		} `json:"usage"` // nil when the line has no usage
 	} `json:"message"`
 }
@@ -159,7 +162,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			Time:      ts,
 			Project:   projectOf(rec.Cwd),
 			Model:     rec.Message.Model,
-			Usage:     anthropic.NormalizeUsage(u.Usage),
+			Usage:     replyUsage(u.Usage, u.Iterations),
 			Fast:      u.Speed == "fast",
 			USOnly:    u.InferenceGeo == "us",
 			ToolCalls: toolCalls(blocks(rec.Message.Content), rec.Cwd),
@@ -194,6 +197,10 @@ func parseLine(line []byte) (source.Message, bool, error) {
 	case rec.Type == "cost-state" && rec.TotalCostUSD != nil:
 		m := source.Message{Kind: source.KindCostRecord, SessionID: rec.SessionID, Time: ts,
 			RunID: string(rec.StartTime), Record: event.HarnessRecord{Cost: *rec.TotalCostUSD, ByModel: map[string]event.ModelRecord{}, At: ts}}
+		var startMs int64
+		if json.Unmarshal(rec.StartTime, &startMs) == nil && startMs > 0 {
+			m.Record.Start = time.UnixMilli(startMs).UTC()
+		}
 		for model, u := range rec.ModelUsage {
 			m.Record.ByModel[model] = event.ModelRecord{
 				Cost: u.CostUSD, InputUncached: u.InputTokens, CacheRead: u.CacheReadInputTokens,
@@ -406,4 +413,19 @@ func memoryName(f memFile) string {
 		return f.Type + " " + name
 	}
 	return name
+}
+
+// replyUsage normalises a reply's usage. When the top level is all zero but
+// the reply was logged as steps (iterations), their usage is added up
+// instead, so the reply is not priced as free.
+func replyUsage(top anthropic.Usage, steps []anthropic.Usage) event.Usage {
+	u := anthropic.NormalizeUsage(top)
+	if u.InputTotal() > 0 || u.Output > 0 || len(steps) == 0 {
+		return u
+	}
+	var sum event.Usage
+	for _, s := range steps {
+		sum = sum.Add(anthropic.NormalizeUsage(s))
+	}
+	return sum
 }

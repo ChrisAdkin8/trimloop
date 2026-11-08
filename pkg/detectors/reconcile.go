@@ -17,9 +17,10 @@ type Reconciliation struct {
 	Ours     float64 `json:"ours"`     // what the logs show for them
 	Gap      float64 `json:"gap"`      // Harness minus Ours: spend the logs do not show
 
-	// Behind counts sessions that kept working after their record was last
-	// written (still running, or ended without writing it), with what the
-	// logs show for them. They are left out of the comparison.
+	// Behind counts sessions whose record does not cover them: work went on
+	// after the record was last written (still running, or ended without
+	// writing it), or began before the earliest recorded run. They are left
+	// out of the comparison.
 	Behind     int     `json:"behind"`
 	BehindCost float64 `json:"behind_cost"`
 
@@ -60,8 +61,9 @@ const staleAfter = 10 * time.Minute
 func FindReconciliation(sessions []event.Session) Reconciliation {
 	var f Reconciliation
 	ours := map[string]float64{}
-	last := map[string]time.Time{} // latest turn of each conversation
-	unpriced := map[string]bool{}  // conversations with a turn that has no price
+	last := map[string]time.Time{}  // latest turn of each conversation
+	first := map[string]time.Time{} // earliest turn of each conversation
+	unpriced := map[string]bool{}   // conversations with a turn that has no price
 	oursModel := map[string]map[string]*ModelGap{}
 	for _, s := range sessions {
 		id := s.Conversation()
@@ -70,6 +72,9 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 		}
 		if e := s.End(); e.After(last[id]) {
 			last[id] = e
+		}
+		if b := s.Start(); !b.IsZero() && (first[id].IsZero() || b.Before(first[id])) {
+			first[id] = b
 		}
 		for _, t := range s.Turns {
 			if !t.Priced {
@@ -101,7 +106,9 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 			f.Unpriced++
 			continue
 		}
-		if at := s.Harness.At; !at.IsZero() && last[s.ID].Sub(at) > staleAfter {
+		at, start := s.Harness.At, s.Harness.Start
+		if !at.IsZero() && last[s.ID].Sub(at) > staleAfter ||
+			!start.IsZero() && !first[s.ID].IsZero() && start.Sub(first[s.ID]) > staleAfter {
 			f.Behind++
 			f.BehindCost += mine
 			continue

@@ -568,9 +568,14 @@ its sub-agents), the mean cost of a turn by context size (under 50 k, to
 In the founder's sample the costliest five conversations made 59 % of
 spend, and a turn over 500 k cost $0.28 against $0.06 under 50 k.
 
-**Saving:** The input cost of the tokens above the threshold, at the turn's
-average input price per token. An upper bound: some context is needed.
-Overlaps P09; the two are never added.
+**Saving:** The cost of the tokens above the threshold, priced at what
+history cost on that turn: the cache-read price, or the write price when
+the cache was rebuilt ([ADR 0035](adr/0035-measurement-corrections.md)). An
+upper bound for keeping every turn under the threshold: some context is
+needed. Overlaps P09; the two are never added. The compaction card's
+figures differ because they measure another change: compacting down to
+the typical post-compaction size (about 30 k) whenever a session passes the
+threshold, which removes more than the part above it.
 
 **Fix:** L1 — compact when a session passes the threshold or between tasks
 (Claude Code: `/compact`; it compacts on its own only near the context

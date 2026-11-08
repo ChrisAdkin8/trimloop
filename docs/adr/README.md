@@ -42,6 +42,7 @@ and M4 automatic fixes).
 | [0032](0032-readable-reports.md) | Readable reports — session titles, likely savings, plain language | Reports (M0) | Yes |
 | [0033](0033-reconciliation-history-standing-context.md) | Reconciliation, weekly history, and pricing standing context | Findings (M0) | Yes |
 | [0034](0034-live-nudges.md) | Live nudges in Claude Code | Live nudges (M0) | Yes |
+| [0035](0035-measurement-corrections.md) | Measurement corrections and how actions are ranked | Measurements (M0) | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

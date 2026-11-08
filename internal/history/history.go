@@ -49,15 +49,18 @@ func Load(path string) (File, error) {
 
 // Merge adds this run's weeks to the history and returns every week, oldest
 // first. A week in this run replaces the kept one unless the kept one has
-// more turns: the harness deletes old logs, so a week at the edge of what is
-// left is only partly in the logs. Weeks only in the history are marked Kept.
+// more turns and was worked out by the same analysis: the harness deletes
+// old logs, so a week at the edge of what is left is only partly in the
+// logs, but figures from an older analysis are replaced while the logs still
+// hold the week. Weeks only in the history are marked Kept.
 func Merge(f *File, current []detectors.Week, prices string) []detectors.Week {
 	inLogs := map[string]bool{}
 	for _, w := range current {
 		inLogs[w.Week] = true
 		w.Prices = prices
+		w.Analysis = detectors.AnalysisVersion
 		w.Kept = false
-		if old, ok := f.Weeks[w.Week]; !ok || w.Turns >= old.Turns {
+		if old, ok := f.Weeks[w.Week]; !ok || w.Turns >= old.Turns || old.Analysis < detectors.AnalysisVersion {
 			f.Weeks[w.Week] = w
 		}
 	}

@@ -327,6 +327,7 @@ the transform version, the sent request can be reproduced exactly.
 
 | Threat | Mitigation |
 |---|---|
+| The M0 prototype | Reads logs on the developer machine and sends nothing anywhere. Its local reports show project names and session titles ([ADR 0032](adr/0032-readable-reports.md)); its stored files hold numbers only; `trimloop setup --write` edits Claude Code's settings only when asked, after a backup ([ADR 0034](adr/0034-live-nudges.md)). Keyed fingerprints below are not built yet |
 | Source code / secrets leaving the machine | Default `capture.content = hashes`; the team collector receives only keyed fingerprints, counts, cost and findings. Content is never uploaded; full capture is a per-repo opt-in that stays on the developer machine and never applies to a sidecar |
 | Guessing attacks on fingerprints (hash a likely path, URL or secret and look for a match) | Fingerprints are HMAC-SHA-256 with a customer-held key the collector never receives; names (paths, URLs, repo, branch, MCP servers) are keyed by default ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
 | Secrets stored locally | Redaction before storage; by default the store holds only keyed hashes and is protected by file permissions. Encryption at rest becomes required when full-content capture is enabled ([ADR 0015](adr/0015-defer-local-store-encryption.md)) |

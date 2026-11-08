@@ -60,8 +60,8 @@ and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)).
    `--out` are done).
 3. P14 in reduced fidelity: spend by effort level.
 4. P02 cache-lifetime fit.
-5. P03, P06, P01; then P05, and P10 and P12 in reduced fidelity from
-   harness records (their full fidelity stays in M3).
+5. P03, P06, P01; then P05, and P12 in reduced fidelity from harness
+   records (its full fidelity, and P10's, stays in M3).
 6. Distribution: installable release, minimal conformance runner, profiles.
 7. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 

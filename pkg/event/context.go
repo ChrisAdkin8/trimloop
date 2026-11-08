@@ -45,7 +45,14 @@ func (s *Standing) Bytes() int {
 type HarnessRecord struct {
 	Cost    float64
 	ByModel map[string]ModelRecord
-	At      time.Time // when the latest record was written; zero if not known
+
+	// At is when the latest record was written. Claude Code's records carry
+	// no time of their own, so readers set it to the time of the last turn
+	// logged before the record. Zero if not known.
+	At time.Time
+	// Start is when the earliest recorded run of the harness began; zero if
+	// not known. Work before it has no record.
+	Start time.Time
 }
 
 // ModelRecord is the harness's account of one model's usage in a session.

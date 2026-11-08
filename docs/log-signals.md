@@ -59,7 +59,7 @@ transcript reader.
 
 Implemented ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)):
 every main session with a record is compared with its logs and sub-agents;
-on 412 sessions the harness recorded $52 (3 %) more. The gap is
+on 412 sessions the harness recorded $52 (3 %) more (corrected by [ADR 0035](adr/0035-measurement-corrections.md) to about 13 % on 409 sessions: records written partway through a session had been compared as complete). The gap is
 concentrated in sessions with many away-from-desk summaries and
 compactions; the median session differs by 0.8 %.
 
@@ -285,17 +285,22 @@ of what a sub-agent returns could not be measured from it.
 
 The same developer's logs were measured several times as the code grew.
 Totals differ because the logs grew and the oldest were deleted, and some
-methods changed. This table is the reference; other documents quote it.
+methods changed. This table is the reference for figures other documents quote; where they differ, this table is the later measurement.
 
 | Figure | Value | When | Method |
 |---|---|---|---|
-| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,116 | 2026-11-06 → 11-08 | Usage counted once per message id (ADR 0026); the logs kept growing |
+| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
 | Spend in turns over 200k tokens (P19) | 57–58 % | 11-06 → 11-08 | Input cost of those turns |
-| P19 saving, keeping turns under 200k | 31 % → **19 %** | 11-06 → 11-08 | First priced at the turn's average input price; corrected to price the removed history at the cache-read price (or write price when the cache was rebuilt) |
-| Compact earlier, likely saving | $820–840 → **$457** (up to $681) | 11-07 → 11-08 | Replay of compacting at 200k; corrected as above |
+| P19 saving, keeping turns under 200k | 31 % → **19 %** ($415) | 11-06 → 11-08 | First priced at the turn's average input price; corrected to price the removed history at the cache-read price (or write price when the cache was rebuilt) |
+| Compact earlier, likely saving | $820–840 → **$463** (up to $688) | 11-07 → 11-08 | Replay of compacting at 200k; corrected as above ([ADR 0035](adr/0035-measurement-corrections.md)) |
 | Re-writes after a break of over an hour (P09) | 17 % ($353–368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
-| Tool output (P04) | 2.2 % above 2k tokens per result; **12 %** carried in all | 11-06; 11-07 | 2.2 % is the saving from capping each result at 2k tokens; 12 % is the cost of carrying all tool output |
+| Tool output (P04) | 2.2 % above 8k tokens per result; **12 %** carried in all | 11-06; 11-07 | 2.2 % is the saving from capping each result at 8k tokens (ADR 0027); 12 % is the cost of carrying all tool output; the report now uses a 2k target (about 3 %) |
 | What every request carries (P07) | 4.3 % injected text → **11 %** with system prompt and tool definitions | 11-07 | Carried like tool output (ADR 0033) |
 | Sub-agents on a cheaper model (P13) | $235 → **$271–274** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out |
-| Claude Code's records above the logs | 4.2 % → 3 % → **2.1 %** | 11-07 → 11-08 | First on the latest record per session; then on every run, leaving out sessions still running |
+| Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
+| Re-writes after breaks: earlier quotes | about $314–340 | 11-07 | The first message back after more than an hour, sessions over 200k; the same money as the P09 row |
+| Spend in the costliest sessions | top 1: 23–24 %, top 5: 59 %, top 10: 75 % | 11-07 → 11-08 | Main session with its sub-agents |
+| Sessions past 500k that never compacted | 6, about $292 | 11-07 → 11-08 | |
+| Costliest project | 22 % → 32 % | 11-07 | 22 % used each session's starting folder; 32 % counts each turn's own project, with worktrees under their project |
+| Lower effort (P14), at most | about $67 (3 %) | 11-07 | Output of max and xhigh turns priced at high's mean |
 

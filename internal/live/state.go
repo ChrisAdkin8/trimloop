@@ -2,6 +2,7 @@ package live
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -50,7 +51,7 @@ func (s Store) Load(session string) State {
 func (s Store) Save(session string, st State) error {
 	p, ok := s.path(session)
 	if !ok {
-		return nil
+		return fmt.Errorf("session id %q cannot be used as a file name", session)
 	}
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return err
@@ -59,7 +60,20 @@ func (s Store) Save(session string, st State) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(p, b, 0o600); err != nil {
+	tmp, err := os.CreateTemp(s.Dir, ".state-*")
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Write(b); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := os.Rename(tmp.Name(), p); err != nil {
 		return err
 	}
 	s.prune(30 * 24 * time.Hour)
