@@ -1,111 +1,88 @@
 # Trimloop
 
-> Small adjustments, big savings. Trimloop watches the traffic between AI coding
-> agents and the models they call, finds the patterns that waste tokens, and
-> fixes them — safely.
+Trimloop reads the session logs Claude Code keeps on your machine, works out
+where your tokens went, and tells you which changes to how you work would save
+the most money.
 
-**Status:** M0 prototype. It analyses the Claude Code session logs on your
-machine and gives live nudges inside Claude Code; everything else (gateway
-plugin, team collector, automatic fixes) is design. To try it, see
-[Running the prototype](#running-the-prototype); for what is built, see
-[Current state](#current-state).
+**Status: M0 prototype.** Today it analyses Claude Code logs and gives live
+nudges inside Claude Code. It recommends; it does not change anything for
+you. The wider product (gateway plugin, team collector, automatic fixes) is
+design only: see [The plan](#the-plan).
 
-## The problem
+## What you get
 
-Teams now spend real money on coding agents (Claude Code, Codex, Cursor, Copilot)
-and on LLM gateways (LiteLLM, Portkey, Helicone, OpenRouter). Existing tools
-answer *where* the money went. Almost none answer *why it was wasted* or *what
-to change*:
+A run on one developer's 44 days of logs:
 
-| What exists today | What it does | What it misses |
-|---|---|---|
-| LLM gateways | Log requests, cost dashboards, caching, routing rules | You write the rules; no pattern analysis |
-| LLM observability (Langfuse, LangSmith, Braintrust, Arize) | Traces and evals for apps you build | Not built around coding harnesses |
-| Coding-agent spend trackers (PointFive TokenShift, agentsview, vendor dashboards) | Spend by developer, team, tool | Reports *where*, not *why* |
-| Local proxies (claude-code-cache-fix) | Rewrite one harness's traffic to improve caching | Single harness, single fix |
-| Trace analysers (Clew, adk-eval, pi-deadloop) | Flag redundant steps in finished sessions | Diagnose only; per-session; no team view |
+```text
+Read 623 logs: 622 sessions, 18,109 turns.
+Spent $2,254 at list prices from 25 Sep to 8 Nov 2026 (44 days), about $359 a week.
+Claude Code's own records show $202 (13%) more than its logs: requests the logs do not record.
 
-Nobody joins the four steps together:
+What to do first (these savings overlap, so do not add them):
+  1. Compact long sessions earlier: likely about $555 ($533–$666), up to $851 (38%)
+     Compact when a session passes about 200,000 tokens, or between tasks.
+  2. Start fresh after a long break: likely about $294, up to $306 (14%)
+     After a break of over an hour, start a new session with a short note instead of carrying on.
+  3. Run sub-agents on a cheaper model: up to $299 (13%)
+     Run sub-agents that search, read and summarise on Sonnet 5.5.
+```
 
-1. **Capture** traffic from *any* harness or gateway.
-2. **Detect** waste patterns (cache-prefix churn, repeated file reads, loops,
-   oversized tool output, over-provisioned models, unused tool definitions…).
-3. **Recommend** fixes ranked by money saved, across a whole team.
-4. **Apply** the safe ones automatically, with measurement and rollback.
+The full report (text or a web page) explains each finding, shows the
+sessions behind it, and gives the fix step by step.
 
-Trimloop is designed to do all four.
+**How far to trust the figures.** They are estimates:
 
-## Principles
+- Costs are at Anthropic's list prices, not your bill.
+- "Up to" is the most a change could save; "likely" replays your logs as if
+  you had made it.
+- Savings overlap — the same tokens can be saved by several changes — so
+  they are never added up.
+- Claude Code makes some requests its logs do not record; the report says how
+  much (13 % above).
+- Quality is not measured: a change marked "untested for quality" (a cheaper
+  model, lower effort) needs checking after you make it.
 
-- **Local-first.** Prompts contain source code and secrets. Raw content never
-  leaves the developer's machine unless explicitly enabled. Teams share keyed
-  hashes, sizes, counts and cost — not code or names. The key stays with the
-  customer: a hosted Trimloop server cannot read your code or names or test
-  guesses against them; on a self-hosted collector the same holds for anyone
-  without the key ([ADR 0011](docs/adr/0011-keyed-fingerprints.md),
-  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
-- **Observe before acting.** Recommendations come first; changes Trimloop
-  would make to requests itself (planned, levels 2 and 3) ship report-only,
-  then shadow, then canary, then on. Each is measured and reversible.
-- **Quality is a constraint, not an afterthought.** A saving that makes the
-  agent worse is not a saving. Trimloop tracks outcome signals alongside cost.
-- **Harness- and provider-neutral.** One event model for every harness,
-  gateway and model provider; their differences live in profiles, not in
-  detectors.
+How each figure is worked out is in [docs/measurements.md](docs/measurements.md).
 
-## Architecture
+## What it looks for
 
-The target design (M0 is the transcript reader and live nudges only):
+| Finding | What it means |
+|---|---|
+| Long sessions (P19) | Every turn re-sends the whole conversation, so big sessions get expensive. When to compact or start fresh. |
+| Long breaks (P09) | After an hour away the saved copy (the cache) expires and the whole session is paid for again. |
+| Short waits (P02) | Sessions whose cache lasts only 5 minutes (sub-agents, SDK runs) losing it while waiting on a slow command. |
+| Tool output (P04) | Large command output and file reads that stay in the conversation and are re-sent on every turn. |
+| What every request carries (P07) | The system prompt, tool definitions, skill lists and memory files sent with each request. |
+| Model choice (P13) | Sub-agents and sessions on a more expensive model than the work needs, or on an older, dearer version. |
+| Effort level (P14) | Turns at the highest effort levels that think far more than usual. |
 
-![Trimloop high-level architecture: coding agents send traffic through Trimloop taps to model providers; a normaliser, local store, detectors and actuators run on the developer machine; an optional team collector receives hashes-only findings, including from a gateway sidecar beside LiteLLM, and ranks recommendations](docs/images/architecture.svg)
+It also checks its totals against Claude Code's own cost records, shows spend
+by project, skill and MCP server, and keeps week-by-week figures so you can
+see whether a change worked. The pattern IDs (P19 and so on) refer to
+[docs/patterns.md](docs/patterns.md).
 
-Everything in the top box runs on the developer's machine; raw prompts and code
-never leave it. The dashed arrow is the fix loop: actuators feed safe
-transforms back into the proxy. The gateway sidecar (M1) runs the same engine
-beside LiteLLM, so teams get findings without installing anything on developer
-machines. The team collector is optional and receives only hashes, counts,
-cost and findings. Detail in
-[docs/design.md §3](docs/design.md#3-architecture).
+## Running it
 
-## Technology
-
-**Go for the core, plus a thin Python plugin for LiteLLM.**
-
-| Part | Language | Why |
-|---|---|---|
-| Core: session analyser, normaliser, detectors, local proxy, team collector | Go | One binary to install (built per OS; the prototype is pure Go, the planned DuckDB driver will link the C library); strong HTTP, TLS and streaming support; one codebase for every tap to feed |
-| Detectors | Go; SQL only for cross-session aggregates. Planned as per-turn state machines; the prototype's are plain functions over finished sessions | One implementation will serve batch analysis and live traffic ([ADR 0010](docs/adr/0010-go-detectors-sql-aggregates.md)) |
-| LiteLLM gateway plugin | Python, kept thin | LiteLLM plugins must be Python. The plugin only captures events and forwards them to a `trimloop serve` sidecar on loopback, which does all parsing, redaction and fingerprinting; it applies transforms the core has decided on but contains no detection logic |
-| Envoy and Kong gateways (later) | Go | Envoy's external processing and Kong's Go plugin server let the core plug in directly — no third language |
-| Web UI | TypeScript | Embedded in the Go binary |
-
-By default all fingerprinting happens in Go, in the sidecar. Where a sidecar
-cannot sit beside the gateway, the plugin fingerprints locally; the rules are
-specified once and both implementations are tested against shared test vectors.
-
-Decisions: [ADR 0002](docs/adr/0002-go-for-agent-and-proxy.md) (Go),
-[ADR 0005](docs/adr/0005-thin-python-plugin-for-litellm.md) (thin Python
-plugin), [ADR 0006](docs/adr/0006-gateway-plugin-forwards-to-sidecar.md)
-(plugin forwards to a sidecar). Engine design: [docs/analyzer.md](docs/analyzer.md).
-
-## Running the prototype
-
-You need only Go 1.27.3 or later. The prototype reads the Claude Code session logs on this machine
-(`~/.claude/projects`) and reports where tokens went and what to change:
+You need Go 1.27.3 or later. Clone this repository, then from its folder:
 
 ```bash
-go run ./cmd/trimloop/                          # short summary: spend, period, top three actions
+go run ./cmd/trimloop/                          # short summary, as above
 go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html
 go run ./cmd/trimloop/ --format text            # the full report as text
 go run ./cmd/trimloop/ --format json --out ~/trimloop.json   # every figure, for scripts
 ```
 
-Reports name your sessions and projects, so keep them out of shared places:
-`.gitignore` covers `trimloop-report.html` in this folder, and `--out` can
-put a report anywhere.
+It reads `~/.claude/projects` and sends nothing anywhere.
 
-No Claude Code logs on this machine? Try the sample session instead.
-`CLAUDE_CONFIG_DIR` points the reader at another folder laid out like
+**Reports name your sessions and projects.** They use the titles Claude Code
+gives sessions, which summarise what you asked. Check a report before sharing
+it; `--no-titles` removes the titles (project, skill and server names stay).
+`.gitignore` keeps `trimloop-report.html` out of git, and `--out` can put a
+report anywhere. The web page is one file that loads nothing from the
+network.
+
+**No Claude Code logs on this machine?** Try the sample session.
+`CLAUDE_CONFIG_DIR` points trimloop at another folder laid out like
 `~/.claude`:
 
 ```bash
@@ -114,36 +91,34 @@ cp testdata/sessions/tools.jsonl /tmp/trimloop-demo/projects/demo/
 CLAUDE_CONFIG_DIR=/tmp/trimloop-demo go run ./cmd/trimloop/ --no-history --format text
 ```
 
-The HTML page is one self-contained file: styles, charts and script are
-inline and it loads nothing from the network, so it works offline and the
-data stays on the machine. It names sessions by the titles Claude Code
-gives them, which summarise what you asked, and shows project and skill
-names: check it before sharing. `--no-titles` removes the titles; project,
-skill, plugin and MCP server names and command types stay
-([ADR 0032](docs/adr/0032-readable-reports.md)).
-
-Each run also keeps week-by-week figures (numbers only) in
-`~/.trimloop/history.json` (with `CLAUDE_CONFIG_DIR` set to another folder,
-in `~/.trimloop/history-<id>.json`, one per folder), so you can compare before and after a change
-even once Claude Code has deleted the old logs. `--history FILE` moves the
-file; `--no-history` neither reads nor writes it
-([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
+**Week by week.** Each run keeps weekly figures (numbers only) in
+`~/.trimloop/history.json` — one `history-<id>.json` per other
+`CLAUDE_CONFIG_DIR` folder — so you can compare before and after a change even
+once Claude Code has deleted old logs. `--history FILE` moves the file;
+`--no-history` neither reads nor writes it.
 
 ### Live nudges in Claude Code
 
-Trimloop can also nudge you while you work: a status line showing the
-conversation's size, its cost and the cache countdown, a message when a
-session passes 200k and 500k tokens, and, in sessions over 500k tokens
-whose cache has expired, a pause once per break before an
-expensive message after a long break
-([ADR 0034](docs/adr/0034-live-nudges.md)). Build the binary, then add its
-settings to Claude Code:
+Trimloop can also nudge you while you work:
+
+- a status line with the session's size, its cost and how long its cache has
+  left;
+- a message when a session passes 200,000 and 500,000 tokens;
+- after a long break in a session over 500,000 tokens, a pause before your
+  first message, once, showing what sending it will cost.
+
+Build the program, then add its settings to Claude Code:
 
 ```bash
 go build -o ~/.local/bin/trimloop ./cmd/trimloop
 ~/.local/bin/trimloop setup                                   # print the settings to add
 ~/.local/bin/trimloop setup --write ~/.claude/settings.json   # or add them (a backup is made)
 ```
+
+`setup --write` saves a backup first, follows a link to the real file, keeps
+its permissions, updates its own entries if the program moved, and leaves
+another status line alone unless you add `--replace-statusline`.
+[ADR 0034](docs/adr/0034-live-nudges.md) has the detail.
 
 ### Files it writes
 
@@ -152,97 +127,109 @@ Everything stays on your machine, readable by you only (mode 0600):
 | File | What it holds |
 |---|---|
 | The report you ask for (`--out`, or `trimloop-report.html`) | Figures, project names and session titles |
-| `~/.trimloop/history.json` (or `history-<id>.json` per `CLAUDE_CONFIG_DIR` folder) | Weekly figures only: no names, titles or paths |
+| `~/.trimloop/history.json` (or `history-<id>.json`) | Weekly figures only: no names, titles or paths |
 | `~/.trimloop/live/<session>.json` | Which nudges a session has been shown |
 | `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
 
-`trimloop setup --write` also edits the Claude Code settings file you name,
-after saving a backup next to it. It follows a link to the real file and
-keeps that file's permissions, updates its own entries if the binary moved,
-and leaves another status line alone unless you add `--replace-statusline`.
+## The plan
 
-## Current state
+Everything in this section is design, not built yet.
 
-What exists today, and where:
+Teams spend real money on coding agents (Claude Code, Codex, Cursor, Copilot)
+and on gateways that route their requests (LiteLLM, Portkey, Helicone,
+OpenRouter). The tools we have seen answer *where* the money went; few say
+*why it was wasted* or *what to change*. Trimloop is designed to join four
+steps:
+
+1. **Capture** requests from any coding agent or gateway.
+2. **Detect** waste patterns: the ones above, and more
+   ([docs/patterns.md](docs/patterns.md)).
+3. **Recommend** fixes ranked by money saved, across a whole team.
+4. **Apply** the safe ones automatically, with measurement and rollback.
+
+Principles it is designed around:
+
+- **Local-first.** Prompts contain source code and secrets. Raw content will
+  never leave the developer's machine unless explicitly enabled; teams will
+  share keyed hashes (fingerprints only the customer's key can make), sizes,
+  counts and cost, not code or names
+  ([ADR 0011](docs/adr/0011-keyed-fingerprints.md),
+  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
+- **Observe before acting.** Recommendations first; changes Trimloop would
+  make to requests itself will ship report-only, then in shadow, then to a
+  few, then to all, each measured and reversible.
+- **Quality is a constraint.** A saving that makes the agent worse is not a
+  saving: Trimloop is to track outcome signals (tests, edits, errors) alongside
+  cost.
+- **Neutral.** One event model for every coding agent, gateway and model
+  provider; their differences live in profiles, not in the detectors.
+
+![Planned architecture: coding agents send traffic through Trimloop to model providers; analysis runs on the developer machine; an optional team collector receives hashes-only findings, including from a gateway sidecar beside LiteLLM](docs/images/architecture.svg)
+
+The core will be one Go program; a thin Python plugin will connect LiteLLM to
+it; a web UI (TypeScript) will be embedded in the program. Detail:
+[docs/design.md](docs/design.md), [docs/analyzer.md](docs/analyzer.md),
+[ROADMAP.md](ROADMAP.md) for the order, and
+[docs/adr/README.md](docs/adr/README.md) for every decision with whether it is
+built.
+
+## Development
+
+To run the prototype you need only Go. To run its checks you also need
+`golangci-lint` and `govulncheck`. `scripts/bootstrap.sh` installs what is
+missing (macOS with Homebrew, or Debian/Ubuntu):
+
+```bash
+scripts/bootstrap.sh --check                       # see what is missing; changes nothing
+scripts/bootstrap.sh --skip-node --skip-python     # enough for the prototype and its checks
+scripts/bootstrap.sh                               # everything the planned stack needs
+```
+
+The full install adds a C toolchain and the DuckDB CLI, `buf` and the
+protobuf plugins, `uv` with Python 3.12, and Node.js 22 or later;
+`--with-collector` also checks Docker. Re-running is safe.
+
+Before committing Go changes:
+
+```bash
+scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, govulncheck
+scripts/check.sh --offline   # the same without govulncheck, which needs the network
+```
+
+It runs every check, lists the failures and exits 1 if there are any. The
+linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
 
 | Package | What it does |
 |---|---|
 | `cmd/trimloop` | The command: reads logs, builds sessions, runs the report or a live command |
-| `internal/adapters/source` | Log readers: `claudecode` (Claude Code transcripts), `jsonl` (shared line reader) |
-| `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price catalogue, usage normalisation |
-| `pkg/detectors` | Findings: P19, P09, P02, P04, P07, P13 (sub-agents and main sessions), P14, growth and compaction, attribution, reconciliation, weekly figures |
-| `pkg/cmdshape` | Shell commands reduced to shapes, without values |
+| `internal/adapters/source` | Log readers: `claudecode` (Claude Code logs), `jsonl` (shared line reader) |
+| `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price list, usage normalisation |
+| `pkg/detectors` | The findings, attribution, reconciliation and weekly figures |
+| `pkg/cmdshape` | Shell commands reduced to their shape, without values |
 | `pkg/fixes` | Recommendations, with the fix ladder of ADR 0030 |
-| `internal/report` | Results, rendered as summary, text, HTML and JSON |
+| `internal/report` | Results, rendered as summary, text, web page and JSON |
 | `internal/history` | Weekly figures kept between runs |
 | `internal/live` | Status line, hooks and `setup` for Claude Code |
-
-Not built yet: keyed fingerprints and redaction (the prototype stores and
-sends nothing beyond the files above), the store (DuckDB), other harnesses, the gateway plugin and
-sidecar (M1), the team collector (M2) and automatic fixes (M3 onwards). The
-[ROADMAP](ROADMAP.md) has the order; [docs/adr/README.md](docs/adr/README.md)
-lists every decision with whether it is built.
-
-There is no licence yet: all rights reserved. Please report security
-problems to the maintainer privately rather than in an issue.
-
-## Development setup
-
-Running the prototype needs only Go. Its checks (`scripts/check.sh`) also
-need `golangci-lint` and `govulncheck`; `scripts/bootstrap.sh --skip-node
---skip-python` is enough for them (it leaves out Node.js and Python). The script below installs
-everything the planned stack needs:
-
-Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or
-Debian/Ubuntu):
-
-```bash
-scripts/bootstrap.sh --check   # see what is missing; changes nothing; exit 1 if any
-scripts/bootstrap.sh           # install what is missing (asks first)
-```
-
-It installs Go (≥ 1.27.3) and a C toolchain for the DuckDB driver; `buf`,
-`protoc-gen-go`, `protoc-gen-go-grpc`, `golangci-lint` and `govulncheck`;
-`uv` with Python 3.12 for the LiteLLM plugin; Node.js (≥ 22) for the web UI;
-and the DuckDB CLI. `--with-collector` also checks Docker for the team
-collector stack; `--skip-node` and `--skip-python` skip those parts. Re-running
-is safe: anything already at the minimum version is left alone.
-
-Before committing Go changes, run the code checks:
-
-```bash
-scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, govulncheck
-scripts/check.sh --offline   # the same without govulncheck, which needs network
-```
-
-It runs every check even when one fails, lists the failures at the end and
-exits 1 if there are any. The linters are set in [.golangci.yml](.golangci.yml).
 
 ## Documents
 
 | Doc | What's in it |
 |---|---|
-| [docs/design.md](docs/design.md) | Architecture, components, deployment, security |
-| [docs/analyzer.md](docs/analyzer.md) | Analyzer engine: standalone CLI, gateway sidecar, embeddable library; harness and provider profiles |
-| [docs/value.md](docs/value.md) | Value case: levers ranked by expected saving, worked example, value model, limits, validation plan |
-| [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today, with its code and the ADRs behind it |
-| [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain: unused signals, measured opportunities, and gaps in the design they expose |
-| [docs/packaging.md](docs/packaging.md) | Artefacts, channels, versioning, release pipeline, supply-chain signing |
+| [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
-| [docs/data-model.md](docs/data-model.md) | Normalised event model and storage |
-| [docs/adr/](docs/adr/README.md) | Architecture decision records, with an index of what is built |
-| [ROADMAP.md](ROADMAP.md) | Milestones from offline analyser to auto-fix |
+| [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain, and the measured figures (§8) |
+| [docs/design.md](docs/design.md) | Planned architecture, components, deployment, security |
+| [docs/analyzer.md](docs/analyzer.md) | The analysis engine: command line, gateway sidecar, library; harness and provider profiles |
+| [docs/value.md](docs/value.md) | Value case: levers ranked by expected saving, validation plan |
+| [docs/data-model.md](docs/data-model.md) | Event model and storage |
+| [docs/packaging.md](docs/packaging.md) | Release artefacts and pipeline |
+| [docs/adr/](docs/adr/README.md) | Decision records, with an index of what is built |
+| [ROADMAP.md](ROADMAP.md) | Milestones from this prototype to automatic fixes |
 
-## Name
+## Licence and security
 
-Trimloop = **trim** + **loop**. It trims wasted tokens, and it works as a
-closed loop: detect a pattern, recommend or apply a fix, measure the saving,
-repeat ([design §6.2](docs/design.md#62-recommendation-engine-team-collector)).
+There is no licence yet: all rights reserved. Please report security problems
+to the maintainer privately rather than in an issue.
 
-The working name was "Trimtab". It was dropped on 2026-11-05 because
-`trimtab.ai` is owned by another company and an npm package called `trimtab`
-already targets AI-agent behaviour.
-
-Availability checked 2026-11-05: `trimloop.ai` and the npm, PyPI and GitHub
-names were unregistered; `trimloop.com` is taken; `.dev` unconfirmed.
-Trademarks not yet checked — see [ROADMAP.md](ROADMAP.md#open-questions).
+Trimloop = **trim** + **loop**: it trims wasted tokens in a loop of detect,
+recommend, measure, repeat.

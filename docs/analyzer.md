@@ -671,7 +671,7 @@ already use (Datadog, Grafana, etc.).
 
 The target layout. The M0 prototype's packages differ (for example
 `pkg/detectors`, `pkg/fixes`, `internal/report`, `internal/live`); the
-README's [Current state](../README.md#current-state) lists them.
+The README's [Development](../README.md#development) section lists them.
 
 ```text
 cmd/trimloop/               CLI: analyse, serve, proxy, report, explain, conformance,

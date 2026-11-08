@@ -183,6 +183,9 @@ the sidecar causes zero failed model calls.
 1. **Name.** Register `trimloop.ai` and claim the GitHub, npm, PyPI and
    Homebrew names (all free on 2026-11-05). Run a trademark search (UK IPO,
    EUIPO, USPTO) before going public. `trimloop.com` belongs to someone else.
+   (The working name "Trimtab" was dropped on 2026-11-05: `trimtab.ai` is
+   owned by another company and an npm package `trimtab` already targets
+   AI-agent behaviour. `.dev` availability was not confirmed.)
 2. **Licence and business model.** Open-source the agent and detectors
    (distribution, trust) with a paid team collector? Or source-available?
 3. **Provider terms.** Confirm that structural request changes (reordering,
