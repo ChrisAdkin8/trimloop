@@ -87,7 +87,7 @@ func ForToolOutput(f detectors.ToolOutput, n int, minSaving float64) []Recommend
 		out = append(out, Recommendation{
 			Pattern: "P04",
 			Title:   ladder.title,
-			Finding: fmt.Sprintf("%s stayed in the conversation and was sent again on every later turn: "+
+			Finding: fmt.Sprintf("%s stayed in the session and was sent again on every later turn: "+
 				"keeping it there cost %s. Results over %s tokens account for the saving.",
 				ladder.what, dollars(g.Carried), thousandsInt(f.Target)),
 			Noise:        g.Noise,

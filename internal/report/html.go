@@ -81,6 +81,10 @@ type view struct {
 	StandingGap bool
 
 	Summary summaryView // the two bars at the top of the page
+
+	Busiest    detectors.Week // the week with the most spend
+	TopProject *detectors.Spend
+	TopFive    float64 // share of spend in the five costliest sessions, 0 to 1
 }
 
 // sessionRow joins one session's P19 and P09 figures.
@@ -147,6 +151,19 @@ func newView(r Results) view {
 	v.ThisWeek = detectors.WeekOf(r.Generated.Local())
 	v.StandingGap = r.Standing.Turns > 0 && float64(r.Standing.Covered) < 0.99*float64(r.Standing.Turns)
 	v.Summary = newSummary(r)
+	for _, w := range r.Weeks {
+		if w.Spend > v.Busiest.Spend {
+			v.Busiest = w
+		}
+	}
+	if len(r.Attribution.ByProject) > 0 {
+		v.TopProject = &r.Attribution.ByProject[0]
+	}
+	for _, s := range r.Growth.TopShares {
+		if s.N == 5 {
+			v.TopFive = s.Share
+		}
+	}
 	return v
 }
 

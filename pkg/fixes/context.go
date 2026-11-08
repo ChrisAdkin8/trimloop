@@ -56,7 +56,7 @@ var contextFixes = map[string]Recommendation{
 	detectors.SourceSkills: {
 		Title: "Turn off skills and plugins you don't use",
 		Finding: "Claude Code lists every available skill near the start of each session, and the list stays " +
-			"in the conversation: %s. Each plugin you install adds its skills to the list.",
+			"in the session: %s. Each plugin you install adds its skills to the list.",
 		Primary: Fix{Source,
 			"Disable plugins and remove skills you don't use.",
 			"Run /plugin to disable plugins you don't use, and delete unused skills from ~/.claude/skills " +
@@ -65,7 +65,7 @@ var contextFixes = map[string]Recommendation{
 	detectors.SourceMCP: {
 		Title: "Remove MCP servers you don't use",
 		Finding: "Every connected MCP server sends its tool definitions with each request and adds its " +
-			"instructions to the conversation: %s.",
+			"instructions to the session: %s.",
 		Primary: Fix{Source,
 			"Remove MCP servers this project doesn't use.",
 			"claude mcp remove <name>, or turn the server off for this project in /mcp."},
@@ -76,7 +76,7 @@ var contextFixes = map[string]Recommendation{
 	},
 	detectors.SourceMemory: {
 		Title:   "Trim memory files",
-		Finding: "Memory files such as CLAUDE.md are added to every session and stay in the conversation: %s.",
+		Finding: "Memory files such as CLAUDE.md are added to every session and stay there: %s.",
 		Primary: Fix{Source,
 			"Keep memory files short; move instructions needed only sometimes into a skill.",
 			"Trim CLAUDE.md to what every session needs. Put task-specific instructions in a skill " +

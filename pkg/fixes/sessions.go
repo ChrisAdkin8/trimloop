@@ -23,15 +23,19 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 				alt = price.DisplayName(g.Alternative)
 			}
 			if len(examples) < 3 {
-				examples = append(examples, g.Type)
+				name := g.Type
+				if name == "unknown" || name == "" {
+					name = "type not recorded"
+				}
+				examples = append(examples, name)
 			}
 		}
 	}
 	return Recommendation{
 		Pattern: "P13",
 		Title:   "Run sub-agents on a cheaper model",
-		Finding: fmt.Sprintf("Sub-agents (helpers Claude starts for side tasks) cost %s, and every one ran on "+
-			"the same model as the main session. The saving assumes all of them moved to %s.", dollars(f.Cost), alt),
+		Finding: fmt.Sprintf("Sub-agents (helpers Claude starts for side tasks) cost %s, and most ran on "+
+			"the same model as the main session. The saving assumes all of those moved to %s.", dollars(f.Cost), alt),
 		Saving:   f.Saving,
 		Examples: examples,
 		Primary: Fix{Structure,
@@ -61,7 +65,7 @@ func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, afte
 	return Recommendation{
 		Pattern: "P19",
 		Title:   "Compact long sessions earlier",
-		Finding: fmt.Sprintf("Every turn sends the whole conversation again, so long sessions get dearer each turn. "+
+		Finding: fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
 			"%d sessions passed %s tokens without compacting; Claude Code compacts on its own only near the limit.",
 			g.Uncompacted, thousandsInt(g.Limit)),
 		Saving: upTo,
@@ -93,7 +97,7 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float
 		Pattern: "P09",
 		Title:   "Start fresh after a long break",
 		Finding: fmt.Sprintf("%d times, work carried on after more than an hour away. The saved copy of the "+
-			"conversation (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses),
+			"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses),
 		Saving:     p.Saving,
 		Likely:     likely,
 		LikelyNote: fmt.Sprintf("As if each of those turns had started a new session of about %s tokens.", thousandsInt(fresh)),
@@ -104,7 +108,7 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float
 		Alternatives: []Fix{
 			{Structure,
 				"Compact before a long break, while the cache is still warm.",
-				"Run /compact before stepping away; compacting after the break re-sends the whole conversation."},
+				"Run /compact before stepping away; compacting after the break re-sends the whole session."},
 		},
 	}, true
 }

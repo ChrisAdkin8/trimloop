@@ -307,7 +307,7 @@ func TestHTMLSummary(t *testing.T) {
 	if strings.Contains(buf.String(), "ZgotmplZ") {
 		t.Error("the template blanked a value it considered unsafe")
 	}
-	for _, want := range []string{"91% of your spend came from turns over 200k tokens", "paid to send the conversation to Claude",
+	for _, want := range []string{"91% of your spend came from turns over 200k tokens", "paid to send the session to Claude",
 		"Tool output", `class="size4"`, `class="kind2"`} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("page has no %q", want)

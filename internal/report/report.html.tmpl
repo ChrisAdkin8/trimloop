@@ -25,15 +25,15 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text);
-  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
 h1 { font-size: 26px; margin: 0 0 2px; }
 h2 { font-size: 20px; margin: 44px 0 6px; }
 h3 { font-size: 15px; margin: 22px 0 8px; }
-p { margin: 6px 0; }
+p { margin: 6px 0; max-width: 75ch; }
 .lead { color: var(--muted); margin-bottom: 14px; }
 .muted { color: var(--muted); }
-.small { font-size: 13px; }
+.small { font-size: 14px; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 14px 0; }
 .tile .num { font-size: 24px; font-weight: 650; line-height: 1.2; }
@@ -52,23 +52,22 @@ p { margin: 6px 0; }
 .copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 3px 9px; border-radius: 5px;
   border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
 details { margin-top: 10px; }
-summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+summary { cursor: pointer; color: var(--accent); font-size: 15px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-th { font-size: 12px; color: var(--muted); font-weight: 600; }
+th { font-size: 13px; color: var(--muted); font-weight: 600; }
 th[data-sort] { cursor: pointer; user-select: none; }
 th[data-sort]::after { content: " ↕"; opacity: .4; }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 td.name { word-break: break-word; }
-.id { display: block; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30em; }
+.id { display: block; font-size: 13px; color: var(--muted); }
 td.session { min-width: 16em; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
 .scroll { overflow-x: auto; }
 .barcell { width: 34%; min-width: 110px; }
 .bar { height: 12px; border-radius: 3px; background: var(--bar); position: relative; overflow: hidden; }
 .bar .part { position: absolute; right: 0; top: 0; bottom: 0; background: var(--bar2); }
-.legend { font-size: 13px; color: var(--muted); }
+.legend { font-size: 14px; color: var(--muted); max-width: none; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
 .legend i:first-child { margin-left: 0; }
 .stack { display: flex; height: 18px; border-radius: 4px; overflow: hidden; margin: 8px 0; }
@@ -90,7 +89,11 @@ a { color: var(--accent); }
 .size3 { background: var(--size3); } .size4 { background: var(--size4); }
 .kind1 { background: var(--kind1); } .kind2 { background: var(--kind2); }
 .kind3 { background: var(--kind3); } .kind4 { background: var(--kind4); }
-footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 18px 0 0; font-size: 15px; }
+section.area h2 { margin-bottom: 4px; }
+section.area details > .panel { margin-top: 10px; }
+.card details { margin-top: 8px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 @media (max-width: 640px) { .barcell { display: none; } dl.glossary { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -99,37 +102,34 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
 
 <h1>Where your Claude Code tokens went</h1>
 <p class="lead">
-{{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{thousands .Read.Sessions}} sessions from {{thousands .Read.Logs}} log files · list prices as of {{.Prices}}
+{{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.Days}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{thousands .Read.Sessions}} sessions · list prices as of {{.Prices}}
 {{if .Read.Failed}}<br><span class="note">{{.Read.Failed}} log files could not be read to the end.</span>{{end}}
 {{if .Read.BadLines}}<br><span class="note">{{.Read.BadLines}} lines could not be read; Claude Code's log format may have changed.</span>{{end}}
 {{if .Read.Unpriced}}<br><span class="muted small">{{.Read.Unpriced}} turns used a model with no known price and are left out.</span>{{end}}
-{{with .Reconciliation}}{{if and .Sessions (gt .Gap 0.0)}}<br><span class="muted small">Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more, for background requests its logs don't show — see <a href="#checks">Checking the totals</a>.</span>{{end}}{{end}}
 </p>
 
 {{with .Summary}}{{if .Bands}}
-<section class="panel summary" aria-label="Spend by conversation size">
+<section class="panel summary" aria-label="Spend by session size">
   <h2>{{p0 .LargeSpendShare}} of your spend came from turns over {{short .Threshold}} tokens</h2>
-  <p class="muted">Only {{p0 .LargeTurnShare}} of turns were that large{{if and .LargeCost .SmallCost}}, but each one cost {{.LargeCost}}, against {{.SmallCost}} for smaller turns{{end}}. Every turn sends the whole conversation again, so long sessions get dear.</p>
-  <div class="row"><b>Spend</b><div class="strip" role="img" aria-label="Share of spend by conversation size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .SpendShare}}%" title="{{.Label}} tokens: {{dollars .Cost}} ({{p0 .SpendShare}} of spend)"></span>{{end}}</div></div>
-  <div class="row"><b>Turns</b><div class="strip" role="img" aria-label="Share of turns by conversation size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .TurnShare}}%" title="{{.Label}} tokens: {{p0 .TurnShare}} of turns"></span>{{end}}</div></div>
-  <p class="legend">{{range .Bands}}<span><i class="{{.Class}}"></i>{{.Label}} tokens · {{dollars .Cost}} · {{p0 .SpendShare}} of spend, {{p0 .TurnShare}} of turns</span>{{end}}</p>
+  <p class="muted">A token is a word-piece of about four characters. Every turn sends the whole session so far, so turns get dearer as a session grows: only {{p0 .LargeTurnShare}} of turns were this large{{if and .LargeCost .SmallCost}}, but each cost {{.LargeCost}}, against {{.SmallCost}} for smaller ones{{end}}.</p>
+  <div class="row"><b>Spend</b><div class="strip" role="img" aria-label="Share of spend by session size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .SpendShare}}%" title="{{.Label}} tokens: {{dollars .Cost}} ({{p0 .SpendShare}} of spend)"></span>{{end}}</div></div>
+  <div class="row"><b>Turns</b><div class="strip" role="img" aria-label="Share of turns by session size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .TurnShare}}%" title="{{.Label}} tokens: {{p0 .TurnShare}} of turns"></span>{{end}}</div></div>
+  <p class="legend">{{range .Bands}}<span><i class="{{.Class}}"></i>{{.Label}} tokens: {{dollars .Cost}}, {{p0 .SpendShare}} of spend, {{p0 .TurnShare}} of turns</span>{{end}}</p>
 </section>
-<section class="panel summary" aria-label="What filled the conversation">
-  <h2>{{dollars .Input}} paid to send the conversation to Claude</h2>
-  <p class="muted">Claude's replies cost another {{dollars .Output}}. This is what the conversation was made of.</p>
-  <div class="row"><div class="strip" role="img" aria-label="What filled the conversation, by cost">{{range .Fill}}<span class="{{.Class}}" style="width: {{w .Share}}%" title="{{.Label}}: {{dollars .Cost}}"></span>{{end}}</div></div>
-  <p class="legend">{{range .Fill}}<span><i class="{{.Class}}"></i>{{.Label}} · {{dollars .Cost}} ({{p0 .Share}})</span>{{end}}</p>
+<section class="panel summary" aria-label="What filled the session">
+  <h2>{{dollars .Input}} paid to send the session to Claude</h2>
+  <p class="muted">Claude's replies cost another {{dollars .Output}}. This is what was being sent.</p>
+  <div class="row"><div class="strip" role="img" aria-label="What filled the session, by cost">{{range .Fill}}<span class="{{.Class}}" style="width: {{w .Share}}%" title="{{.Label}}: {{dollars .Cost}}"></span>{{end}}</div></div>
+  <p class="legend">{{range .Fill}}<span><i class="{{.Class}}"></i>{{.Label}}: {{dollars .Cost}} ({{p0 .Share}})</span>{{end}}</p>
 </section>
 {{end}}{{end}}
 
-<div class="tiles">
-  <div class="panel tile"><div class="num">{{dollars .Total}}</div><div class="lbl">spent{{if .Period.Days}} · about {{dollars .Period.PerWeek}} a week{{end}}</div></div>
-  {{range .Growth.TopShares}}{{if eq .N 5}}<div class="panel tile"><div class="num">{{share .Share}}</div><div class="lbl">spent in the 5 costliest sessions</div></div>{{end}}{{end}}
-  {{with .SubAgents}}{{if .Runs}}<div class="panel tile"><div class="num">{{pct .Cost $.Total}}</div><div class="lbl">spent by sub-agents ({{thousands .Runs}} runs)</div></div>{{end}}{{end}}
-</div>
+<nav class="toc" aria-label="Sections">
+  <a href="#actions">What to do</a><a href="#money">Where the money went</a>{{if .Weeks}}<a href="#weeks">Week by week</a>{{end}}<a href="#long">Long sessions</a><a href="#tools">Tool output</a><a href="#carried">What every request carries</a><a href="#subagents">Sub-agents</a>{{if .Reconciliation.Sessions}}<a href="#checks">Checking the totals</a>{{end}}<a href="#words">Words used</a>
+</nav>
 
-<h2>What to do first</h2>
-<p class="lead">The changes most likely to save money, largest first. "Likely" is an estimate for that change; "up to" is the most it could save. Several fixes target the same money, so their savings can't be added up.</p>
+<h2 id="actions">What to do first</h2>
+<p class="lead">Largest likely saving first. Several of these target the same money, so their savings can't be added up.</p>
 {{if not .First}}<p>Nothing found was worth changing.</p>{{end}}
 <div class="cards">
 {{range .First}}{{template "action" (args . $.Total)}}{{end}}
@@ -142,22 +142,23 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
 </details>
 {{end}}
 
-<h2>Where the money went</h2>
-<p class="lead">Claude is paid by the token (a word-piece of about four characters). Every turn sends the whole conversation again, and most of that is read back from a short-lived saved copy, the cache, at a lower price.</p>
+<section class="area">
+<h2 id="money">Where the money went</h2>
+<p class="lead">{{with .TopProject}}{{.Name}} was the costliest project, at {{dollars .Cost}} ({{pct .Cost $.Total}}).{{end}} Most of the spend paid for re-reading the session from the cache, Claude's cheaper saved copy of it.</p>
+<details><summary>Show details</summary>
 <div class="panel">
   <h3 style="margin-top:0">What the money paid for</h3>
   {{with .Cost}}
   <div class="stack" role="img" aria-label="Spend by kind of token">
-    <span style="width: {{width .CacheRead $.Total}}%; background: var(--bar)" title="Re-reading the conversation from the cache"></span>
-    <span style="width: {{width .CacheWrite1h $.Total}}%; background: var(--bar2)" title="Saving the conversation to the cache, kept 1 hour"></span>
-    <span style="width: {{width .CacheWrite5m $.Total}}%; background: var(--bar3)" title="Saving the conversation to the cache, kept 5 minutes"></span>
+    <span style="width: {{width .CacheRead $.Total}}%; background: var(--bar)" title="Re-reading the session from the cache"></span>
+    <span style="width: {{width .CacheWrite1h $.Total}}%; background: var(--bar2)" title="Saving the session to the cache, kept 1 hour"></span>
+    <span style="width: {{width .CacheWrite5m $.Total}}%; background: var(--bar3)" title="Saving the session to the cache, kept 5 minutes"></span>
     <span style="width: {{width .Output $.Total}}%; background: var(--bar4)" title="Claude's replies"></span>
   </div>
   <p class="legend"><i style="background:var(--bar)"></i>Re-reading from the cache {{dollars .CacheRead}} ({{pct .CacheRead $.Total}})
     <i style="background:var(--bar2)"></i>Saving to the cache, kept 1 hour {{dollars .CacheWrite1h}} ({{pct .CacheWrite1h $.Total}})
     <i style="background:var(--bar3)"></i>Saving to the cache, kept 5 minutes {{dollars .CacheWrite5m}} ({{pct .CacheWrite5m $.Total}})
-    <i style="background:var(--bar4)"></i>Claude's replies {{dollars .Output}} ({{pct .Output $.Total}})
-    {{if .InputUncached}}· text sent without the cache {{dollars .InputUncached}}{{end}}</p>
+    <i style="background:var(--bar4)"></i>Claude's replies {{dollars .Output}} ({{pct .Output $.Total}})</p>
   {{end}}
 
   <h3>By project</h3>
@@ -175,18 +176,21 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
   </table></div>
 
   {{if or .Attribution.BySkill .Attribution.ByPlugin .Attribution.ByMCPServer}}
-  <details><summary>By skill, plugin and MCP server</summary>
-    <p class="muted small">Claude Code names a skill, plugin or MCP server (a connected tool provider) on some turns. The cost shown is those turns' cost; it can include work that followed the tool, not only the tool itself.</p>
-    {{template "spend" (args "Skill" .Attribution.BySkill $.Total false)}}
-    {{template "spend" (args "Plugin" .Attribution.ByPlugin $.Total false)}}
-    {{template "spend" (args "MCP server" .Attribution.ByMCPServer $.Total true)}}
-  </details>
+  <h3>By skill, plugin and MCP server</h3>
+  <p class="muted small">Claude Code names a skill, plugin or MCP server (a connected tool provider) on some turns. The cost is those turns' cost, which can include work that followed the tool.</p>
+  {{template "spend" (args "Skill" .Attribution.BySkill $.Total false)}}
+  {{template "spend" (args "Plugin" .Attribution.ByPlugin $.Total false)}}
+  {{template "spend" (args "MCP server" .Attribution.ByMCPServer $.Total true)}}
   {{end}}
 </div>
+</details>
+</section>
 
 {{if .Weeks}}
-<h2>Week by week</h2>
-<p class="lead">Use this to see whether a change worked: compare the weeks before and after it. Weeks marked "kept" come from earlier runs, after Claude Code deleted their logs.</p>
+<section class="area">
+<h2 id="weeks">Week by week</h2>
+<p class="lead">{{with .Busiest}}{{if .Spend}}The busiest week began {{weekStart .Week}}, at {{dollars .Spend}}.{{end}}{{end}} Compare the weeks before and after a change to see whether it worked.</p>
+<details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table>
     <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">Compactions</th><th class="barcell"></th></tr></thead>
@@ -200,35 +204,21 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
     </tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">"In large turns": share of the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the conversation. "Re-reads": share of file views that re-read a file already seen, unchanged.</p>
+  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "Kept": weeks from earlier runs, after Claude Code deleted their logs.</p>
 </div>
+</details>
+</section>
 {{end}}
 
-<h2>Long sessions <span class="code">P19 · P10 · P09</span></h2>
-<p class="lead">The longer a session runs, the more each turn costs, because each turn sends everything said so far.</p>
+<section class="area">
+<h2 id="long">Long sessions and breaks</h2>
+<p class="lead">{{if .TopFive}}The 5 costliest sessions made {{share .TopFive}} of spend.{{end}}{{with .Growth}}{{if .Uncompacted}} {{.Uncompacted}} grew past {{short .Limit}} tokens without ever compacting ({{dollars .UncompactedCost}}).{{end}}{{end}}{{with .Pause}}{{if .Pauses}} Coming back after more than {{duration .MinGap}} cost {{dollars .Cost}} in re-saving the cache.{{end}}{{end}}</p>
+<details><summary>Show details</summary>
 <div class="panel">
   {{with .Growth}}
-  <div class="tiles">
-    {{range .TopShares}}<div class="tile"><div class="num">{{share .Share}}</div><div class="lbl">of spend in the costliest {{if eq .N 1}}session{{else}}{{.N}} sessions{{end}}</div></div>{{end}}
-    <div class="tile"><div class="num">{{dollars .MedianCost}}</div><div class="lbl">a typical session (the median)</div></div>
-    {{if .Uncompacted}}<div class="tile"><div class="num">{{dollars .UncompactedCost}}</div><div class="lbl">in {{.Uncompacted}} sessions that passed {{short .Limit}} tokens and never compacted</div></div>{{end}}
-  </div>
-
-  <h3>What one turn costs, by conversation size</h3>
-  <table>
-    <tbody>
-    {{range .Bands}}<tr>
-      <td style="width:10em">{{if .Max}}{{short .Min}} to {{short .Max}} tokens{{else}}over {{short .Min}} tokens{{end}}</td>
-      <td class="n" style="width:6em"><b>{{dollars .MeanCost}}</b></td>
-      <td class="n muted" style="width:9em">{{thousands .Turns}} turns</td>
-      <td><div class="bar" style="width: {{width .MeanCost $.MaxBand}}%"></div></td>
-    </tr>{{end}}
-    </tbody>
-  </table>
-
-  <h3>Costliest sessions</h3>
+  <h3 style="margin-top:0">Costliest sessions</h3>
   <div class="scroll"><table class="sortable">
-    <thead><tr><th data-sort>Session</th><th data-sort>Project</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Largest size</th></tr></thead>
+    <thead><tr><th data-sort>Session</th><th data-sort>Project</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Largest size (tokens)</th></tr></thead>
     <tbody>
     {{range .Top}}{{$l := $.Name .ID}}<tr>
       <td class="name session">{{template "session" (args $l .ID)}}</td><td class="name">{{.Project}}</td>
@@ -236,42 +226,27 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
       <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td></tr>{{end}}
     </tbody>
   </table></div>
+  <p class="muted small">A typical session cost {{dollars .MedianCost}}.</p>
 
   <h3>Compaction</h3>
-  <p>Compacting replaces the conversation with a short summary. Claude Code did it {{.Compactions}} times ({{.Manual}} when asked){{if .MedianBefore}}, typically shrinking {{short .MedianBefore}} tokens to {{short .MedianAfter}}{{end}}{{if .Longest}}; the longest wait was {{duration .Longest}}{{end}}.</p>
+  <p>Compacting replaces the session with a short summary. Claude Code did it {{.Compactions}} times ({{.Manual}} when asked){{if .MedianBefore}}, typically shrinking {{short .MedianBefore}} tokens to {{short .MedianAfter}}{{end}}{{if .Longest}}; the longest wait was {{duration .Longest}}{{end}}.</p>
   {{end}}
 
   {{with .Pause}}
   <h3>Long breaks</h3>
-  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. By then the cache had expired, so the next turn paid to save the whole conversation again: <b>{{dollars .Cost}}</b> ({{pct .Cost $.Total}} of spend).</p>
-  {{end}}
-
-  {{if .Sessions}}
-  <h3>Sessions that would save most</h3>
-  <div class="scroll"><table class="sortable">
-    <thead><tr><th data-sort>Session</th><th class="n" data-sort>Keeping it small</th><th class="n" data-sort>Fresh starts</th><th class="n" data-sort>Breaks</th><th class="n" data-sort>Largest size</th></tr></thead>
-    <tbody>
-    {{range .Sessions}}{{$l := $.Name .ID}}<tr><td class="name session">{{template "session" (args $l .ID)}}</td>
-      <td class="n" data-v="{{.ContextSave}}">{{dollars .ContextSave}}</td><td class="n" data-v="{{.PauseSave}}">{{dollars .PauseSave}}</td>
-      <td class="n" data-v="{{.Pauses}}">{{.Pauses}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td></tr>{{end}}
-    </tbody>
-  </table></div>
-  <p class="muted small">"Keeping it small" is the most saved by keeping the session under {{short .Context.Threshold}} tokens; "fresh starts" the most saved by starting a new session after each long break. Both are upper bounds and partly the same money.</p>
+  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).</p>
   {{end}}
 </div>
+</details>
+</section>
 
-<h2>What fills the conversation: tool output <span class="code">P04</span></h2>
-<p class="lead">When Claude runs a command or reads a file, the output joins the conversation and is sent again on every later turn until the session ends or is compacted.</p>
+<section class="area">
+<h2 id="tools">Tool output</h2>
+{{with .Tools}}
+<p class="lead">When Claude runs a command or reads a file, the output stays in the session and is sent again on every later turn. Keeping it there cost {{dollars .Carried}} ({{pct .Carried $.Total}} of spend){{if .FileViews}}, and {{pct (float .Rereads) (float .FileViews)}} of file views re-read a file already seen{{end}}.</p>
+<details><summary>Show details</summary>
 <div class="panel">
-  {{with .Tools}}
-  <div class="tiles">
-    <div class="tile"><div class="num">{{dollars .Carried}}</div><div class="lbl">to keep tool output in the conversation ({{pct .Carried $.Total}} of spend, part of the long-session cost)</div></div>
-    <div class="tile"><div class="num">{{thousands .Calls}}</div><div class="lbl">tool results, about {{short .Tokens}} tokens</div></div>
-    {{if .FileViews}}<div class="tile"><div class="num">{{pct (float .Rereads) (float .FileViews)}}</div><div class="lbl">of file views re-read a file already seen, unchanged ({{dollars .RereadCarried}})</div></div>{{end}}
-    <div class="tile"><div class="num">{{dollars .Saving}}</div><div class="lbl">up to, if no result were over {{short .Target}} tokens</div></div>
-  </div>
-
-  <h3>By tool</h3>
+  <h3 style="margin-top:0">By tool</h3>
   <table>
     <tbody>
     {{range .ByTool}}<tr><td class="name" style="width:14em">{{.Name}}</td><td class="n" style="width:6em">{{dollars .Carried}}</td>
@@ -282,7 +257,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
 
   {{if .ByShape}}
   <h3>Shell commands by type</h3>
-  <p class="muted small">Commands are grouped with their file names and values removed: <span class="mono">sed -n '1,50p' a.go</span> and <span class="mono">sed -n '9,20p' b.go</span> are the same type. "Already filtered" is the share whose output was cut down, for example with head or grep.</p>
+  <p class="muted small">Commands are grouped with file names and values removed, so <span class="mono">sed -n '1,50p' a.go</span> and <span class="mono">sed -n '9,20p' b.go</span> are one type. "Already filtered" is the share whose output was cut down, for example with head or grep.</p>
   <div class="scroll"><table class="sortable">
     <thead><tr><th data-sort>Command type</th><th class="n" data-sort>Cost to keep</th><th class="n" data-sort>Uses</th><th class="n" data-sort>Tokens</th><th class="n" data-sort>Already filtered</th></tr></thead>
     <tbody>
@@ -292,19 +267,17 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
     </tbody>
   </table></div>
   {{end}}
-  {{end}}
 </div>
+</details>
+{{end}}
+</section>
 
-<h2>What every request carries <span class="code">P07</span></h2>
-<p class="lead">Before any work, each request sends Claude Code's system prompt and the definitions of every tool it can use. Claude Code also adds text to the conversation — the list of skills, memory files such as CLAUDE.md, reminders — which stays there like tool output.</p>
+<section class="area">
+<h2 id="carried">What every request carries</h2>
+{{with .Standing}}
+<p class="lead">Each request also sends Claude Code's own instructions (the system prompt), the definitions of every tool, and text Claude Code adds such as the skill list and CLAUDE.md. That cost {{dollars .Total}} ({{pct .Total $.Total}} of spend).</p>
+<details><summary>Show details</summary>
 <div class="panel">
-  {{with .Standing}}
-  <div class="tiles">
-    <div class="tile"><div class="num">{{dollars .Total}}</div><div class="lbl">for all of it ({{pct .Total $.Total}} of spend, part of the long-session cost)</div></div>
-    <div class="tile"><div class="num">{{dollars .ToolDefinitions}}</div><div class="lbl">to send tool definitions on every turn</div></div>
-    <div class="tile"><div class="num">{{dollars .SystemPrompt}}</div><div class="lbl">to send the system prompt on every turn</div></div>
-    <div class="tile"><div class="num">{{dollars .Injected}}</div><div class="lbl">to keep added text in the conversation</div></div>
-  </div>
   {{if $.StandingGap}}<p class="muted small">Claude Code recorded the system prompt and tools for {{pct (float .Covered) (float .Turns)}} of turns; the rest are not counted.</p>{{end}}
   <div class="scroll"><table>
     <thead><tr><th>Source</th><th class="n">Cost</th><th class="n">Size</th><th>Who can change it</th><th class="barcell"></th></tr></thead>
@@ -316,41 +289,40 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
     </tr>{{end}}{{end}}
     </tbody>
   </table></div>
-  {{end}}
 </div>
+</details>
+{{end}}
+</section>
 
-<h2>Sub-agents <span class="code">P13</span></h2>
-<p class="lead">Sub-agents are helpers Claude starts for side tasks such as searching or reading many files. Each starts with an empty conversation.</p>
+<section class="area">
+<h2 id="subagents">Sub-agents</h2>
+{{with .SubAgents}}
+{{if .Runs}}
+<p class="lead">Sub-agents are helpers Claude starts for side tasks. {{thousands .Runs}} runs cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend), mostly on the main session's model.</p>
+<details><summary>Show details</summary>
 <div class="panel">
-  {{with .SubAgents}}
-  {{if .Runs}}
-  <div class="tiles">
-    <div class="tile"><div class="num">{{dollars .Cost}}</div><div class="lbl">spent by {{thousands .Runs}} sub-agent runs ({{pct .Cost $.Total}})</div></div>
-    <div class="tile"><div class="num">{{dollars .Saving}}</div><div class="lbl">less on a cheaper model, if every run moved (quality untested)</div></div>
-    <div class="tile"><div class="num">{{share .WriteShare}}</div><div class="lbl">of their spend saves to the cache ({{share .MainWriteShare}} in main sessions): each run starts cold</div></div>
-    {{if .Large}}<div class="tile"><div class="num">{{.Large}}</div><div class="lbl">runs grew past {{short .LargeAbove}} tokens ({{dollars .LargeCost}})</div></div>{{end}}
-  </div>
   <div class="scroll"><table class="sortable">
-    <thead><tr><th data-sort>Agent type</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Runs</th><th class="n" data-sort>Saving</th><th data-sort>Model</th><th data-sort>Suggested</th><th class="barcell"></th></tr></thead>
+    <thead><tr><th data-sort>Agent type</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Runs</th><th class="n" data-sort>On a cheaper model, less by</th><th data-sort>Model</th><th data-sort>Suggested</th></tr></thead>
     <tbody>
     {{range .ByType}}<tr><td class="name">{{agent .Type}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Runs}}">{{.Runs}}</td>
       <td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td>
-      <td>{{model .Model}}</td><td>{{if .Alternative}}{{model .Alternative}}{{else}}<span class="muted">—</span>{{end}}</td>
-      <td class="barcell"><div class="bar" style="width: {{width .Cost $.MaxAgent}}%"></div></td></tr>{{end}}
+      <td>{{model .Model}}</td><td>{{if .Alternative}}{{model .Alternative}}{{else}}<span class="muted">—</span>{{end}}</td></tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">No cheaper model is suggested for "fork" agents: they continue the main conversation and reuse its cache, which a different model would lose.</p>
-  {{else}}<p>No sub-agent runs.</p>{{end}}
-  {{end}}
+  <p class="muted small">Each run starts with an empty session, so {{share .WriteShare}} of sub-agent spend goes on saving to the cache ({{share .MainWriteShare}} in main sessions). No cheaper model is suggested for "fork" agents: they continue the main session and reuse its cache.</p>
 </div>
+</details>
+{{else}}<p class="lead">No sub-agent runs.</p>{{end}}
+{{end}}
+</section>
 
 {{with .Reconciliation}}{{if .Sessions}}
+<section class="area">
 <h2 id="checks">Checking the totals</h2>
-<p class="lead">Claude Code keeps its own record of what each session cost. Comparing it with the logs shows how much this report can't see.</p>
+<p class="lead">Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs, for background requests the logs don't show, such as session titles and web searches.{{if .Unrecorded}} {{.Unrecorded}} sessions ({{pct .UnrecordedCost $.Total}} of spend) have no record to check against.{{end}}</p>
+<details><summary>Show details</summary>
 <div class="panel">
-  <p>For {{.Sessions}} sessions with a record, Claude Code recorded <b>{{dollars .Harness}}</b> and the logs show {{dollars .Ours}}. The difference, <b>{{dollars .Gap}} ({{pct .Gap .Ours}})</b>, was spent on background requests the logs don't show, such as session titles, summaries when you come back after a break, and web searches{{if .WebSearches}} ({{.WebSearches}} searches, about {{dollars .WebSearchCost}} in search fees){{end}}.</p>
-  {{if .Unrecorded}}<p>{{.Unrecorded}} sessions have no record ({{dollars .UnrecordedCost}}, {{pct .UnrecordedCost $.Total}} of spend), so their totals can't be checked.</p>{{end}}
-  {{if .Behind}}<p class="muted small">{{.Behind}} sessions went on after their record was last written and are left out.</p>{{end}}
+  <p>For {{.Sessions}} sessions with a record, Claude Code recorded {{dollars .Harness}} and the logs show {{dollars .Ours}}.{{if .WebSearches}} {{.WebSearches}} web searches cost about {{dollars .WebSearchCost}} in search fees.{{end}}{{if .Behind}} {{.Behind}} sessions went on after their record was last written and are left out.{{end}}</p>
   <div class="scroll"><table>
     <thead><tr><th>Model</th><th class="n">Claude Code's record</th><th class="n">In the logs</th><th class="n">Difference</th></tr></thead>
     <tbody>
@@ -358,56 +330,61 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
     </tbody>
   </table></div>
 </div>
+</details>
+</section>
 {{end}}{{end}}
 
-<h2>Words used in this report</h2>
+<section class="area">
+<h2 id="words">Words used in this report</h2>
+<details><summary>Show the words</summary>
 <div class="panel">
 <dl class="glossary">
   <dt>Token</dt><dd>The unit Claude is paid by: a word-piece of about four characters.</dd>
-  <dt>Turn</dt><dd>One request to Claude and its reply. A single prompt from you can take many turns while Claude works.</dd>
-  <dt>Session</dt><dd>One Claude Code conversation, together with any sub-agents it started.</dd>
-  <dt>Conversation size</dt><dd>How many tokens a turn sends: everything said so far, including tool output.</dd>
-  <dt>Cache</dt><dd>A saved copy of the conversation that Claude can re-read cheaply. It expires after 5 minutes or 1 hour without use.</dd>
-  <dt>Compact</dt><dd>Replace the conversation with a short summary (/compact in Claude Code).</dd>
+  <dt>Turn</dt><dd>One request to Claude and its reply. One prompt from you can take many turns while Claude works.</dd>
+  <dt>Session</dt><dd>One Claude Code conversation, with any sub-agents it started. Every turn sends the whole session so far.</dd>
+  <dt>Session size</dt><dd>How many tokens a turn sends: everything said so far, including tool output.</dd>
+  <dt>Cache</dt><dd>A saved copy of the session that Claude can re-read cheaply. It expires after 5 minutes or 1 hour without use.</dd>
+  <dt>Compact</dt><dd>Replace the session with a short summary (/compact in Claude Code).</dd>
   <dt>Sub-agent</dt><dd>A helper Claude starts for a side task; only its final report returns to the main session.</dd>
   <dt>MCP server</dt><dd>A connected tool provider, such as a browser or an issue tracker.</dd>
   <dt>System prompt</dt><dd>Claude Code's own instructions to Claude, sent at the start of every request.</dd>
   <dt>Memory file</dt><dd>A file such as CLAUDE.md whose instructions are added to every session.</dd>
-  <dt>P04, P19 …</dt><dd>Trimloop's codes for the patterns it looks for, listed in its docs/patterns.md.</dd>
+  <dt>Likely, up to</dt><dd>"Likely" is an estimate for one change; "up to" is the most it could save.</dd>
 </dl>
 </div>
+</details>
+</section>
 
 <footer>
-  <p>Costs are estimates at list prices ({{.Prices}}); tool output and added text are sized at about 4 characters per token. Claude Code's own records show a few percent more, for background requests that never appear in its logs.</p>
+  <p>Costs are estimates at list prices ({{.Prices}}); tool output and added text are sized at about 4 characters per token. Savings are estimates and overlap.</p>
   <p>Written by trimloop on {{date .Generated}}, on this machine. The page loads nothing from the network. It shows project names and session titles, which summarise what you asked: check before sharing it.</p>
 </footer>
 
 </main>
 
-{{define "session"}}{{$l := index . 0}}{{$id := index . 1}}{{if $l.Title}}{{$l.Title}}{{else}}<span class="muted">Untitled session</span>{{end}}{{if $l.SubAgent}} <span class="muted small">(a sub-agent)</span>{{end}}<span class="id" title="{{$id}}">{{if not $l.Start.IsZero}}{{day $l.Start}} · {{end}}{{$id}}</span>{{end}}
+{{define "session"}}{{$l := index . 0}}{{$id := index . 1}}{{if $l.Title}}{{$l.Title}}{{else}}<span class="muted">Untitled session</span>{{end}}{{if $l.SubAgent}} <span class="muted small">(a sub-agent)</span>{{end}}{{if not $l.Start.IsZero}}<span class="id" title="Session {{$id}}">{{day $l.Start}}</span>{{end}}{{end}}
 
 {{define "action"}}{{$a := index . 0}}{{$total := index . 1}}
 <div class="panel card">
-  <h3>{{$a.Title}}<span class="code">{{$a.Pattern}}</span></h3>
+  <h3>{{$a.Title}}</h3>
   {{if $a.Finding}}<p>{{$a.Finding}}</p>{{end}}
-  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span> <span class="muted">· up to {{dollars $a.Saving}} ({{pct $a.Saving $total}} of spend)</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span> <span class="muted">({{pct $a.Saving $total}} of spend){{if $a.Examples}} · mostly {{join $a.Examples ", "}}{{end}}</span>{{end}}</p>
-  {{if $a.LikelyNote}}<p class="muted small">How "likely" was worked out: {{$a.LikelyNote}}</p>{{end}}
-  {{if $a.Overlap}}<span class="note">{{$a.Overlap}}</span>{{end}}
+  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span> <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join $a.Examples ", "}}</span>{{end}}{{end}}</p>
   <div class="fix">
     <p><b>{{$a.Primary.What}}</b></p>
     <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>
   </div>
   {{if $a.Check}}<p class="small"><b>Then check:</b> {{$a.Check}}</p>{{end}}
-  {{if $a.Alternatives}}
-  <details><summary>{{len $a.Alternatives}} other way{{if gt (len $a.Alternatives) 1}}s{{end}} to do it</summary>
+  <details><summary>More</summary>
+    {{if $a.LikelyNote}}<p class="small">How "likely" was worked out: {{$a.LikelyNote}}</p>{{end}}
+    {{if $a.Overlap}}<p class="small">{{$a.Overlap}}.</p>{{end}}
+    <p class="small muted">{{pct $a.Saving $total}} of spend at most · Trimloop pattern {{$a.Pattern}}</p>
     {{range $a.Alternatives}}
     <div class="fix">
-      <p><b>{{.What}}</b></p>
+      <p><b>Or: {{.What}}</b></p>
       <div class="how">{{.How}}<button class="copy" type="button">Copy</button></div>
     </div>
     {{end}}
   </details>
-  {{end}}
 </div>
 {{end}}
 
