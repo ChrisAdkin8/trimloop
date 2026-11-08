@@ -6,7 +6,7 @@
 | Last updated | 2026-11-08 |
 | Decision | [ADR 0008](adr/0008-packaging-and-distribution.md) |
 | Built | Little yet: the prototype binary has the `analyse`, `setup`, `statusline` and `hook` commands, is pure Go, and is built from source. The other commands, the DuckDB store, release builds and CI checks below are planned |
-| Related | [analyzer.md](analyzer.md) (shapes and repo layout), [design.md §9](design.md#9-deployment-modes) (deployment modes) |
+| Related | [analyzer.md](analyzer.md) (shapes, `trimloop serve` in [§5.2](analyzer.md#52-gateway-sidecar-trimloop-serve), repo layout in [§12](analyzer.md#12-repository-layout)), [design.md §9](design.md#9-deployment-modes) (deployment modes) |
 
 ## 1. Principles
 
@@ -52,7 +52,7 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | `trimloop analyse` | Standalone analysis of session transcripts (M0) |
 | `trimloop statusline`, `trimloop hook stop\|prompt` | Live nudges, run by Claude Code (M0, [ADR 0034](adr/0034-live-nudges.md)) |
 | `trimloop setup` | Print or add the Claude Code settings for the live nudges |
-| `trimloop serve` | Sidecar, connector or team collector, depending on configuration |
+| `trimloop serve` | Sidecar, connector or team collector, depending on configuration ([analyzer.md §5.2](analyzer.md#52-gateway-sidecar-trimloop-serve)) |
 | `trimloop serve --extproc` | Envoy external-processing server |
 | `trimloop proxy` | Local forward/reverse proxy |
 | `trimloop report`, `explain` | Render reports (also from one or more sidecars with `--from`); explain a finding |
@@ -166,6 +166,10 @@ pre-upgrade job.
 | Linux (glibc) | amd64, arm64 | `.tar.gz`, `.deb`, `.rpm`; base of the container image |
 | Windows | amd64 | Later; no Windows-specific design work until demand exists |
 
+**Today** trimloop is pure Go, so one job builds every platform
+([ADR 0047](adr/0047-first-release-pure-go.md)); the rest of this section
+applies once DuckDB arrives.
+
 The DuckDB Go driver needs cgo, so binaries are built **per operating system**
 ([ADR 0014](adr/0014-release-builds-per-os.md)): a macOS Apple-silicon runner
 builds both macOS architectures (`amd64` with Apple's clang `-arch x86_64`),
@@ -194,7 +198,9 @@ baseline (ADR 0014).
 
 ## 6. Helm chart
 
-One chart, four modes:
+One chart, four modes. What `trimloop serve` does in each is in
+[analyzer.md §5.2](analyzer.md#52-gateway-sidecar-trimloop-serve); this
+section covers only how the chart deploys it.
 
 | Mode | What it deploys |
 |---|---|
@@ -279,7 +285,14 @@ which sidecar API versions.
 
 ## 10. Release pipeline
 
-Run by CI on a version tag:
+**Today:** one GoReleaser job (`.goreleaser.yaml`,
+`.github/workflows/release.yml`) builds a draft release with signed
+checksums, SBOMs, provenance, packages and a Homebrew cask; macOS binaries
+are not yet notarised ([ADR 0047](adr/0047-first-release-pure-go.md)). The
+pipeline below is the target once cgo arrives.
+
+Run by CI on a version tag. The web UI is built first, so every job embeds
+it. Then:
 
 1. **macOS job** (Apple-silicon runner): build both macOS architectures, sign
    with a Developer ID, notarise, and upload archives to a draft release.
@@ -290,14 +303,13 @@ Run by CI on a version tag:
    images into a multi-arch manifest, attach SBOMs and provenance (§11),
    update the Homebrew tap, and publish the release.
 
-Each job runs open-source GoReleaser with `release.mode: append`
+Each binary job runs open-source GoReleaser with `release.mode: append`
 ([ADR 0014](adr/0014-release-builds-per-os.md)); GoReleaser Pro is the
-fallback if the merge step proves fragile.
+fallback if the merge step proves fragile. The Python plugin and the Helm
+chart are published by their own jobs in the same workflow.
 
-4. The web UI is built first and embedded; the Python plugin and Helm chart
-   are published by their own jobs in the same workflow.
-5. Release notes list changed detectors, profiles and price-catalogue
-   versions, because those change findings.
+Release notes list changed detectors, profiles and price-catalogue versions,
+because those change findings.
 
 ## 11. Supply chain
 
@@ -313,29 +325,18 @@ fallback if the merge step proves fragile.
 The README's install section will show how to verify a download and an image
 signature.
 
-## 12. Repository layout additions
+## 12. Repository layout
 
-These extend the layout in [analyzer.md §12](analyzer.md#12-repository-layout):
-
-```text
-cmd/trimloop/          the binary
-cmd/trimloop-kong/     Kong plugin binary (M4)
-internal/collector/    team-collector features: recommendations, policy, multi-user
-web/                   TypeScript UI, built then embedded into the binary
-deploy/helm/trimloop/  Helm chart
-deploy/compose/        Docker Compose example
-plugins/litellm/       Python package with its own pyproject.toml
-.goreleaser.yaml       release definition
-```
-
-`internal/collector/` keeps team-only features in one place, so a later
-licensing decision (open-core or otherwise) does not force a restructure.
+The packaging parts of the layout — `cmd/trimloop-kong/`,
+`internal/collector/`, `web/`, `deploy/`, `plugins/litellm/` and
+`.goreleaser.yaml` — are in the single target layout in
+[analyzer.md §12](analyzer.md#12-repository-layout).
 
 ## 13. Open questions
 
-1. **Licence.** Open-source everything, or open-source the binary's
-   developer and sidecar modes with a commercial collector? The layout keeps
-   both possible.
+1. **Licence.** Settled by [ADR 0046](adr/0046-licensing.md): the
+   binary is FSL-1.1-ALv2, the Python plugin and other connectors
+   Apache-2.0, and team features commercial.
 2. **Homebrew.** Own tap first; apply to homebrew-core once the project
    meets its popularity rules?
 3. **Windows.** Wait for demand, or ship `analyse` early because transcript

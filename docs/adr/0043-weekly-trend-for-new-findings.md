@@ -1,6 +1,6 @@
 # ADR 0043: Weekly figures for P02, P14 and main-session models
 
-- Status: Accepted — built in the M0 prototype; labels and the meaning of `short_waits` (analysis version 6) amended by [ADR 0044](0044-effort-thinking-and-cache-figures.md)
+- Status: Accepted — built in the M0 prototype; labels and the meaning of `short_waits` (analysis version 6) amended by [ADR 0044](0044-effort-thinking-and-cache-figures.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md)
 - Date: 2026-11-08
 - Amends: [ADR 0033](0033-reconciliation-history-standing-context.md) (what the history file keeps), [ADR 0042](0042-p02-p14-and-main-session-models.md) (how its cards are checked)
 
@@ -30,3 +30,5 @@ page's word list.
   short waits $101, top effort $110, older models $214.
 - The history file holds three more numbers per week; still no names,
   titles or paths (ADR 0004).
+- Figures of this ADR's day: current figures are in
+  [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance).

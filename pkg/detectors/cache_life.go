@@ -120,11 +120,11 @@ func FindCacheLife(sessions []event.Session, topN int) CacheLife {
 			hour = hour || t.Usage.CacheWrite1h > 0
 		}
 		switch {
-		case hour && s.Kind == "subagent":
+		case hour && s.Kind == event.SubAgentSession:
 			f.SubHour++
 		case hour:
 			f.MainHour++
-		case short && s.Kind == "subagent":
+		case short && s.Kind == event.SubAgentSession:
 			f.SubShort++
 		case short:
 			f.MainShort++
@@ -153,7 +153,7 @@ func FindCacheLife(sessions []event.Session, topN int) CacheLife {
 		for _, w := range waits {
 			t := s.Turns[w.turn]
 			f.Waits++
-			if s.Kind == "subagent" {
+			if s.Kind == event.SubAgentSession {
 				f.SubAgent++
 			}
 			f.Cost += t.Cost.Total()

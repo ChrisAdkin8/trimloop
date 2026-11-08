@@ -35,7 +35,7 @@ func FindMainModels(sessions []event.Session) MainModels {
 	var f MainModels
 	by := map[string]*ModelSpend{}
 	for _, s := range sessions {
-		if s.Kind == "subagent" {
+		if s.Kind == event.SubAgentSession {
 			continue
 		}
 		for _, t := range s.Turns {

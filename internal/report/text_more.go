@@ -71,35 +71,59 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 		return
 	}
 	fmt.Fprintln(w, "\nWEEK BY WEEK")
-	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s %9s %7s %9s %9s %9s\n", "week of", "spend", "turns", "large ctx", "sub-agents",
-		"tool out", "re-reads", "breaks", "compact", "short wt", "top eff", "cheaper")
+	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s %9s %7s %9s %9s %9s %6s\n", "week of", "spend", "turns", "large ctx", "sub-agents",
+		"tool out", "re-reads", "breaks", "compact", "short wt", "top eff", "cheaper", "limits")
 	for _, k := range weeks {
 		kept := ""
 		if k.Kept {
 			kept = "  (kept from an earlier run)"
 		}
-		if olderFigures(k, prices) {
-			kept += "  (older prices or method)"
+		if reason := olderReason(k, prices); reason != "" {
+			kept += "  (" + reason + ")"
 		}
-		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%% %9s %7d %9s %9s %9s%s\n", k.Week, money(k.Spend), thousands(k.Turns),
+		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%% %9s %7d %9s %9s %9s %6s%s\n", k.Week, money(k.Spend), thousands(k.Turns),
 			pct(k.LargeContext, k.Spend), pct(k.SubAgents, k.Spend), money(k.ToolOutput),
 			pct(float64(k.Rereads), float64(k.FileViews)), money(k.PauseRewrite), k.Compactions,
-			measured(k, k.ShortWaits), measured(k, k.TopEffort), measured(k, k.OlderModels), kept)
+			measured(k, k.ShortWaits), measured(k, k.TopEffort), measured(k, k.OlderModels), limitHits(k), kept)
 	}
 }
 
 // olderFigures reports whether a week's figures were worked out with another
 // price list or an older analysis than this run's, so they may not compare.
-func olderFigures(k detectors.Week, prices string) bool {
-	// Analysis 0 is a week stored before versions were recorded: older.
-	return k.Prices != "" && prices != "" && k.Prices != prices || k.Analysis < detectors.AnalysisVersion
+func olderFigures(k detectors.Week, prices string) bool { return olderReason(k, prices) != "" }
+
+// olderReason says why a week's figures may not compare with this run's:
+// an older analysis, another price list, or both; "" if neither.
+func olderReason(k detectors.Week, prices string) string {
+	method := k.Analysis < detectors.AnalysisVersion // 0: stored before versions were recorded
+	otherPrices := k.Prices != "" && prices != "" && k.Prices != prices
+	switch {
+	case method && otherPrices:
+		return "older method and prices"
+	case method && k.Analysis == 0:
+		return "older method"
+	case method:
+		return fmt.Sprintf("older method: analysis %d, now %d", k.Analysis, detectors.AnalysisVersion)
+	case otherPrices:
+		return "older prices: " + k.Prices
+	}
+	return ""
 }
 
-// measured writes a figure added in analysis version 5, or "-" for a week an
+// measured writes a figure added in analysis version 5 (NewFindingsSince), or "-" for a week an
 // earlier version stored, which did not measure it.
 func measured(k detectors.Week, v float64) string {
-	if k.Analysis < 5 {
+	if !k.HasNewFindings() {
 		return "-"
 	}
 	return money(v)
+}
+
+// limitHits writes a week's limit hits, or "-" for a week stored before
+// analysis version 7, which did not count them.
+func limitHits(k detectors.Week) string {
+	if !k.HasLimitHits() {
+		return "-"
+	}
+	return fmt.Sprint(k.LimitHits)
 }

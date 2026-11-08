@@ -7,3 +7,6 @@ trimloop-report.html
 
 # Local build output.
 /trimloop
+
+# GoReleaser output (releases and dry runs)
+dist/

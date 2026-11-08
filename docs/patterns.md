@@ -11,6 +11,9 @@ prompt cache. Anything that changes inside the prefix invalidates the cache
 from that point on.
 
 **Milestone:** when the detector ships ([ROADMAP.md](../ROADMAP.md)).
+**Built:** what the M0 prototype reports today (`pkg/detectors`): **Yes**;
+**Reduced**, a reduced-fidelity version from usage and harness records; or
+**No**, planned.
 **Kind:** **Go** = per-turn state machine; **SQL** = cross-session aggregate;
 **Go + SQL** = both ([ADR 0010](adr/0010-go-detectors-sql-aggregates.md)).
 
@@ -19,27 +22,27 @@ needs ([analyzer.md §10.4](analyzer.md#104-capability-gated-detectors)) and
 reports "not applicable" where they are missing, never zero. Caching is not
 neutral, so P01 and P02 describe each provider cache model.
 
-| ID | Pattern | Milestone | Kind | Max fix level |
-|---|---|---|---|---|
-| P01 | Cache-prefix churn | M0 | Go | 3 |
-| P02 | Cache TTL expiry | M0 (reduced built, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) | Go | 2 |
-| P03 | Repeated file reads | M0 | Go | 1 |
-| P04 | Oversized and noisy tool output | M0 | Go | 3 |
-| P05 | Tool-call loops | M0 | Go | 0 |
-| P06 | Unused tool definitions | M0 | SQL | 1 |
-| P07 | Bloated standing and injected context | M0 | Go ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) | 1 |
-| P08 | Stale context | M3 | Go | 3 |
-| P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
-| P10 | Compaction thrash | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0035](adr/0035-measurement-corrections.md)); M3 full | Go | 1 |
-| P11 | Post-failure burn | M3 | Go | 0 |
-| P12 | Retry storms | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md)), not built yet; M3 full | Go | 1 |
-| P13 | Model over-provisioning | M0 sub-agents and main sessions, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)); M4 full | Go | 3 |
-| P14 | Thinking-budget overspend | M0 reduced (built, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)), M4 full ([ADR 0028](adr/0028-harness-recorded-signals.md)) | Go | 3 |
-| P15 | Duplicated exploration across a team | M4 | SQL | 1 |
-| P16 | Repeated workflow (skill candidate) | M4 | Go + SQL | 1 |
-| P17 | Repeated instructions | M4 | SQL | 1 |
-| P18 | Hot documentation | M4 | SQL | 1 |
-| P19 | Large working context | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Go | 1 |
+| ID | Pattern | Milestone | Built | Kind | Max fix level |
+|---|---|---|---|---|---|
+| P01 | Cache-prefix churn | M0 | No | Go | 3 |
+| P02 | Cache TTL expiry | M0 ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) | Reduced | Go | 2 |
+| P03 | Repeated file reads | M0 | No (re-reads are shown under P04) | Go | 1 |
+| P04 | Oversized and noisy tool output | M0 | Yes | Go | 3 |
+| P05 | Tool-call loops | M0 | No | Go | 0 |
+| P06 | Unused tool definitions | M0 | No | SQL | 1 |
+| P07 | Bloated standing and injected context | M0 | Yes | Go ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) | 1 |
+| P08 | Stale context | M3 | No | Go | 3 |
+| P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Yes | Go | 1 |
+| P10 | Compaction thrash | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0045](adr/0045-m0-measurement-method.md)); M3 full | Reduced | Go | 1 |
+| P11 | Post-failure burn | M3 | No | Go | 0 |
+| P12 | Retry storms | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md)); M3 full | No | Go | 1 |
+| P13 | Model over-provisioning | M0 sub-agents and main sessions, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)); M4 full | Reduced | Go | 3 |
+| P14 | Thinking-budget overspend | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)); M4 full | Reduced | Go | 3 |
+| P15 | Duplicated exploration across a team | M4 | No | SQL | 1 |
+| P16 | Repeated workflow (skill candidate) | M4 | No | Go + SQL | 1 |
+| P17 | Repeated instructions | M4 | No | SQL | 1 |
+| P18 | Hot documentation | M4 | No | SQL | 1 |
+| P19 | Large working context | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Yes | Go | 1 |
 
 ---
 
@@ -97,7 +100,7 @@ the founder's logs, sub-agents and SDK runs) after a wait of 5 minutes to an
 hour, priced against the cache still being there; what the hour's cache
 would save all such sessions net of its dearer writes; and, the other way,
 what the hour saved the sessions that used it, as a range
-([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0044](adr/0044-effort-thinking-and-cache-figures.md); [measurements.md](measurements.md)).
+([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0045](adr/0045-m0-measurement-method.md); [measurements.md](measurements.md)).
 
 **What happens:** The developer pauses longer than the cache lives, so the
 next turn pays again for a prefix that was cached moments before the pause.
@@ -152,29 +155,13 @@ results. Claude Code already caps what the model sees of one result (about
 30 KB; larger output is saved to disk), so a single dump is bounded; thousands
 of moderate outputs carried for hundreds of turns are not.
 
-**In the founder's sample** (one developer, ≈ $2,021 of spend; program names
-only, no command text or output read):
-
-| Source | Calls | Output on arrival | Carried cost (est.) |
-|---|---|---|---|
-| Bash | 12,994 | 28.6 MB | ≈ $197 |
-| Read tool | 1,641 | 17.2 MB | ≈ $136 |
-| MCP, WebSearch, WebFetch, other | — | 7.7 MB | ≈ $46 |
-
-The noisiest Bash programs were file viewing and searching, not builds or
-tests: `sed` (mostly `sed -n 'X,Yp' file`) $57, `grep` $31, inline `python3`
-$23, `cat` $19. Of 5,377 file views (Read, `cat`, `sed -n`, `head`, `tail`),
-38 % re-read a file already seen in the same session (P03). Half or more of
-these commands were already piped through a filter; the waste is whole-file
-views, broad searches and repeats.
-
-These figures came from a one-off script that carried output past
-compactions. The M0 detector drops output at each compaction, as the harness
-does, and measures less on the same logs: ≈ $251 carried in all (Bash $163,
-Read $62; `sed -n` $48; 2026-11-07, before ADR 0039 priced rebuilt-cache
-turns as writes: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance) has the current figure), and 23 % of file views re-reading a file unchanged
-since it was last viewed (an edit or a compaction resets that). Ignoring
-compactions, the detector gives ≈ $449, so compaction accounts for the gap.
+In the founder's logs the noisiest shell programs were file viewing and
+searching, not builds or tests, and many file views re-read a file already
+seen. Half or more of those commands were already piped through a filter;
+the waste is whole-file views, broad searches and repeats. A one-off script
+that carried output past compactions measured more than the M0 detector,
+which drops output at each compaction as the harness does: compaction
+accounts for the gap. Measured figures: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); method: [measurements.md](measurements.md).
 
 **Kinds of noise:**
 
@@ -229,11 +216,9 @@ Until `truncate_tool_result` ships, P04's fixes are L1.
 `enforce` is the step up when the habit persists; `source` and
 `structure` last longest where the tool or the way of working can change;
 `cap` is blunt and is offered last among the L1 kinds. For the founder's
-sample, the primary fix is `advise` (Read with ranges) with `structure`
+logs, the primary fix is `advise` (Read with ranges) with `structure`
 (sub-agents for exploration) and `enforce` (a hook on `cat` and `sed -n`) as
-alternatives — together aimed at about $76 of carried cost and much of the
-38 % of repeat file views (2026-11-07; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance)
-has the current figure).
+alternatives, aimed at file-view output and repeat file views.
 
 **Cautions** (ADR 0030):
 - **Keep failures visible.** A filter or cap that hides the failing line
@@ -301,16 +286,13 @@ injected kind — so the fix names the skill, plugin or MCP server. In M0
 ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) the system
 prompt and tool definitions are priced on every turn (cache-read price, or
 the write price when new or changed), tool definitions grouped by MCP
-server; injected text is carried like P04's tool output. In the founder's
-sample: $221 (11 % of spend) — built-in tool definitions $102, the skill
-listing $36, MCP servers $18, memory files $4 (2026-11-07; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance) has
-the current figure, [measurements.md](measurements.md) the current method).
+server; injected text is carried like P04's tool output. In the founder's logs
+the built-in tool definitions cost the most, then the skill listing; MCP
+servers and memory files cost far less. Measured figures: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); method: [measurements.md](measurements.md).
 
 **Saving:** Hard to estimate precisely; reported as an upper bound with low
 confidence. Injected kinds can be priced like tool output (P04): carried
-from when they appear until the session ends or is compacted. In the
-founder's sample that came to ≈ $88 (4.3 % of spend), $36 of it the skill
-listing ([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07)).
+from when they appear until the session ends or is compacted.
 
 **Fix:** L1 — report the largest sections. Where a section is relevant to
 only some sessions, recommend moving it into a skill (or the harness's
@@ -358,8 +340,7 @@ pause in a main session that the user ended: by typing, answering Claude's
 question, or allowing or refusing a tool call. The report counts the other
 waits (on a tool, a sub-agent, a timer or another agent, or inside a
 sub-agent), and the "start fresh" saving leaves them out
-([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md), [ADR 0038](adr/0038-real-size-after-compaction.md),
-[ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)).
+([ADR 0045](adr/0045-m0-measurement-method.md)).
 
 **Fix:** L1 — report the cost of cold resumes and recommend continuing within
 the cache lifetime or starting fresh. (No automatic fix: rewriting a resumed
@@ -452,17 +433,14 @@ agents (Claude Code: the Agent tool's `model` argument or a custom agent's
 `model` field), stated as untested for quality and checked after with the
 agent type's outcome signals (ADR 0030). Agent types that continue the main
 conversation and read its cache (Claude Code's `fork`) get no suggestion,
-since another model would lose that cache. In the founder's sample, no Agent
-call set a model; sub-agents were 26 % of spend, and their Opus 5.5 and
-Fable turns would have cost $271 (13 % of all spend) less on Sonnet 5.5
-(first measured 2026-11-07; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance)
-has the current figure).
+since another model would lose that cache. In the founder's logs, no Agent
+call set a model, so every sub-agent ran on the main model. Measured figures: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); method: [measurements.md](measurements.md).
 
 ## P14 — Thinking-budget overspend
 
 **In M0 (reduced fidelity, built):** spend by effort level, and how much
 more xhigh and max turns think per turn, on average, than the same model's
-high-effort turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)).
+high-effort turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0045](adr/0045-m0-measurement-method.md)).
 
 **What happens:** Extended reasoning tokens are spent on trivial turns.
 
@@ -470,16 +448,12 @@ high-effort turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR
 reduced fidelity (M0): thinking tokens (Claude Code logs them in
 `output_tokens_details`, as part of output) and output cost by requested
 effort level (`request.effort`), and how much more per turn, on average, the
-highest levels think than high does ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)).
+highest levels think than high does ([ADR 0045](adr/0045-m0-measurement-method.md)).
 
 **Fix:** L1 (M0) — report spend by effort level and recommend a lower
-default or per-turn effort where the harness supports it. Measured in the
-founder's sample, the lever is smaller than its token share suggests: `max`
-and `xhigh` turns were 22 % of spend but their output cost $109, and running
-them at `high`'s mean output would save at most ≈ $67 (3 %)
-([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07);
-2026-11-07, a method since replaced: [measurements.md](measurements.md) has
-the current one, log-signals §8 the current figure). L3 (M4, op
+default or per-turn effort where the harness supports it. In the founder's
+logs the lever is smaller than its token share suggests: the highest
+levels' extra thinking costs far less than their share of spend. Measured figures: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); method: [measurements.md](measurements.md). L3 (M4, op
 `cap_thinking`) — cap the budget per turn class; canary-gated.
 
 **Requires:** `request.effort` (reduced, M0) or `usage.reasoning` (full). **Optional:** `usage.reasoning` in reduced fidelity, where it replaces output tokens.
@@ -587,7 +561,7 @@ summaries), `harness.skills`.
 **What happens:** A session keeps going until its context is very large.
 Every turn re-sends the whole conversation, so each later turn pays again,
 at cache-read price or worse, for everything accumulated so far. In the
-founder's sessions, turns over 200k tokens were 57% of spend
+founder's sessions, turns over 200k tokens made more than half of spend
 ([ADR 0027](adr/0027-measured-m0-findings.md)).
 
 **Signals:** A turn's input tokens (uncached, cache read and cache write)
@@ -599,20 +573,19 @@ Also report where spend piles up ([ADR 0031](adr/0031-m0-order-from-measured-spe
 the share in the costliest 1, 5 and 10 conversations (a main session with
 its sub-agents), the mean cost of a turn by context size (under 50 k, to
 200 k, to 500 k, over 500 k), and sessions past 500 k that never compacted.
-In the founder's sample (2026-11-07) the costliest five conversations made
-59 % of spend, and a turn over 500 k cost $0.28 against $0.06 under 50 k.
+In the founder's logs a few conversations made most of the spend, and a
+turn over 500 k cost several times one under 50 k. Measured figures: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); method: [measurements.md](measurements.md).
 
 **Saving:** The cost of the tokens above the threshold. They are the oldest
 history, so each is priced by where it sat in that turn's request: read
 from the cache, or written where the cache was rebuilt
-([ADR 0035](adr/0035-measurement-corrections.md),
-[ADR 0040](adr/0040-position-pricing-and-one-method-page.md);
+([ADR 0045](adr/0045-m0-measurement-method.md);
 [measurements.md](measurements.md) §2). An
 upper bound for keeping every turn under the threshold: some context is
 needed. Overlaps P09; the two are never added. The compaction card's
 figures differ because they measure another change: compacting down to
-the typical size of the first request after a compaction (about 92k on the
-founder's logs: the summary, the system prompt and re-attached files)
+the typical size of the first request after a compaction (the summary,
+the system prompt and re-attached files)
 whenever a session passes the threshold, which removes more than the part
 above it, priced the same way.
 
@@ -624,8 +597,7 @@ typical size of the first request after a compaction (the summary plus the
 system prompt and re-attached files) whenever it passed the threshold,
 including each compaction's cost, with a range from how much that size
 varies ([ADR 0032](adr/0032-readable-reports.md),
-[ADR 0038](adr/0038-real-size-after-compaction.md),
-[ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md); [measurements.md](measurements.md)). Live
+[ADR 0045](adr/0045-m0-measurement-method.md); [measurements.md](measurements.md)). Live
 nudges remind the user at 200k and 500k tokens and show the size in the
 status line ([ADR 0034](adr/0034-live-nudges.md)). Where P04, P07 or P08 are
 detected, report them as the causes: they say *what* fills the context.

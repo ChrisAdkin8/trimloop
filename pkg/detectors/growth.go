@@ -133,7 +133,7 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 				// What the next request sent, measured on main sessions (those
 				// the user can compact), and only when it is smaller than the
 				// session was before: a larger one is not a request after it.
-				if ctx > 0 && s.Kind != "subagent" && (t.Compaction.Before == 0 || ctx < t.Compaction.Before) {
+				if ctx > 0 && s.Kind != event.SubAgentSession && (t.Compaction.Before == 0 || ctx < t.Compaction.Before) {
 					resume = append(resume, ctx)
 				}
 				f.Longest = max(f.Longest, t.Compaction.Duration)

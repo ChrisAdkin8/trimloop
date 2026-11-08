@@ -30,6 +30,10 @@ type Week struct {
 	TopEffort   float64 `json:"top_effort"`   // output cost of xhigh and max turns (P14)
 	OlderModels float64 `json:"older_models"` // main-session spend on a model with a newer, cheaper version or a cheaper tier (P13)
 
+	// Added in analysis version 7 (ADR 0048): requests refused because a
+	// subscription usage limit was reached.
+	LimitHits int `json:"limit_hits"`
+
 	Prices string `json:"prices,omitempty"` // price catalogue the figures used
 	// Analysis is the AnalysisVersion that worked the figures out.
 	Analysis int `json:"analysis,omitempty"`
@@ -47,8 +51,24 @@ type Week struct {
 // sub-agent pauses out of PauseRewrite, counts refusals as the user's and
 // compactions after a session's last reply (ADR 0039); version 5 adds the
 // short-wait, top-effort and older-model figures (ADR 0043); version 6
-// prices short waits against the cache still there (ADR 0044).
-const AnalysisVersion = 6
+// prices short waits against the cache still there (ADR 0044); version 7
+// adds limit hits (ADR 0048).
+const AnalysisVersion = 7
+
+// The analysis version in which each later weekly figure was first
+// measured. A week stored by an earlier version does not have it; reports
+// show a dash rather than a zero.
+const (
+	NewFindingsSince = 5 // ShortWaits, TopEffort, OlderModels (ADR 0043)
+	LimitHitsSince   = 7 // LimitHits (ADR 0048)
+)
+
+// HasNewFindings reports whether the week measured the P02, P14 and P13
+// main-session figures.
+func (k Week) HasNewFindings() bool { return k.Analysis >= NewFindingsSince }
+
+// HasLimitHits reports whether the week counted usage-limit hits.
+func (k Week) HasLimitHits() bool { return k.Analysis >= LimitHitsSince }
 
 // TurnsCountedSince is the first AnalysisVersion that counts turns as this
 // one does, so turn counts from it on can be compared.
@@ -88,7 +108,7 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 			if t.Priced && (t.Effort == "xhigh" || t.Effort == "max") {
 				w.TopEffort += t.Cost.Output
 			}
-			if t.Priced && s.Kind != "subagent" {
+			if t.Priced && s.Kind != event.SubAgentSession {
 				_, newer := price.Successor(t.Model)
 				_, tier := price.LowerTier(t.Model)
 				if newer || tier {
@@ -100,7 +120,7 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 			if t.Context() > threshold && t.Priced {
 				w.LargeContext += t.Cost.Input()
 			}
-			if s.Kind == "subagent" {
+			if s.Kind == event.SubAgentSession {
 				w.SubAgents += t.Cost.Total()
 			}
 			if userBreak(s, t, pauseGap) {
@@ -108,6 +128,11 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 			}
 			if t.CompactedBefore {
 				w.Compactions++
+			}
+		}
+		for _, h := range s.LimitHits {
+			if !h.At.IsZero() {
+				get(h.At).LimitHits++
 			}
 		}
 		for _, c := range s.Unreplied {

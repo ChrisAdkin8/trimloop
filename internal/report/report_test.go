@@ -400,3 +400,21 @@ func TestCompactionLikelyRange(t *testing.T) {
 		t.Errorf("note %q has no %q", f.LikelyNote, want)
 	}
 }
+
+func TestOlderReason(t *testing.T) {
+	now := detectors.AnalysisVersion
+	for _, c := range []struct {
+		w    detectors.Week
+		want string
+	}{
+		{detectors.Week{Analysis: now, Prices: "p"}, ""},
+		{detectors.Week{Analysis: now, Prices: "q"}, "older prices: q"},
+		{detectors.Week{Analysis: 4, Prices: "p"}, fmt.Sprintf("older method: analysis 4, now %d", now)},
+		{detectors.Week{Analysis: 0}, "older method"},
+		{detectors.Week{Analysis: 4, Prices: "q"}, "older method and prices"},
+	} {
+		if got := olderReason(c.w, "p"); got != c.want {
+			t.Errorf("olderReason(%+v) = %q, want %q", c.w, got, c.want)
+		}
+	}
+}

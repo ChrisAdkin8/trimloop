@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -102,7 +103,13 @@ func FindStandingContext(sessions []event.Session) StandingContext {
 				for _, d := range st.Tools {
 					byGroup[toolDefGroup(d.Name)] += d.Bytes
 				}
-				for g, b := range byGroup {
+				groups := make([]string, 0, len(byGroup))
+				for g := range byGroup {
+					groups = append(groups, g)
+				}
+				sort.Strings(groups) // a fixed order, so the sums are the same every run
+				for _, g := range groups {
+					b := byGroup[g]
 					c := float64(tokens(b)) * rate
 					f.ToolDefinitions += c
 					src := mcpSource(g)

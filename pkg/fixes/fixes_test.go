@@ -175,3 +175,28 @@ func TestNewFindingCards(t *testing.T) {
 		t.Errorf("P14: got %+v", r)
 	}
 }
+
+func TestForCacheLifeWhenOnlySubAgentsKeepTheHour(t *testing.T) {
+	f := detectors.CacheLife{Saving: 50, Waits: 10, MainShort: 4, SubHour: 3}
+	r, ok := ForCacheLife(f, 1)
+	if !ok || !strings.Contains(r.Primary.What, "main session") || len(r.Alternatives) != 0 ||
+		strings.Contains(r.Primary.How, "rather than a sub-agent") {
+		t.Errorf("only sub-agents on the hour: got %+v", r)
+	}
+	f.MainHour = 2 // main sessions keep the hour: move waits there
+	if r, _ := ForCacheLife(f, 1); !strings.Contains(r.Primary.What, "keeps its cache for an hour") || len(r.Alternatives) != 1 {
+		t.Errorf("main sessions on the hour: got %+v", r)
+	}
+}
+
+func TestForSubAgentsNamesTheModel(t *testing.T) {
+	f := detectors.SubAgents{Cost: 100, Saving: 40, ByType: []detectors.AgentGroup{{Type: "Explore", Alternative: "claude-haiku-5-5", Saving: 40}}}
+	r, ok := ForSubAgents(f, 1)
+	if !ok || !strings.Contains(r.Primary.How, `"model: haiku"`) || !strings.Contains(r.Alternatives[0].How, "model: haiku;") {
+		t.Errorf("haiku alternative: got %+v", r)
+	}
+	f.ByType[0].Alternative = "" // a saving with no named model
+	if r, _ := ForSubAgents(f, 1); strings.Contains(r.Finding, "moved to .") || !strings.Contains(r.Finding, "a cheaper model") {
+		t.Errorf("no named model: got %q", r.Finding)
+	}
+}

@@ -39,7 +39,7 @@ func LikelyCompactionSaving(sessions []event.Session, at, after, summary int) (l
 		return 0, 0
 	}
 	for _, s := range sessions {
-		if s.Kind == "subagent" {
+		if s.Kind == event.SubAgentSession {
 			continue
 		}
 		removed := 0 // tokens the simulated compactions have removed so far
@@ -106,7 +106,7 @@ func LikelyPauseSaving(sessions []event.Session, minGap time.Duration, fresh int
 func TypicalStart(sessions []event.Session) int {
 	var firsts []int
 	for _, s := range sessions {
-		if s.Kind == "main" && len(s.Turns) > 0 {
+		if s.Kind == event.MainSession && len(s.Turns) > 0 {
 			firsts = append(firsts, s.Turns[0].Context())
 		}
 	}

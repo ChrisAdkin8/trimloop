@@ -22,7 +22,8 @@ const FormatVersion = "trimloop-report/1"
 type Results struct {
 	Format    string    `json:"format"`
 	Generated time.Time `json:"generated"`
-	Prices    string    `json:"price_catalogue"` // price catalogue version
+	Prices    string    `json:"price_catalogue"`            // price catalogue version
+	Version   string    `json:"trimloop_version,omitempty"` // the build that made the report
 
 	Read  Read       `json:"read"`
 	Cost  event.Cost `json:"cost"`  // by token class
@@ -49,6 +50,10 @@ type Results struct {
 	ModelFixes   []fixes.Recommendation `json:"p13_main_fixes"`
 	Effort       detectors.Effort       `json:"p14_effort"`
 	EffortFix    *fixes.Recommendation  `json:"p14_fix,omitempty"`
+
+	// Plan and Limits are the user's plan and usage limits (ADR 0048).
+	Plan   Plan             `json:"plan"`
+	Limits detectors.Limits `json:"usage_limits"`
 
 	Reconciliation detectors.Reconciliation  `json:"reconciliation"`
 	Standing       detectors.StandingContext `json:"p07_standing_context"`
@@ -90,6 +95,9 @@ type Read struct {
 	Sessions int `json:"sessions"`
 	Turns    int `json:"turns"`
 	Unpriced int `json:"unpriced"` // turns with no price, left out of costs
+	// Since, if set, is the --since date (YYYY-MM-DD): only main sessions
+	// that started on or after it were analysed, with their sub-agents.
+	Since string `json:"since,omitempty"`
 }
 
 // Settings are the thresholds the findings use.
@@ -138,6 +146,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 			}
 		}
 	}
+	r.Limits = detectors.FindLimits(sessions, nil, minLimitSpend, minLimitRise) // AddLimits adds readings
 	r.Cost = detectors.TotalCost(sessions)
 	r.Total = r.Cost.Total()
 
@@ -274,7 +283,7 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 		}
 		l := Label{Project: s.Project, Start: s.Start()}
 		named := s
-		if s.Kind == "subagent" {
+		if s.Kind == event.SubAgentSession {
 			l.SubAgent = true
 			if p, ok := byID[s.ParentID]; ok {
 				named = p

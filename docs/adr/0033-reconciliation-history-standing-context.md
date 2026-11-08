@@ -1,6 +1,6 @@
 # ADR 0033: Reconciliation, weekly history, and pricing standing context
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md), [ADR 0036](0036-prices-reconciliation-status.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md), [ADR 0038](0038-real-size-after-compaction.md), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0043](0043-weekly-trend-for-new-findings.md)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md), [ADR 0036](0036-prices-reconciliation-status.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md), [ADR 0038](0038-real-size-after-compaction.md), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0043](0043-weekly-trend-for-new-findings.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md); limit hits in the weekly figures: [ADR 0048](0048-usage-limits-for-subscribers.md)
 - Date: 2026-11-07
 - Amends: [ADR 0028](0028-harness-recorded-signals.md) (how reconciliation is done), [ADR 0029](0029-m0-build-order-by-user-value.md) item 4 (results kept between runs), [ADR 0010](0010-go-detectors-sql-aggregates.md) (P07 is a Go detector, not SQL), [patterns.md P07](../patterns.md#p07--bloated-standing-and-injected-context)
 
@@ -55,9 +55,8 @@ them raised three questions the earlier ADRs left open.
 ## Consequences
 
 - On the founder's logs, Claude Code recorded $52 (3 %) more than the logs
-  show for 412 sessions; 14 % of spend has no record. (Corrected by
-  [ADR 0035](0035-measurement-corrections.md): about 13 %, once records
-  written partway through a session are left out.) Standing and injected
+  show for 412 sessions; 14 % of spend has no record. (Figures of this ADR's
+  day: current figures are in [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance).) Standing and injected
   context cost $221 (11 %), of which built-in tool definitions are $102,
   the skill listing $36 and MCP servers $18.
 - The report can show a week-by-week table, so the effect of a fix is

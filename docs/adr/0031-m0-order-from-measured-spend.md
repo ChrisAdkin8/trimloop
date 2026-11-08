@@ -1,6 +1,6 @@
 # ADR 0031: Re-rank M0 from measured spend; sub-agent model fit in M0
 
-- Status: Accepted — mostly built (items 1–7, 9 and 10; saved offsets, item 8's filters and item 11 on to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md)
+- Status: Accepted — mostly built (items 1–4, 6, 9 and 10; item 5 without auxiliary turns, item 7 without saved offsets, item 8 without filters; item 11 on to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md)
 - Date: 2026-11-07
 - Amends: [ADR 0029](0029-m0-build-order-by-user-value.md) (M0 build order), [patterns.md](../patterns.md) (P13, P14 milestones)
 
@@ -91,8 +91,7 @@ anything stored or sent keys them (`repo`, `skill`, `plugin`, `mcp`,
 - A sub-agent model recommendation can lower quality; it is offered with
   its outcome check, never as a pure saving.
 - Totals stay unreconciled with the harness until item 5; the report's
-  figures may be about 4 % low. (Corrected 2026-11-08: item 5 reports the
-  gap, which is about 13 %; the logs cannot match the record until
-  auxiliary turns are built, after M0. See [ADR 0036](0036-prices-reconciliation-status.md).)
+  figures may be about 4 % low. (Figures of this ADR's day: current figures
+  are in [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance).)
 - The price catalogue gains per-request charges for server tools (web
   search) with item 5, as log-signals §4 proposed.

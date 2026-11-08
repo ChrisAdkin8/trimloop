@@ -10,69 +10,101 @@ developer machines comes last (M4).
 **Goal:** `trimloop analyse` reads existing Claude Code transcripts and prints a
 findings report with estimated savings. No proxy, no server.
 
-- Transcript importer for Claude Code (`~/.claude/projects/**/*.jsonl`).
-  Done in the prototype.
-- Keyed fingerprints and `trimloop key init` / `import` / `status`
-  (per-machine key for solo use; [ADR 0011](docs/adr/0011-keyed-fingerprints.md),
-  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
-- Content-addressed segment storage: each segment stored once, turns hold
-  references ([ADR 0017](docs/adr/0017-content-addressed-segments.md)).
-- Normaliser: segmenting, redaction, fingerprinting, pricing.
-- DuckDB store. Not built: the prototype keeps everything in memory for one
-  run, and weekly figures in a history file. As ADR 0029 item 4 says, the
-  store follows when needed: P06 needs it. It holds no content before
-  redaction is built (build order item 5; ADR 0004).
-- Detectors P01–P07, P09, P10, P12, P14 and P19 ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
-  [ADR 0028](docs/adr/0028-harness-recorded-signals.md)), and P13 for
-  sub-agents and main sessions in reduced fidelity
-  ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md), [ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)).
-- Reader also takes the harness's own cost and compaction records. Done in
-  the prototype: reconciliation reports the gap with them (about 13 %).
-  ADR 0028's acceptance test, within 2 % with auxiliary turns added, is not
-  yet passed: auxiliary turns come after M0 ([ADR 0036](docs/adr/0036-prices-reconciliation-status.md)).
-- Live nudges in Claude Code: status line, after-reply and before-send hooks
-  ([ADR 0034](docs/adr/0034-live-nudges.md)). Done in the prototype.
-- CLI report (terminal + static HTML). Done in the prototype: a summary, the
-  full text, a self-contained HTML page and JSON (`--format`, `--out`,
-  `--no-titles`), with sessions named by title and likely savings beside the
-  upper bounds ([ADR 0032](docs/adr/0032-readable-reports.md)).
-- Minimal conformance runner: profile schema, capability claims against
-  fixtures, golden events — so the M0 profiles pass it before being enabled.
-- Fixtures: synthetic sessions in the repository; real (redacted) sessions
-  only in a private, access-controlled store, never committed. Detector unit
-  tests.
-- Local store protected by file permissions; encryption deferred until
-  full-content capture ([ADR 0015](docs/adr/0015-defer-local-store-encryption.md)).
-- Aggregate runner for the cross-session detectors (P06). P07 is built as a
-  per-session Go detector ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
-- Release: an installable release first (ADR 0029 item 10); the signed
-  pipeline — signed binary on GitHub Releases, `.deb` / `.rpm` packages and a
-  Homebrew tap ([packaging.md](docs/packaging.md)), proved by a dry-run of
-  the per-OS build ([ADR 0014](docs/adr/0014-release-builds-per-os.md)) —
-  can follow within M0 or in M1.
+Each item is tagged **Done**, **Partly** or **Not built** for the prototype.
 
-**Build order** ([ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md),
-re-ranked from measured spend by [ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md)).
-Done: reader, usage de-duplication, pricing, P19 and P09; P04 (context
-composition by tool and command shape, with fixes from the ADR 0030
-ladder); sub-agent economics and P13 in reduced fidelity; P19 concentration
-and compaction point, with P10 from compaction records; spend by project,
-skill, plugin and MCP server; reconciliation with the harness cost record
-(the gap is reported; the 2 % test waits for auxiliary turns);
-P07 priced by carried cost, including the system prompt and tool
-definitions; weekly figures kept between runs
-([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md));
-live nudges in Claude Code — status line, after-reply and before-send hooks,
-and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)); P02 cache
-expiry during short waits, P13 for main sessions and P14 by effort level in
-reduced fidelity ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md),
-[ADR 0044](docs/adr/0044-effort-thinking-and-cache-figures.md)).
+- **Done.** Transcript importer for Claude Code (`~/.claude/projects/**/*.jsonl`).
+- **Not built.** Keyed fingerprints and `trimloop key init` / `import` /
+  `status` (per-machine key for solo use;
+  [ADR 0011](docs/adr/0011-keyed-fingerprints.md),
+  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
+- **Not built.** Content-addressed segment storage: each segment stored
+  once, turns hold references
+  ([ADR 0017](docs/adr/0017-content-addressed-segments.md)).
+- **Partly.** Normaliser: pricing is done; segmenting, redaction and
+  fingerprinting are not.
+- **Not built.** DuckDB store. The prototype keeps everything in memory for
+  one run, and weekly figures in a history file. The store follows when
+  needed (ADR 0029 item 4): P06 needs it. It holds no content before
+  redaction is built (build order item 5; ADR 0004).
+- **Partly.** Detectors ([ADR 0027](docs/adr/0027-measured-m0-findings.md),
+  [ADR 0028](docs/adr/0028-harness-recorded-signals.md),
+  [ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md),
+  [ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)). Done: P04,
+  P07, P09 and P19; in reduced fidelity, P02, P10, P13 (sub-agents and main
+  sessions) and P14. Not built: P01, P03, P05, P06 and P12.
+- **Partly.** Reader also takes the harness's own cost and compaction
+  records: reconciliation reports the gap with them (about 13 %). ADR 0028's
+  acceptance test, within 2 % with auxiliary turns added, is not yet passed:
+  auxiliary turns come after M0
+  ([ADR 0045](docs/adr/0045-m0-measurement-method.md) rule 9).
+- **Done.** Live nudges in Claude Code: status line, after-reply and
+  before-send hooks, and `trimloop setup`
+  ([ADR 0034](docs/adr/0034-live-nudges.md)).
+- **Done.** CLI report (terminal + static HTML): a summary, the full text, a
+  self-contained HTML page and JSON (`--format`, `--out`, `--no-titles`),
+  with sessions named by title and likely savings beside the upper bounds
+  ([ADR 0032](docs/adr/0032-readable-reports.md)).
+- **Not built.** Minimal conformance runner: profile schema, capability
+  claims against fixtures, golden events — so the M0 profiles pass it before
+  being enabled.
+- **Partly.** Fixtures: synthetic sessions in the repository
+  (`testdata/sessions`) and detector unit tests are done; a private,
+  access-controlled store of real (redacted) sessions, never committed, is
+  not.
+- **Done.** Local files protected by file permissions (mode 0600);
+  encryption deferred until full-content capture
+  ([ADR 0015](docs/adr/0015-defer-local-store-encryption.md)).
+- **Not built.** Aggregate runner for the cross-session detectors (P06). P07
+  is built as a per-session Go detector
+  ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
+- **Partly.** Release: the installable release is built — one GoReleaser
+  job, signed checksums, `.deb` / `.rpm`, a Homebrew cask
+  ([ADR 0047](docs/adr/0047-first-release-pure-go.md)); nothing is
+  published yet. Still to do with cgo:
+  the per-OS signed pipeline — signed binary on GitHub Releases, `.deb` / `.rpm`
+  packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved
+  by a dry-run of the per-OS build
+  ([ADR 0014](docs/adr/0014-release-builds-per-os.md)) — can follow within
+  M0 or in M1.
+
+**Build order** ([ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md),
+which re-ranked [ADR 0029](docs/adr/0029-m0-build-order-by-user-value.md)
+from measured spend). How each figure is measured is in
+[ADR 0045](docs/adr/0045-m0-measurement-method.md) and
+[measurements.md](docs/measurements.md).
+
+Done:
+
+- reader, usage de-duplication and pricing;
+- P19 (size, concentration and compaction point) and P09;
+- P04: context by tool and command shape, with fixes from the ADR 0030
+  ladder;
+- sub-agent economics and P13 for sub-agents, in reduced fidelity;
+- P10 from compaction records;
+- spend by project, skill, plugin and MCP server;
+- reconciliation with the harness cost record (the gap is reported; the 2 %
+  test waits for auxiliary turns);
+- P07 priced by carried cost, including the system prompt and tool
+  definitions;
+- weekly figures kept between runs
+  ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md),
+  [ADR 0043](docs/adr/0043-weekly-trend-for-new-findings.md));
+- live nudges in Claude Code and `trimloop setup`
+  ([ADR 0034](docs/adr/0034-live-nudges.md));
+- P02 cache expiry during short waits, P13 for main sessions and P14 by
+  effort level, in reduced fidelity
+  ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md));
+- usage limits for Pro and Max subscribers: the plan, limit hits, and
+  savings as a share of the weekly limit from status-line readings
+  ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md)).
+
+To do:
 
 1. Saved offsets, so a re-run reads only new lines.
-2. Command-line options: `--since`, `--repo` (`analyse`, `--format` and
-   `--out` are done).
-3. P03, P06 (with the DuckDB store, numbers only until item 5), P01; then P05, and P12 in reduced fidelity from harness
-   records (its full fidelity, and P10's, stays in M3).
+2. Command-line options: `--repo` (`analyse`, `--format`, `--out`,
+   `--open`, `--since` and `--version` are done).
+3. P03, P06 (with the DuckDB store, numbers only until item 5), P01; then
+   P05, and P12 in reduced fidelity from harness records (its full fidelity, and P10's, stays in M3).
 4. Distribution: installable release, minimal conformance runner, profiles.
 5. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 
@@ -186,8 +218,10 @@ the sidecar causes zero failed model calls.
    (The working name "Trimtab" was dropped on 2026-11-05: `trimtab.ai` is
    owned by another company and an npm package `trimtab` already targets
    AI-agent behaviour. `.dev` availability was not confirmed.)
-2. **Licence and business model.** Open-source the agent and detectors
-   (distribution, trust) with a paid team collector? Or source-available?
+2. **Licence and business model.** Settled by
+   [ADR 0046](docs/adr/0046-licensing.md): the repository is source-available
+   (FSL-1.1-ALv2), connectors will be Apache-2.0, and team features are
+   expected to be commercial.
 3. **Provider terms.** Confirm that structural request changes (reordering,
    cache markers, TTL choice) are allowed under each provider's terms, and
    that forward-proxying a vendor's harness is acceptable to that vendor.

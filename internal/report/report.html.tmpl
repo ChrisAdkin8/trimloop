@@ -103,10 +103,12 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <h1>Where your Claude Code tokens went</h1>
 <p class="lead">
 {{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.PerWeek}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{thousands .Read.Sessions}} sessions · list prices as of {{.Prices}}
+{{if .Read.Since}}<br><span class="note">Only sessions started on or after {{sinceDay .Read.Since}}, with their sub-agents.</span>{{end}}
 {{if .Read.Failed}}<br><span class="note">{{.Read.Failed}} log files could not be read to the end.</span>{{end}}
 {{if .Read.BadLines}}<br><span class="note">{{.Read.BadLines}} lines could not be read; Claude Code's log format may have changed.</span>{{end}}
 {{if .Read.Unpriced}}<br><span class="muted small">{{.Read.Unpriced}} turns used a model with no known price and are left out.</span>{{end}}
 </p>
+{{if .Subscriber}}<p class="note">You are on {{.PlanName}}, a flat fee: these figures are list prices, a measure of how much of your usage limits work takes, not money you would get back. {{.LimitHitsText}} {{.LimitRateText}}</p>{{end}}
 
 {{with .Summary}}{{if .Bands}}
 <section class="panel summary" aria-label="Spend by session size">
@@ -195,18 +197,18 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table>
-    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="n">Short waits</th><th class="n">Top effort</th><th class="n">Cheaper choice</th><th class="barcell"></th></tr></thead>
+    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="n">Short waits</th><th class="n">Top effort</th><th class="n">Cheaper choice</th><th class="n">Limit hits</th><th class="barcell"></th></tr></thead>
     <tbody>
     {{range .Weeks}}<tr>
-      <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{if $.Older .}} <span class="muted small">(older prices or method)</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
+      <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{with $.OlderReason .}} <span class="muted small">({{.}})</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
       <td class="n">{{dollars .Spend}}</td><td class="n">{{thousands .Turns}}</td>
       <td class="n">{{pct .LargeContext .Spend}}</td><td class="n">{{pct .SubAgents .Spend}}</td>
-      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td>{{if ge .Analysis 5}}<td class="n">{{dollars .ShortWaits}}</td><td class="n">{{dollars .TopEffort}}</td><td class="n">{{dollars .OlderModels}}</td>{{else}}<td class="n muted">—</td><td class="n muted">—</td><td class="n muted">—</td>{{end}}
+      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td>{{if .HasNewFindings}}<td class="n">{{dollars .ShortWaits}}</td><td class="n">{{dollars .TopEffort}}</td><td class="n">{{dollars .OlderModels}}</td>{{else}}<td class="n muted">—</td><td class="n muted">—</td><td class="n muted">—</td>{{end}}{{if .HasLimitHits}}<td class="n">{{.LimitHits}}</td>{{else}}<td class="n muted">—</td>{{end}}
       <td class="barcell"><div class="bar" style="width: {{width .Spend $.MaxWeek}}%"></div></td>
     </tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Short waits": what a 5-minute cache expiring after a wait of 5 minutes to an hour cost. Dashes: not measured for that week (stored by an earlier version). "Top effort": the output cost of xhigh and max turns. "Cheaper choice": main-session spend on a model with a newer, cheaper version or a cheaper tier. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
+  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Short waits": what a 5-minute cache expiring after a wait of 5 minutes to an hour cost. Dashes: not measured for that week (stored by an earlier version). "Top effort": the output cost of xhigh and max turns. "Cheaper choice": main-session spend on a model with a newer, cheaper version or a cheaper tier. "Limit hits": requests Claude Code refused because a subscription usage limit was reached. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older method" or "older prices": worked out with an earlier analysis or price list, so they may not compare exactly.</p>
 </div>
 </details>
 </section>
@@ -402,7 +404,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 <footer>
   <p>Costs are estimates at list prices ({{.Prices}}); tool output and added text are sized at about 4 characters per token. Savings are estimates and overlap.</p>
-  <p>Written by trimloop on {{date .Generated}}, on this machine. The page loads nothing from the network. It shows project names and session titles, which summarise what you asked: check before sharing it.</p>
+  <p>Written by trimloop{{with .Version}} {{.}}{{end}} on {{date .Generated}}, on this machine. The page loads nothing from the network. It shows project names and session titles, which summarise what you asked: check before sharing it.</p>
 </footer>
 
 </main>
@@ -413,7 +415,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <div class="panel card">
   <h3>{{$a.Title}}</h3>
   {{if $a.Finding}}<p>{{$a.Finding}}</p>{{end}}
-  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join $a.Examples ", "}}</span>{{end}}{{end}}</p>
+  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join $a.Examples ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
   <div class="fix">
     <p><b>{{$a.Primary.What}}</b></p>
     <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>

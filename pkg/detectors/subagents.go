@@ -72,7 +72,7 @@ func FindSubAgents(sessions []event.Session, largeAbove int) SubAgents {
 	var sub, main cacheUse
 
 	for _, s := range sessions {
-		if s.Kind != "subagent" {
+		if s.Kind != event.SubAgentSession {
 			for _, t := range s.Turns {
 				main.add(t)
 			}

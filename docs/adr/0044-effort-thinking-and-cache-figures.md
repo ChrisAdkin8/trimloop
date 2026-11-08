@@ -1,6 +1,6 @@
 # ADR 0044: Effort by thinking tokens, and fairer cache figures
 
-- Status: Accepted — built in the M0 prototype
+- Status: Superseded by [ADR 0045](0045-m0-measurement-method.md) (kept as history). Was: Accepted — built in the M0 prototype
 - Date: 2026-11-08
 - Amends: [ADR 0042](0042-p02-p14-and-main-session-models.md) (decisions 1 and 3), [ADR 0043](0043-weekly-trend-for-new-findings.md) (labels, the meaning of `short_waits`, analysis version 6), [patterns.md P14](../patterns.md#p14--thinking-budget-overspend) and [analyzer.md](../analyzer.md) (what P14 requires in M0: the effort level, with thinking tokens where logged)
 

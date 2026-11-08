@@ -1,6 +1,6 @@
 # ADR 0041: Compaction edge cases and the quartile rule
 
-- Status: Accepted — built in the M0 prototype
+- Status: Superseded by [ADR 0045](0045-m0-measurement-method.md) (kept as history). Was: Accepted — built in the M0 prototype
 - Date: 2026-11-08
 - Amends: [ADR 0040](0040-position-pricing-and-one-method-page.md) (decision 4), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) (decision 3), [ADR 0038](0038-real-size-after-compaction.md) (decision 6)
 

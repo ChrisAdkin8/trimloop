@@ -38,7 +38,17 @@ func ForCacheLife(f detectors.CacheLife, minSaving float64) (Recommendation, boo
 		},
 		Check: "After a week, the weekly \"short waits\" figure should fall.",
 	}
-	if f.MainHour == 0 && f.SubHour == 0 {
+	switch {
+	case f.MainHour == 0 && f.SubHour > 0:
+		// Only sub-agents kept the hour (possible in SDK runs): the main
+		// session is where waits cost most, and handing work to sub-agents
+		// is not the advice.
+		r.Primary = Fix{Structure,
+			"Don't let a main session wait on slow commands: start them in the background and check back.",
+			"In these logs only sub-agents kept their cache for an hour, so a main session that waits longer " +
+				"than 5 minutes saves its whole history again when it carries on."}
+		r.Alternatives = nil
+	case f.MainHour == 0 && f.SubHour == 0:
 		// No session here kept the hour: there is nowhere better to move the wait.
 		r.Primary = Fix{Structure,
 			"Don't let a session wait on slow commands: start them in the background and check back.",

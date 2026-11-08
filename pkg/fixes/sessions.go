@@ -2,6 +2,7 @@ package fixes
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
@@ -15,12 +16,12 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 	if f.Saving < minSaving || len(f.ByType) == 0 {
 		return Recommendation{}, false
 	}
-	alt := ""
+	alt, alias := "", ""
 	var examples []string
 	for _, g := range f.ByType {
 		if g.Alternative != "" && g.Saving > 0 {
 			if alt == "" {
-				alt = price.DisplayName(g.Alternative)
+				alt, alias = price.DisplayName(g.Alternative), agentAlias(g.Alternative)
 			}
 			if len(examples) < 3 {
 				name := g.Type
@@ -30,6 +31,9 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 				examples = append(examples, name)
 			}
 		}
+	}
+	if alt == "" { // saving with no named cheaper model: say so plainly
+		alt, alias = "a cheaper model", "sonnet"
 	}
 	return Recommendation{
 		Pattern: "P13",
@@ -42,11 +46,11 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 		Primary: Fix{Structure,
 			fmt.Sprintf("Run sub-agents that search, read and summarise on %s.", alt),
 			`Define the agents you use for searching, exploring and web research in .claude/agents/<name>.md ` +
-				`with "model: sonnet" in the front matter, and use them instead of general-purpose.`},
+				`with "model: ` + alias + `" in the front matter, and use them instead of general-purpose.`},
 		Alternatives: []Fix{
 			{Advise,
 				"Ask for the cheaper model when starting a sub-agent.",
-				`Add to CLAUDE.md: "When starting a sub-agent to search, read or summarise, pass model: sonnet; ` +
+				`Add to CLAUDE.md: "When starting a sub-agent to search, read or summarise, pass model: ` + alias + `; ` +
 					`keep the main model for design work and tricky changes."`},
 		},
 		Check: "Untested for quality: after a week, compare the agent type's turns per run and tool errors " +
@@ -145,4 +149,15 @@ func dollars(v float64) string {
 		return "-" + dollars(-v)
 	}
 	return "$" + thousandsInt(int(v+0.5))
+}
+
+// agentAlias is the name Claude Code's agent front matter takes for a model:
+// "sonnet" for claude-sonnet-5-5. Unknown families fall back to "sonnet".
+func agentAlias(model string) string {
+	for _, family := range []string{"haiku", "sonnet", "opus", "fable"} {
+		if strings.Contains(model, family) {
+			return family
+		}
+	}
+	return "sonnet"
 }

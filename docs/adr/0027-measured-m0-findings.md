@@ -1,6 +1,6 @@
 # ADR 0027: Add P19 large context and bring P09 into M0, from measured sessions
 
-- Status: Accepted — built in the M0 prototype (P19, P09) — M0 detector list extended by [ADR 0028](0028-harness-recorded-signals.md); M0 order of work replaced by [ADR 0029](0029-m0-build-order-by-user-value.md); amended by [ADR 0035](0035-measurement-corrections.md)
+- Status: Accepted — built in the M0 prototype (P19, P09) — M0 detector list extended by [ADR 0028](0028-harness-recorded-signals.md); M0 order of work replaced by [ADR 0029](0029-m0-build-order-by-user-value.md); amended by [ADR 0035](0035-measurement-corrections.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md)
 - Date: 2026-11-07
 - Amends: [patterns.md](../patterns.md) (P09 milestone and signal, new P19),
   M0 detector list ([ROADMAP.md](../../ROADMAP.md),
@@ -42,8 +42,8 @@ for M3 and triggers only on resumes.
 - **New pattern P19 — Large working context**, milestone M0, Go, max fix
   level L1. A turn sends more than a threshold of input tokens (default
   200k). Saving: the input cost of the tokens above the threshold, at the
-  turn's average input price per token (amended by [ADR 0035](0035-measurement-corrections.md):
-  priced at what history cost on the turn); an upper bound, since some context
+  turn's average input price per token (since amended: today's rule is in [ADR 0045](0045-m0-measurement-method.md)
+  and [measurements.md](../measurements.md)); an upper bound, since some context
   is needed. Fix: L1, start a new session per task or compact earlier.
   Requires only `usage.*`. P04, P07 and P08 explain *why* a context is large,
   and are reported as its causes where they are detected.

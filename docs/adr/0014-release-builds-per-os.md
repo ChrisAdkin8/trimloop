@@ -1,6 +1,6 @@
 # ADR 0014: Per-OS release builds with open-source GoReleaser
 
-- Status: Proposed
+- Status: Proposed — applies once trimloop needs cgo; until then releases build in one job ([ADR 0047](0047-first-release-pure-go.md))
 - Date: 2026-11-05
 - Amends: [ADR 0008](0008-packaging-and-distribution.md) (how release builds run)
 

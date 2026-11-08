@@ -58,8 +58,106 @@ var ErrStatusLineTaken = errors.New("the settings already have a status line; us
 
 // isTrimloop reports whether a command runs trimloop with the given
 // arguments, wherever trimloop is installed: "statusline" or "hook stop".
+// The program must be named trimloop (quoted or not); a wrapper such as
+// trimloop-wrapper is someone else's.
 func isTrimloop(cmd, args string) bool {
-	return strings.Contains(cmd, "trimloop") && strings.HasSuffix(strings.TrimSpace(cmd), " "+args)
+	prog, rest := splitCommand(strings.TrimSpace(cmd))
+	return filepath.Base(prog) == "trimloop" && strings.TrimSpace(rest) == args
+}
+
+// splitCommand splits a shell command into its program, unquoted, and the
+// rest. It understands a program in single or double quotes, which is how
+// setup and earlier versions wrote it.
+func splitCommand(cmd string) (prog, rest string) {
+	if cmd == "" {
+		return "", ""
+	}
+	if q := cmd[0]; q == '\'' || q == '"' {
+		if end := strings.IndexByte(cmd[1:], q); end >= 0 {
+			return cmd[1 : end+1], cmd[end+2:]
+		}
+		return "", cmd
+	}
+	if sp := strings.IndexByte(cmd, ' '); sp >= 0 {
+		return cmd[:sp], cmd[sp:]
+	}
+	return cmd, ""
+}
+
+// EntryState is where one of trimloop's settings entries stands: the
+// status line, or one hook. WriteSettings and CheckSettings both decide
+// from it.
+type EntryState int
+
+// The states of a settings entry, and what WriteSettings does in each.
+const (
+	Missing EntryState = iota // not there: added
+	Current                   // runs this trimloop with today's settings: left alone
+	Stale                     // runs trimloop from another path or with old settings: updated
+	Other                     // a status line that is not trimloop's: kept unless replace is set
+)
+
+func (s EntryState) String() string {
+	return [...]string{"missing", "up to date", "out of date", "another program's"}[s]
+}
+
+// statusLineState classifies the settings' status line.
+func statusLineState(cfg map[string]any, exe string) EntryState {
+	sl, has := cfg["statusLine"]
+	if !has {
+		return Missing
+	}
+	slMap, _ := sl.(map[string]any)
+	cmd, _ := slMap["command"].(string)
+	switch {
+	case runsExe(cmd, exe, "statusline"):
+		return Current
+	case isTrimloop(cmd, "statusline"):
+		return Stale
+	}
+	return Other
+}
+
+// runsExe reports whether cmd runs exe with args, however exe is quoted.
+func runsExe(cmd, exe, args string) bool {
+	prog, rest := splitCommand(strings.TrimSpace(cmd))
+	return prog == exe && strings.TrimSpace(rest) == args
+}
+
+// hookState classifies trimloop's hooks for one event in list.
+func hookState(list []any, exe, arg string) EntryState {
+	hooks := trimloopHooks(list, arg)
+	if len(hooks) == 0 {
+		return Missing
+	}
+	for _, h := range hooks {
+		if staleHook(h, exe, arg) {
+			return Stale
+		}
+	}
+	return Current
+}
+
+// trimloopHooks returns the hooks in list that run trimloop's hook arg.
+func trimloopHooks(list []any, arg string) []map[string]any {
+	var out []map[string]any
+	for _, e := range list {
+		entry, _ := e.(map[string]any)
+		inner, _ := entry["hooks"].([]any)
+		for _, h := range inner {
+			hook, _ := h.(map[string]any)
+			cmd, _ := hook["command"].(string)
+			if hook != nil && isTrimloop(cmd, "hook "+arg) {
+				out = append(out, hook)
+			}
+		}
+	}
+	return out
+}
+
+func staleHook(hook map[string]any, exe, arg string) bool {
+	cmd, _ := hook["command"].(string)
+	return !runsExe(cmd, exe, "hook "+arg) || fmt.Sprint(hook["timeout"]) != fmt.Sprint(hookTimeout)
 }
 
 // WriteSettings adds the nudges to the Claude Code settings file at path,
@@ -102,17 +200,15 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 
 	want := claudeSettings(exe)
 	changed := false
-	sl, has := cfg["statusLine"]
-	slMap, _ := sl.(map[string]any)
-	slCmd, _ := slMap["command"].(string)
-	switch {
-	case !has:
+	switch statusLineState(cfg, exe) {
+	case Current:
+	case Other:
+		if !replace {
+			return "", ErrStatusLineTaken
+		}
 		cfg["statusLine"], changed = want["statusLine"], true
-	case slCmd == statusCommand(exe):
-	case isTrimloop(slCmd, "statusline") || replace:
+	default: // Missing, Stale
 		cfg["statusLine"], changed = want["statusLine"], true
-	default:
-		return "", ErrStatusLineTaken
 	}
 
 	hooks := map[string]any{}
@@ -128,11 +224,13 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 				return "", fmt.Errorf("%s: hooks for %s are not a list; not changing them", path, event)
 			}
 		}
-		updated, found := updateHooks(list, exe, arg)
-		switch {
-		case !found:
+		switch hookState(list, exe, arg) {
+		case Missing:
 			hooks[event], changed = append(list, hookEntry(exe, arg)), true
-		case updated:
+		case Stale:
+			for _, h := range trimloopHooks(list, arg) {
+				h["command"], h["timeout"] = hookCommand(exe, arg), hookTimeout
+			}
 			hooks[event], changed = list, true
 		}
 	}
@@ -157,26 +255,52 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 	return backup, writeAtomic(path, buf.Bytes(), mode)
 }
 
-// updateHooks points every trimloop hook in list at exe, with the current
-// timeout. found reports whether there was one; updated whether any changed.
-func updateHooks(list []any, exe, arg string) (updated, found bool) {
-	for _, e := range list {
-		entry, _ := e.(map[string]any)
-		inner, _ := entry["hooks"].([]any)
-		for _, h := range inner {
-			hook, _ := h.(map[string]any)
-			cmd, _ := hook["command"].(string)
-			if hook == nil || !isTrimloop(cmd, "hook "+arg) {
-				continue
-			}
-			found = true
-			if cmd != hookCommand(exe, arg) || fmt.Sprint(hook["timeout"]) != fmt.Sprint(hookTimeout) {
-				hook["command"], hook["timeout"] = hookCommand(exe, arg), hookTimeout
-				updated = true
-			}
+// Check is where each of trimloop's settings entries stands in a settings
+// file, for setup --check.
+type Check struct {
+	StatusLine EntryState
+	Hooks      map[string]EntryState // by Claude Code event: "Stop", "UserPromptSubmit"
+}
+
+// OK reports whether every entry is up to date.
+func (c Check) OK() bool {
+	if c.StatusLine != Current {
+		return false
+	}
+	for _, s := range c.Hooks {
+		if s != Current {
+			return false
 		}
 	}
-	return updated, found
+	return true
+}
+
+// CheckSettings reads the Claude Code settings file at path and says where
+// each of trimloop's entries stands, without changing anything. A missing
+// file has every entry missing.
+func CheckSettings(path, exe string) (Check, error) {
+	c := Check{StatusLine: Missing, Hooks: map[string]EntryState{}}
+	for event := range hookEvents {
+		c.Hooks[event] = Missing
+	}
+	b, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return c, nil
+	}
+	if err != nil {
+		return c, err
+	}
+	var cfg map[string]any
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return c, fmt.Errorf("%s is not a settings object: %w", path, err)
+	}
+	c.StatusLine = statusLineState(cfg, exe)
+	hooks, _ := cfg["hooks"].(map[string]any)
+	for event, arg := range hookEvents {
+		list, _ := hooks[event].([]any)
+		c.Hooks[event] = hookState(list, exe, arg)
+	}
+	return c, nil
 }
 
 // writeBackup copies data to a new backup file next to path, never

@@ -32,7 +32,11 @@ sessions behind it, and gives the fix step by step.
 
 **How far to trust the figures.** They are estimates:
 
-- Costs are at Anthropic's list prices, not your bill.
+- Costs are at Anthropic's list prices, not your bill. On a Pro or Max plan
+  you pay a flat fee, so the report says so, counts how often you hit a
+  usage limit, and, once trimloop's status line has watched your limits for
+  a while, shows each saving as a share of your weekly limit
+  ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md)).
 - "Up to" is the most a change could save; "likely" replays your logs as if
   you had made it.
 - Savings overlap — the same tokens can be saved by several changes — so
@@ -63,16 +67,28 @@ see whether a change worked. The pattern IDs (P19 and so on) refer to
 
 ## Running it
 
-You need Go 1.27.3 or later. Clone this repository, then from its folder:
+No release has been published yet ([Releases](#releases) says how they
+will work). Until then you need Go 1.27.3 or later. Clone this repository,
+then from its folder:
 
 ```bash
 go run ./cmd/trimloop/                          # short summary, as above
 go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html
 go run ./cmd/trimloop/ --format text            # the full report as text
 go run ./cmd/trimloop/ --format json --out ~/trimloop.json   # every figure, for scripts
+go run ./cmd/trimloop/ --open                   # write the web page and open it
+go run ./cmd/trimloop/ --since 2026-11-01       # only sessions started on or after a date
+go run ./cmd/trimloop/ --since 7d               # ... or in the last 7 days (2w for two weeks)
 ```
 
-It reads `~/.claude/projects` and sends nothing anywhere.
+It reads `~/.claude/projects` and sends nothing anywhere. `--version` says
+which build you have; each report names it too.
+
+**Did a change work?** Run with `--since` set to the day you made it: the
+report covers only sessions started from then on, with their sub-agents.
+Weekly figures (below) show the same week by week. A `--since` run neither
+reads nor updates the history file, since figures from part of the logs
+would replace fuller ones.
 
 **Reports name your sessions and projects.** They use the titles Claude Code
 gives sessions, which summarise what you asked. Check a report before sharing
@@ -115,6 +131,9 @@ go build -o ~/.local/bin/trimloop ./cmd/trimloop
 ~/.local/bin/trimloop setup --write ~/.claude/settings.json   # or add them (a backup is made)
 ```
 
+`trimloop setup --check` says whether the status line and both hooks run
+this trimloop and are up to date, and whether usage-limit readings are
+arriving; it changes nothing, and exits 1 if something needs doing.
 `setup --write` saves a backup first, follows a link to the real file, keeps
 its permissions, updates its own entries if the program moved, and leaves
 another status line alone unless you add `--replace-statusline`.
@@ -130,6 +149,7 @@ Everything stays on your machine, readable by you only (mode 0600):
 | `~/.trimloop/history.json` (or `history-<id>.json`) | Weekly figures only: no names, titles or paths |
 | `~/.trimloop/live/<session>.json` | Which nudges a session has been shown |
 | `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
+| `~/.trimloop/limits.jsonl` (or `limits-<id>.jsonl`) | Pro and Max only: how much of your 5-hour and weekly limits was used, each time it changed |
 
 ## The plan
 
@@ -211,12 +231,50 @@ linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
 | `internal/history` | Weekly figures kept between runs |
 | `internal/live` | Status line, hooks and `setup` for Claude Code |
 
+### Releases
+
+Pushing a version tag (`git tag v0.1.0 && git push origin v0.1.0`) runs
+[.github/workflows/release.yml](.github/workflows/release.yml), which builds
+a draft GitHub release with [GoReleaser](.goreleaser.yaml): archives for
+macOS and Linux (Apple silicon, Intel and arm64), `.deb` and `.rpm`
+packages, signed checksums, a software bill of materials and build
+provenance. Check the draft, then publish it. With a `HOMEBREW_TAP_TOKEN`
+secret the release also updates the `ChrisAdkin8/homebrew-tap` cask, for
+`brew install --cask chrisadkin8/tap/trimloop`. Every pull request runs
+the checks and a release dry run ([ci.yml](.github/workflows/ci.yml)).
+[ADR 0047](docs/adr/0047-first-release-pure-go.md) has the detail.
+
+#### Checking a download
+
+Download `checksums.txt`, `checksums.txt.sigstore.json` and your archive
+into one folder. First check that the release workflow signed the
+checksums (put the release's tag in place of `v0.1.0`):
+
+```bash
+cosign verify-blob \
+  --certificate-identity 'https://github.com/ChrisAdkin8/trimloop/.github/workflows/release.yml@refs/tags/v0.1.0' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  --bundle checksums.txt.sigstore.json checksums.txt
+```
+
+Then check the archive against them:
+
+```bash
+shasum -a 256 --check --ignore-missing checksums.txt
+```
+
+The macOS binaries are not yet notarised by Apple, so macOS may refuse to
+open a downloaded one until you clear its quarantine flag
+(`xattr -d com.apple.quarantine ./trimloop`); do that only after both
+checks pass. The Homebrew cask does it for you.
+
 ## Documents
 
 | Doc | What's in it |
 |---|---|
 | [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
+| [docs/state-machines.md](docs/state-machines.md) | What the code remembers between steps, and the files it keeps |
 | [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain, and the measured figures (§8) |
 | [docs/design.md](docs/design.md) | Planned architecture, components, deployment, security |
 | [docs/analyzer.md](docs/analyzer.md) | The analysis engine: command line, gateway sidecar, library; harness and provider profiles |
@@ -228,7 +286,16 @@ linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
 
 ## Licence and security
 
-There is no licence yet: all rights reserved. Please report security problems
+Trimloop is source-available under the
+[Functional Source License 1.1, Apache-2.0 future licence](LICENSE.md)
+(FSL-1.1-ALv2). You may use, change and share it for any purpose, including
+at work, except to offer a competing commercial product or service. Each
+version becomes Apache-2.0 two years after its release. It is not "open
+source" by the Open Source Initiative's definition. Why:
+[ADR 0046](docs/adr/0046-licensing.md).
+
+Outside contributions are not accepted yet: they will need a contributor
+licence agreement. Please report security problems
 to the maintainer privately rather than in an issue.
 
 Trimloop = **trim** + **loop**: it trims wasted tokens in a loop of detect,

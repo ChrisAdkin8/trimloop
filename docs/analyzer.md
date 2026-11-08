@@ -7,6 +7,17 @@
 | Scope | The analysis engine: standalone CLI, gateway sidecar, embeddable library |
 | Related | [design.md](design.md), [patterns.md](patterns.md), [data-model.md](data-model.md), ADRs [0002](adr/0002-go-for-agent-and-proxy.md), [0005](adr/0005-thin-python-plugin-for-litellm.md), [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md) |
 
+> **Today.** Only the M0 prototype is built: `trimloop analyse` reads Claude
+> Code's logs, finds waste and writes a summary, text, HTML or JSON report,
+> and `trimloop setup`, `statusline` and `hook` give live nudges. It has no
+> store, no sidecar and no incremental detectors. The code is in `cmd/`,
+> `internal/` and `pkg/`; the [README](../README.md#development) lists the
+> packages. How each figure is worked out:
+> [measurements.md](measurements.md). The measured figures:
+> [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance). What
+> is next: [ROADMAP.md](../ROADMAP.md). **Everything else in this document is
+> the target design.**
+
 ## 1. Goal
 
 One analysis engine that runs, unchanged, in three shapes:
@@ -24,9 +35,11 @@ between shapes lives in **adapters** at the edge.
 
 1. **Ports and adapters.** The core is pure: events in, findings and
    decisions out. Sources, stores and sinks are interfaces.
-2. **One detector, two drivers.** Every detector is written once as an
-   incremental state machine. Batch mode replays history through it; streaming
-   mode feeds it live. Parity between the two is a tested invariant.
+2. **One detector, two drivers.** Every detector will be written once as an
+   incremental state machine. Batch mode will replay history through it;
+   streaming mode will feed it live. Parity between the two will be a tested
+   invariant. Not built: today's detectors are one-pass functions over
+   finished sessions (§7).
 3. **Normalise once, in Go.** Provider parsing, redaction and fingerprinting
    exist in one implementation. Gateway plugins forward raw events to a
    co-located sidecar rather than re-implementing them (ADR 0006).
@@ -77,6 +90,12 @@ flowchart LR
 
 ## 4. Core packages
 
+The target packages and what each will do; §12 shows where they sit in the
+repository. Today's packages are listed in the README's
+[Development](../README.md#development) section: some share a name with a
+row below (`pkg/event`, `pkg/price`, `pkg/normalize`, `pkg/detectors`) but
+hold less.
+
 | Package | Responsibility | Pure? |
 |---|---|---|
 | `pkg/event` | Canonical model (Session, Turn, Segment, ToolCall, Outcome, Finding) and the versioned wire schema (`proto/trimloop/v1`) | yes |
@@ -87,7 +106,7 @@ flowchart LR
 | `pkg/profile` | Provider and harness profiles, capability sets, registry (§10) | yes |
 | `pkg/sessionize` | Group turns into sessions when the source does not (gateway case, §6) | stateful, in-memory |
 | `pkg/detect` | Detector interface, registry, incremental driver | yes (state passed in) |
-| `pkg/detectors` | One file per pattern: `p01_cache_churn.go`, … | yes |
+| `pkg/detectors` | The detectors, one file per pattern | yes |
 | `pkg/aggregate` | Cross-session aggregates (repo / developer / org scope): SQL, plus P16's Go sequence miner | runs on a Store |
 | `pkg/decide` | Turns policy + session context into a declarative transform spec (L2/L3) | yes |
 | `pkg/store` | Store interface and the memory implementation; DuckDB and ClickHouse stores live in `internal/store` | adapter |
@@ -95,7 +114,41 @@ flowchart LR
 
 ### Key interfaces (sketch)
 
+`Reader` is built: the code below matches
+`internal/adapters/source/source.go`. Every other interface here is the
+target and is not built. Today's detectors are plain functions in
+`pkg/detectors`, such as
+`FindLongPauses(sessions []event.Session, minGap time.Duration, topN int)`.
+
 ```go
+// A Reader reads one harness's session logs from disk (Claude Code today;
+// Codex in M1). Discover and Read are separate so that a re-run can read
+// only new lines (Log.Offset) and the user can choose which harness to read.
+type Reader interface {
+    Name() string                             // "claude-code"; also Log.Harness
+    Discover() ([]Log, error)                 // find logs on disk
+    Read(log *Log) iter.Seq2[Message, error]  // stream one log; advances log.Offset
+}
+
+type Log struct {
+    Harness string // Name of the Reader that found it
+    Path    string
+    Offset  int64  // where reading starts; not yet saved between runs
+}
+
+// Message is one log line that matters (a turn with usage and its tool
+// calls, tool results, a compaction, a title, ...); it stands in for
+// event.Raw until that type exists.
+//
+// Reader contract, in short (source.go has it in full):
+// - Read moves log.Offset past each complete line; it stops before a final
+//   line with no newline, and starts again if the log has shrunk.
+// - It yields every line that carries usage, repeats included. The caller
+//   counts each message id once across all logs and runs (ADR 0026), but
+//   collects tool calls from every line with that id.
+// - A line it cannot parse is yielded as an error wrapping ErrBadLine, and
+//   reading carries on.
+
 // A Source produces raw events from a live stream: a socket, an HTTP body
 // (the gateway ingest API, the OTLP receiver, the local proxy).
 type Source interface {
@@ -103,33 +156,9 @@ type Source interface {
     Run(ctx context.Context, emit func(event.Raw) error) error
 }
 
-// A Reader reads one harness's session logs from disk (Claude Code, Codex, …).
-// Discover and Read are separate so that a re-run reads only new lines
-// (Log.Offset) and the user can choose which harness to read (--harness).
-type Reader interface {
-    Name() string                                                   // "claude-code"
-    Discover(ctx context.Context) ([]Log, error)                    // find logs on disk
-    Read(ctx context.Context, log *Log) iter.Seq2[event.Raw, error] // stream one log; advances log.Offset
-}
-
-type Log struct {
-    Path   string
-    Offset int64 // where the previous run stopped
-}
-
-// Reader contract:
-// - Read starts at log.Offset and moves it past each complete line it reads.
-//   The caller saves the new offset only after saving what was read.
-// - Read stops before a final line with no newline (still being written);
-//   that line is read on the next run.
-// - If the log is now shorter than log.Offset, it was replaced or cut short;
-//   Read starts again from the beginning.
-// - Read yields every line that carries usage, repeats included. The caller
-//   counts each message id once across all logs and runs (ADR 0026).
-
-// A Detector is an incremental state machine over one session.
-// Batch mode replays a session's turns in order; streaming mode calls
-// OnTurn as turns arrive. Both must yield identical findings.
+// A Detector is an incremental state machine over one session. Batch mode
+// replays a session's turns in order; streaming mode calls OnTurn as turns
+// arrive. Both must yield identical findings.
 type Detector interface {
     ID() string          // "P01"
     Version() string     // bump on any logic change
@@ -173,13 +202,13 @@ team/key alias, cwd/repo when known).
 
 ### 5.1 Standalone: `trimloop analyse`
 
-**Today (M0 prototype):** `trimloop [analyse] [--format summary|text|html|json]
-[--out FILE] [--no-titles] [--history FILE | --no-history]`, plus
-`trimloop setup`, `statusline` and `hook` for live nudges
-([ADR 0034](adr/0034-live-nudges.md)). There is no store yet: each run reads
-every log again, and only weekly figures are kept between runs
-([ADR 0033](adr/0033-reconciliation-history-standing-context.md)). The rest of
-this section is the target design.
+**Today:** `trimloop [analyse] [--format summary|text|html|json]
+[--out FILE] [--open] [--since DATE|7d] [--no-titles] [--history FILE |
+--no-history]` and `trimloop --version`. `--since` keeps the main sessions
+that started on or after the date, with their sub-agents, and leaves the
+history file alone. Each run reads every log again; only weekly figures are kept between runs
+([ADR 0033](adr/0033-reconciliation-history-standing-context.md)). The rest
+of this section is the target design.
 
 ```text
 trimloop analyse [--harness claude-code|codex|all] [--since 30d]
@@ -188,7 +217,7 @@ trimloop analyse [--harness claude-code|codex|all] [--since 30d]
 ```
 
 1. Source adapters discover transcripts (Claude Code: `~/.claude/projects/**/*.jsonl`;
-   Codex: its session log directory).
+   Codex, from M1: its session log directory).
 2. Each transcript is already one session, so `sessionize` is bypassed.
 3. Turns are replayed through the incremental detectors in order.
 4. Sessions and findings are written to `~/.trimloop/trimloop.duckdb`;
@@ -204,25 +233,12 @@ trimloop analyse [--harness claude-code|codex|all] [--since 30d]
 Incremental re-runs: the store records each transcript's path, size and last
 offset, so a second run only reads new lines.
 
-Transcript contents vary by harness and version. A survey of local Claude
-Code transcripts (versions 2.1.288–2.1.318, 2026-11-05) found:
-
-- `api-request-shape` lines holding the system prompt and tool definitions,
-  keyed by `shapeHash`, and `api-request` lines that reference a shape plus
-  message blobs (`api-request-blob`). The request as sent can therefore
-  largely be rebuilt, giving `request.full_body` for these versions.
-- Usage blocks with `cache_creation.ephemeral_5m_input_tokens` and
-  `ephemeral_1h_input_tokens`, and `output_tokens_details.thinking_tokens`.
-- An assistant message split across several lines (one per content block),
-  each repeating the **same** usage block. Usage is counted once per message
-  id; summing lines double-counts.
-- Sub-agent transcripts in sub-folders, with `isSidechain` set; the reader
-  includes them and links them to the parent session.
-- Claude Code deletes old transcripts after a retention period
-  (`cleanupPeriodDays`), which bounds `--since` and `--rebuild`.
-
-Older or other harnesses may log less. Findings carry a `fidelity` field
-(`transcript`, `gateway` or `wire`) so the report can say so.
+What Claude Code's logs contain, record by record, is surveyed in
+[log-signals.md](log-signals.md#1-what-the-logs-contain). Claude Code
+deletes old logs after `cleanupPeriodDays`, which bounds `--since` and
+`--rebuild`. Older or other harnesses may log less. Findings carry a
+`fidelity` field (`transcript`, `gateway` or `wire`) so the report can say
+so.
 
 ### 5.2 Gateway sidecar: `trimloop serve`
 
@@ -245,9 +261,16 @@ network stack inside the gateway's host or pod (ADR 0006). The sidecar
 normalises, redacts and fingerprints; only hashes, counts, cost and findings
 are written to disk or uploaded.
 
-The sidecar also serves as the **team collector** when run centrally with
-`--store clickhouse` (plus Postgres for recommendations and policy) — same binary, different
-adapters.
+The same binary has two more `serve` modes, chosen by configuration:
+
+- **Team collector** (M2): run centrally with `--store clickhouse` (plus
+  Postgres for recommendations and policy) — same binary, different adapters.
+- **Connector** (M2): receives OTLP and pulls logs from gateways without a
+  plugin, holds the fingerprint key, and forwards keyed records to the
+  collector ([ADR 0011](adr/0011-keyed-fingerprints.md)).
+
+This section is the reference for `trimloop serve`; design.md §4.4 and
+packaging.md §3 and §6 point here.
 
 ### 5.3 Embedded library
 
@@ -262,72 +285,68 @@ Hosts written in Go import `pkg/engine` directly and call `Ingest` and
 
 ## 6. Sessionising gateway traffic
 
-Gateways see independent HTTP requests, not sessions. Detectors need
-sessions. `pkg/sessionize` rebuilds them:
+Gateways see independent HTTP requests, not sessions; detectors need
+sessions. `pkg/sessionize` will rebuild them. The rules are decided in ADRs
+[0012](adr/0012-gateway-sessions-and-parity.md),
+[0016](adr/0016-m1-sidecar-operation.md) and
+[0020](adr/0020-session-identity.md); in short:
 
-1. **Anchor.** Every session has an anchor: the harness's own session id
-   when the request carries one, otherwise
-   `fp("root", harness ‖ principal ‖ first user_text)` — which excludes
-   system, tool, memory-file and injected segments, so a system prompt that
-   changes every turn does not change it
-   ([ADR 0020](adr/0020-session-identity.md)).
-2. **Joining.** A request joins open session *S* when it has the same anchor
-   **and** its history contains *S*'s most recent assistant response (by
-   content hash). Otherwise it opens a new session. If two open sessions
-   match, the one with the most recent turn wins.
-3. **Scoping.** Matching is restricted to the same gateway key / user and
-   harness (from `User-Agent` or metadata), within an idle window
-   — the larger of 2 hours and the longest cache TTL observed in the session,
-   capped at 24 hours, so P02 sees expiries — which also closes sessions.
-   Turns are first held per gateway key for a 5-second **reorder window** and
-   released in request-timestamp order; a late turn that shows two open
-   sessions are one merges them and replays their detectors.
-4. **History edits.** Harnesses rewrite history: providers clear old tool
-   results, and Claude Code records requests as an earlier request cut to
-   `keep` messages plus a new `tail`. Because joining needs only the latest
-   response, edits do not break a session; the first point where the request
-   differs from *S*'s previous one is recorded as `history_edit_at`, and P01
-   attributes cache breaks there to context editing.
-5. **Forks and compaction.** A compaction or `/clear` replaces the history,
-   so the request opens a new session, linked by `resumed_from` when its
-   anchor matches.
+1. **Anchor and joining.** A session's anchor is the harness's session id,
+   or else a keyed hash of harness, principal and first user message, so a
+   system prompt that changes every turn does not split it. A request joins
+   an open session with the same anchor whose latest response its history
+   contains; otherwise it opens a new one (ADR 0020).
+2. **Scoping and order.** Matching stays within one gateway key and harness.
+   Turns wait in a 5-second reorder window per key; a late turn that shows
+   two sessions are one merges them and replays their detectors. Sessions
+   close after an idle window long enough for P02 to see cache expiries
+   (ADR 0016).
+3. **History edits and compaction.** Where a request's history first
+   differs from the previous one is recorded as `history_edit_at`, so P01
+   can blame context editing. A compaction or `/clear` opens a new session,
+   linked by `resumed_from` (ADRs 0016, 0020).
+4. **Kinds.** Sessions are labelled `main`, `subagent` or `auxiliary` by
+   rules in the harness profile; per-session statistics count `main` only
+   (ADR 0012).
 
-6. **Kinds.** Each session is labelled `main`, `subagent` or `auxiliary`
-   (titles, summaries and similar side calls), by rules in the harness
-   profile. Sub-agents link to their parent session. Per-session statistics
-   count `main` sessions only.
+Open sessions are held in an LRU; an evicted session is closed and its
+detectors' `OnSessionEnd` runs.
 
-Index memory is bounded (LRU on open sessions); evicted sessions are closed
-and `OnSessionEnd` runs.
-
-**Replicas.** One sidecar sees only the traffic of its own gateway replica.
-M1 therefore requires a single gateway instance or sticky routing by API key
-or user; a sidecar that sees a prefix continue from a turn it never received
-reports it. From M2, when a team collector is configured, sidecars upload
-keyed turn records and the collector sessionises across all replicas and runs
-the session-scope detectors ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)).
+**Replicas.** One sidecar sees only its own gateway replica's traffic, so M1
+needs a single gateway instance or sticky routing; from M2 the team
+collector sessionises across replicas (ADR 0012).
 
 ## 7. Detector execution
+
+**Today.** The prototype reads every log, builds whole sessions in memory,
+then runs each detector once over the finished sessions: one-pass Go
+functions in `pkg/detectors` (for example `FindLongPauses` for P09 and
+`FindEffort` for P14). There is no detector state, no versioning on
+findings and no streaming driver. The rest of this section is the target
+([ADR 0010](adr/0010-go-detectors-sql-aggregates.md)).
 
 | Scope | Mechanism | Batch | Streaming |
 |---|---|---|---|
 | Turn, session | Incremental `Detector` | Replay turns in order | `OnTurn` per arrival; `OnSessionEnd` on idle close |
 | Repo, developer, org | `Aggregate` over the store (SQL, or Go for P16) | After import | Every N minutes (default 15) and on demand |
 
-**Parity invariant.** CI replays every fixture session through both drivers —
-once as a batch, once as a shuffled-arrival stream across interleaved sessions
-— and asserts identical findings. This is what lets the same detectors serve
-the CLI and the gateway.
+**Parity invariant.** CI will replay every fixture session through both
+drivers — once as a batch, once as a shuffled-arrival stream across
+interleaved sessions — and assert identical findings. This is what lets
+the same detectors serve the CLI and the gateway.
 
-**Detector state.** State returned by `NewState` is serialisable and saved per
-open session (table `detector_state`, keyed by session and
-`detector_id@version`). An incremental re-run or a sidecar restart resumes from
-saved state; if a detector's version changed, its open sessions are replayed
-from stored turns instead.
+**Detector state.** State returned by `NewState` will be serialisable and
+saved per open session (table `detector_state`, keyed by session and
+`detector_id@version`). An incremental re-run or a sidecar restart will
+resume from saved state; if a detector's version changed, its open sessions
+are replayed from stored turns instead.
 
-**Versioning.** Each finding stores `detector_id@version`,
+**Versioning.** Each finding will store `detector_id@version`,
 `price_catalogue_version` and `fidelity`. Re-running with newer detectors
-produces new findings; old ones are kept for before/after comparisons.
+will produce new findings; old ones are kept for before/after comparisons.
+Today only the report as a whole records versions: the price catalogue, and
+an analysis version on each stored week
+([data-model.md](data-model.md#week-history-file)).
 
 ## 8. Decide path (automatic fixes)
 
@@ -357,43 +376,35 @@ produces new findings; old ones are kept for before/after comparisons.
 - Any error or timeout ⇒ empty spec ⇒ request goes through unchanged.
 - Only ops listed in the provider profile's `ops` are ever returned (§10.2);
   for example `set_cache_ttl` exists for Anthropic, `set_cache_key` for OpenAI.
-- A decide request carries the request, so the sidecar sessionises it from
-  the request's own history without waiting for `/v1/events`. The canary
-  bucket is `fp("bucket", anchor ‖ experiment_id)` — the session anchor
-  (§6), not the system prompt, so it is stable across turns and replicas.
-  Sub-agents inherit their parent's bucket only when the harness links them
-  visibly to the replica handling the request
-  ([ADR 0018](adr/0018-rollout-refinements.md),
-  [ADR 0020](adr/0020-session-identity.md)).
-- Each op has preconditions checked before it is returned — for example
-  `set_cache_breakpoint` only if the request stays within the provider's
-  breakpoint limit, counting the harness's own markers. `move_segment` is L3.
-- If the provider rejects a transformed request with an invalid-request
-  error, the plugin resends the original once and reports
-  `transform_rejected`. An op is disabled for a provider and model only after
-  at least 3 such rejections within an hour where the resend succeeded; auth,
-  size, context-length and server errors never count
-  ([ADR 0013](adr/0013-decide-path-and-transform-safety.md),
-  [ADR 0018](adr/0018-rollout-refinements.md)).
+
+The rest is decided in ADRs and not repeated here: decide requests carry the
+client-format request, so the sidecar sessionises them without waiting for
+`/v1/events`, and the canary bucket comes from the session anchor (§6)
+([ADR 0013](adr/0013-decide-path-and-transform-safety.md),
+[ADR 0020](adr/0020-session-identity.md),
+[ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)); each op's
+preconditions, the closed op catalogue and its safety levels, and the
+resend-once rule when a provider rejects a transformed request
+([ADR 0013](adr/0013-decide-path-and-transform-safety.md),
+[ADR 0018](adr/0018-rollout-refinements.md), ADR 0021).
 
 ## 9. The thin LiteLLM plugin
 
-Package `trimloop-litellm` (Python): a few hundred lines of capture, message
-splitting and transport bookkeeping, with no fingerprinting or detection
-([ADR 0023](adr/0023-content-addressed-plugin-transport.md)). It subclasses
+Package `trimloop-litellm` (Python): capture, message splitting and
+transport bookkeeping only — no parsing beyond LiteLLM's own objects, no
+fingerprinting and no detectors. Why it is thin, how it reaches the sidecar
+and how it sends repeated messages as digests are in ADRs
+[0005](adr/0005-thin-python-plugin-for-litellm.md),
+[0006](adr/0006-gateway-plugin-forwards-to-sidecar.md) and
+[0023](adr/0023-content-addressed-plugin-transport.md). It subclasses
 LiteLLM's `CustomLogger`:
 
 | Hook | What the plugin does |
 |---|---|
-| `async_log_success_event` / `async_log_failure_event` | Build an `event.Raw` from the **provider-bound request** (after LiteLLM's translation), the response, usage, timings and LiteLLM call id; append to an in-memory ring buffer |
-| Background task | Flush the buffer to `POST /v1/events` every 1 s or 100 events; the buffer is capped at 50 MB as well as by event count, and on overflow drops the oldest events and counts them |
-| `async_pre_call_hook` (only if `decide` enabled) | `POST /v1/decide` with the **client-format** request (before LiteLLM's translation; ops are defined for that format, [ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)), sent as message digests with a 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged |
-| `async_post_call_failure_hook` (only if `decide` enabled) | Detect a transformed request the provider rejected with an invalid-request error, arrange one resend of the original, and report `transform_rejected`. A failure hook cannot resend by itself; the exact LiteLLM mechanism is open question 7 |
-
-It contains no parsing beyond reading LiteLLM's own objects, no detectors and
-no fingerprinting. When the sidecar is not co-located (ADR 0006, remote mode)
-it can fingerprint locally, with the organisation's fingerprint key, using
-the shared spec and test vectors.
+| `async_log_success_event` / `async_log_failure_event` | Build an `event.Raw` from the provider-bound request (after LiteLLM's translation), response, usage, timings and call id; append to an in-memory buffer |
+| Background task | Flush the buffer to `POST /v1/events` every 1 s or 100 events; capped in bytes and events, dropping the oldest on overflow ([ADR 0012](adr/0012-gateway-sessions-and-parity.md)) |
+| `async_pre_call_hook` (decide only) | `POST /v1/decide` with the client-format request, 25 ms timeout; apply returned ops to `data`; on any failure return `data` unchanged ([ADR 0021](adr/0021-decide-body-ops-and-policy-signing.md)) |
+| `async_post_call_failure_hook` (decide only) | Spot a transformed request the provider rejected, arrange one resend of the original, report `transform_rejected`. The exact LiteLLM mechanism is open question 7 |
 
 ```mermaid
 sequenceDiagram
@@ -578,7 +589,7 @@ Each detector declares **required** capabilities (any-of groups allowed) and
 | P10 Compaction thrash | `harness.compaction` **or** `request.full_body` | — |
 | P12 Retry storms | `harness.retries` **or** `request.full_body` | `timing.per_turn` |
 | P19 Large working context | `usage.cache_read` | `usage.cache_write`, `response.tool_calls` (what fills the context), `harness.compaction` |
-| P13 Model over-provisioning (sub-agents and main sessions, reduced) | Sub-agent sessions (the profile's `sidechains`); per-turn model | `harness.attribution` (agent type) |
+| P13 Model over-provisioning (sub-agents and main sessions, reduced) | Per-turn model; for the sub-agent part, sub-agent sessions (the profile's `sidechains`) | `harness.attribution` (agent type) |
 | P14 Thinking-budget overspend | `request.effort` (reduced, M0: thinking, else output, by effort level within each model) **or** `usage.reasoning` (full) | `outcome.git` (turn-complexity classes, M4) |
 | P16 Repeated workflow | `response.tool_calls` | `content.local`, `harness.skills` |
 | P17 Repeated instructions | — | `content.local`, `harness.skills` |
@@ -640,7 +651,7 @@ capture:
 fingerprint:
   key: keychain            # developer machines: keychain only; servers/CI: file:PATH | env:TRIMLOOP_FINGERPRINT_KEY (ADR 0024)
 privacy:
-  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp, developer, alias, skill, plugin
+  plain_names: []          # org-wide, per field: repo, branch, path, url, mcp, developer, alias, skill, plugin, agent
 sources:
   claude_code: { enabled: true }
   codex:       { enabled: true }
@@ -669,14 +680,17 @@ already use (Datadog, Grafana, etc.).
 
 ## 12. Repository layout
 
-The target layout. The M0 prototype's packages differ (for example
+The single target layout; packaging.md
+[§12](packaging.md#12-repository-layout) points here. §4 says what each
+`pkg/` package does. The M0 prototype's packages differ (for example
 `pkg/detectors`, `pkg/fixes`, `internal/report`, `internal/live`); the
-The README's [Development](../README.md#development) section lists them.
+README's [Development](../README.md#development) section lists them.
 
 ```text
-cmd/trimloop/               CLI: analyse, serve, proxy, report, explain, conformance,
-                            update-catalogue, key, recommendations (M2),
+cmd/trimloop/               the binary: analyse, serve, proxy, report, explain,
+                            conformance, update-catalogue, key, recommendations (M2),
                             identity, policy (M3), version
+cmd/trimloop-kong/          Kong plugin binary (M4)
 pkg/engine/                 public embedding API
 pkg/event/                  canonical model
 pkg/normalize/{anthropic,openai,gemini}/
@@ -686,26 +700,32 @@ pkg/price/                  catalogue.yaml embedded
 pkg/profile/                profile types, capability sets, registry
 pkg/sessionize/
 pkg/detect/                 interfaces, registry, drivers
-pkg/detectors/              p01_cache_churn.go … one per pattern
+pkg/detectors/              one file per pattern
 pkg/aggregate/              *.sql + runner
 pkg/decide/                 ops, policy evaluation
 pkg/store/                  store interface; memory implementation
 internal/store/{duckdb,clickhouse}/
 internal/adapters/source/{claudecode,codex,otlp,ingest}/
 internal/adapters/sink/{report,otel,upload,webhook}/
+internal/collector/         team-collector features: recommendations, policy, multi-user
 proto/trimloop/v1/          events.proto, decide.proto
 profiles/providers/         one YAML per API surface (anthropic-messages, openai-responses, …)
 profiles/harnesses/         one YAML per harness (claude-code, codex, …)
 templates/<harness>/        fix-recommendation templates per pattern
-plugins/litellm/            Python package trimloop-litellm
-testdata/sessions/          redacted fixture sessions + expected findings
+plugins/litellm/            Python package trimloop-litellm, with its own pyproject.toml
+web/                        TypeScript UI, built then embedded into the binary
+deploy/helm/trimloop/       Helm chart
+deploy/compose/             Docker Compose example
+testdata/sessions/          synthetic fixture sessions + expected findings
+.goreleaser.yaml            release definition
 ```
 
 `pkg/` is public so Envoy/Kong hosts and third parties can embed the engine.
 Adapters and database-backed stores live under `internal/`, which Go
-enforces as private, so the public core has no I/O dependencies. Packaging adds
-`cmd/trimloop-kong/`, `internal/collector/`, `web/`, `deploy/` and
-`.goreleaser.yaml` ([packaging.md §12](packaging.md#12-repository-layout-additions)).
+enforces as private, so the public core has no I/O dependencies.
+`internal/collector/` keeps team-only features in one place, so they can
+carry a commercial licence ([ADR 0046](adr/0046-licensing.md)) without a
+restructure.
 
 ## 13. Performance targets
 
@@ -764,18 +784,20 @@ Mapped to the milestones in [ROADMAP.md](../ROADMAP.md):
 ## 16. Open questions
 
 1. ~~Do Claude Code transcripts include enough of the request for P01 root
-   causes?~~ Largely yes for versions 2.1.288 onward (§5.1). Still to confirm:
-   whether every turn's request can be rebuilt exactly, including cache
-   markers.
+   causes?~~ Largely yes for versions 2.1.288 onward
+   ([log-signals.md §1](log-signals.md#1-what-the-logs-contain)). Still to
+   confirm: whether every turn's request can be rebuilt exactly, including
+   cache markers.
 2. Which harnesses send an explicit session identifier through a gateway?
    Affects how often §6 falls back to prefix continuity.
 3. Is the LiteLLM success callback guaranteed to carry final usage for
    streamed responses in every supported version?
 4. Should `serve` support a Unix socket as well as loopback TCP, to tighten
    the local-only guarantee?
-5. ~~Which capabilities do Claude Code transcripts provide?~~ See §5.1 and the
-   harness profile (§10.3). P06 still needs tool-definition sizes per MCP
-   server, which come from the recorded request shape.
+5. ~~Which capabilities do Claude Code transcripts provide?~~ See
+   [log-signals.md](log-signals.md) and the harness profile (§10.3). P06
+   still needs tool-definition sizes per MCP server, which come from the
+   recorded request shape.
 6. For providers with no local tokenizer, how large is the token-estimate
    error, and should findings that depend on estimates carry lower
    confidence by default?

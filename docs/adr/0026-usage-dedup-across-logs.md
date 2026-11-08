@@ -1,6 +1,6 @@
 # ADR 0026: Count usage once per message id across all logs
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0035](0035-measurement-corrections.md)
+- Status: Accepted — partly built: each message counted once across the logs of one run; keeping counted ids and log offsets between runs is not built; amended by [ADR 0035](0035-measurement-corrections.md); method summarised in [ADR 0045](0045-m0-measurement-method.md)
 - Date: 2026-11-06
 - Amends: Reader contract in [analyzer.md §4](../analyzer.md#key-interfaces-sketch)
 

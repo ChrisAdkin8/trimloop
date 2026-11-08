@@ -1,0 +1,110 @@
+# Release definition for the trimloop binary. Run by .github/workflows/release.yml
+# on a version tag, and as a snapshot (nothing published) by ci.yml.
+#
+# While trimloop is pure Go (no cgo), one job builds every platform
+# (ADR 0047). When the DuckDB store brings cgo, releases move to the
+# per-OS jobs of ADR 0014.
+version: 2
+project_name: trimloop
+
+builds:
+  - id: trimloop
+    main: ./cmd/trimloop
+    binary: trimloop
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.buildVersion=v{{ .Version }}
+    # The same source gives the same files (reproducible builds).
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: trimloop
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE.md
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+# A software bill of materials for each archive (needs syft).
+sboms:
+  - artifacts: archive
+
+# Keyless signature of the checksums file, tied to this repository's release
+# workflow; it vouches for every archive and package listed in it.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - --yes
+    artifacts: checksum
+
+nfpms:
+  - id: packages
+    package_name: trimloop
+    vendor: Chris Adkin
+    maintainer: Chris Adkin
+    homepage: https://github.com/ChrisAdkin8/trimloop
+    description: Finds where Claude Code's tokens go and which changes to how you work save the most.
+    license: FSL-1.1-ALv2
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE.md
+        dst: /usr/share/doc/trimloop/LICENSE.md
+      - src: README.md
+        dst: /usr/share/doc/trimloop/README.md
+
+# Homebrew: brew install --cask chrisadkin8/tap/trimloop. Needs the
+# ChrisAdkin8/homebrew-tap repository and a HOMEBREW_TAP_TOKEN secret; the
+# release workflow skips this step when the secret is not set.
+homebrew_casks:
+  - name: trimloop
+    binaries: [trimloop]
+    homepage: https://github.com/ChrisAdkin8/trimloop
+    description: Finds where Claude Code's tokens go and which changes save the most
+    license: FSL-1.1-ALv2
+    repository:
+      owner: ChrisAdkin8
+      name: homebrew-tap
+      token: '{{ envOrDefault "HOMEBREW_TAP_TOKEN" "" }}'
+    commit_msg_template: "trimloop {{ .Tag }}"
+    # The macOS binaries are not yet signed and notarised by Apple (ADR 0047),
+    # so macOS would refuse to run one installed from the cask. Until they
+    # are, the install clears the quarantine flag, and says so.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/trimloop"]
+          end
+    caveats: |
+      trimloop's macOS binary is not yet notarised by Apple, so this cask
+      removed macOS's quarantine flag from it. Its checksums are signed:
+      see the README to verify a download.
+
+release:
+  github:
+    owner: ChrisAdkin8
+    name: trimloop
+  # Every release starts as a draft: check it on GitHub, then publish.
+  draft: true
+  footer: |
+    Verify a download: see "Checking a download" in the README.
+    Licence: FSL-1.1-ALv2 (each version becomes Apache-2.0 two years after release).
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge "

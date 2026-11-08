@@ -1,6 +1,6 @@
 # ADR 0034: Live nudges in Claude Code
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction), [ADR 0038](0038-real-size-after-compaction.md) (status after compaction, re-arming), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0040](0040-position-pricing-and-one-method-page.md) (status line after a compaction)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction), [ADR 0038](0038-real-size-after-compaction.md) (status after compaction, re-arming), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0040](0040-position-pricing-and-one-method-page.md) (status line after a compaction); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md); the status line keeps usage-limit readings: [ADR 0048](0048-usage-limits-for-subscribers.md)
 - Date: 2026-11-08
 - Amends: [ROADMAP.md](../../ROADMAP.md) (M0 scope), [packaging.md §3](../packaging.md#3-the-trimloop-binary) (commands)
 

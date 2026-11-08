@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -431,5 +432,89 @@ func TestNudgesAfterCompaction(t *testing.T) {
 	StatusLine(strings.NewReader(in), &out, e)
 	if line := out.String(); !strings.Contains(line, "compacted") || strings.Contains(line, "30k") || strings.Contains(line, "cache") {
 		t.Errorf("status line after compaction: got %q", line)
+	}
+}
+
+func TestStatusLineKeepsLimitReadings(t *testing.T) {
+	e := env(t, t0)
+	e.Limits = filepath.Join(t.TempDir(), "limits.jsonl")
+	in := func(used float64) string {
+		var m map[string]any
+		_ = json.Unmarshal([]byte(session(t, 100_000, t0)), &m)
+		m["rate_limits"] = map[string]any{
+			"five_hour": map[string]any{"used_percentage": used, "resets_at": 1_800_000_000},
+			"seven_day": map[string]any{"used_percentage": 40, "resets_at": 1_800_500_000},
+		}
+		b, _ := json.Marshal(m)
+		return string(b)
+	}
+	for _, used := range []float64{12, 12, 15} {
+		StatusLine(strings.NewReader(in(used)), &bytes.Buffer{}, e)
+	}
+	b, err := os.ReadFile(e.Limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(b), "\n"); n != 2 || !strings.Contains(string(b), `"used":15`) || strings.Contains(string(b), "s1") {
+		t.Errorf("limit readings: %d lines, %s; want 2, numbers only", n, b)
+	}
+	// No rate limits (an API key, or before the first reply): nothing kept.
+	e.Limits = filepath.Join(t.TempDir(), "none.jsonl")
+	StatusLine(strings.NewReader(session(t, 100_000, t0)), &bytes.Buffer{}, e)
+	if fileExists(e.Limits) {
+		t.Error("readings kept without rate limits")
+	}
+}
+
+func TestIsTrimloop(t *testing.T) {
+	for _, c := range []struct {
+		cmd, args string
+		want      bool
+	}{
+		{`'/usr/local/bin/trimloop' statusline`, "statusline", true},
+		{`"/Users/a b/bin/trimloop" hook stop`, "hook stop", true},
+		{`trimloop statusline`, "statusline", true},
+		{`/opt/bin/trimloop-wrapper statusline`, "statusline", false}, // someone else's program
+		{`trimloop hook stop`, "hook prompt", false},
+		{`'/bin/trimloop`, "statusline", false}, // unclosed quote
+		{``, "statusline", false},
+	} {
+		if got := isTrimloop(c.cmd, c.args); got != c.want {
+			t.Errorf("isTrimloop(%q, %q) = %v, want %v", c.cmd, c.args, got, c.want)
+		}
+	}
+}
+
+func TestCheckSettingsStates(t *testing.T) {
+	dir := t.TempDir()
+	exe := "/home/u/bin/trimloop"
+	write := func(s string) string {
+		p := filepath.Join(dir, "settings.json")
+		if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	hook := func(cmd string) string {
+		return `[{"hooks":[{"type":"command","command":` + strconv.Quote(cmd) + `,"timeout":5}]}]`
+	}
+	c, err := CheckSettings(write(`{"statusLine":{"command":"\"/home/u/bin/trimloop\" statusline"},"hooks":{`+
+		`"Stop":`+hook(`"/home/u/bin/trimloop" hook stop`)+`,`+
+		`"UserPromptSubmit":`+hook(`/old/trimloop hook prompt`)+`}}`), exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.StatusLine != Current || c.Hooks["Stop"] != Current || c.Hooks["UserPromptSubmit"] != Stale || c.OK() {
+		t.Errorf("double-quoted current, old path stale: got %+v", c)
+	}
+	c, _ = CheckSettings(write(`{"statusLine":{"command":"ccstatus"}}`), exe)
+	if c.StatusLine != Other || c.Hooks["Stop"] != Missing || c.StatusLine.String() != "another program's" {
+		t.Errorf("someone else's status line, no hooks: got %+v", c)
+	}
+	if c, err := CheckSettings(filepath.Join(dir, "missing.json"), exe); err != nil || c.StatusLine != Missing {
+		t.Errorf("no settings file: got %+v, %v", c, err)
+	}
+	if _, err := CheckSettings(write(`[1]`), exe); err == nil {
+		t.Error("a settings file that is not an object: want an error")
 	}
 }

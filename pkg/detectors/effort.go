@@ -166,7 +166,11 @@ func FindEffort(sessions []event.Session) Effort {
 	})
 	most := 0
 	for level, g := range by {
-		if level != "" && (g.Turns > most || g.Turns == most && effortOrder[level] < effortOrder[f.Usual]) {
+		// Ties go to the lower level, then (for levels this code does not
+		// know) to the name, so every run picks the same one.
+		lower := effortOrder[level] < effortOrder[f.Usual] ||
+			effortOrder[level] == effortOrder[f.Usual] && level < f.Usual
+		if level != "" && (g.Turns > most || g.Turns == most && lower) {
 			f.Usual, most = level, g.Turns
 		}
 	}

@@ -1,6 +1,6 @@
 # ADR 0030: How fixes are chosen — the fix ladder, failure-preserving cuts, measure after
 
-- Status: Accepted — partly built (fix kinds and alternatives; measuring after a fix is not built yet) — amended by [ADR 0032](0032-readable-reports.md)
+- Status: Accepted — partly built (fix kinds and alternatives; measuring after a fix is not built yet) — amended by [ADR 0032](0032-readable-reports.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md)
 - Date: 2026-11-07
 - Amends: [design.md §6.2](../design.md#62-recommendation-engine-team-collector) (recommendation ranking), [data-model.md](../data-model.md) (Recommendation)
 

@@ -1,6 +1,6 @@
 # ADR 0040: Removed history priced by position, and one page for the current method
 
-- Status: Accepted — built in the M0 prototype; decision 4 amended by [ADR 0041](0041-compaction-edges-and-quartile-rule.md)
+- Status: Superseded by [ADR 0045](0045-m0-measurement-method.md) (kept as history). Was: Accepted — built in the M0 prototype; decision 4 amended by [ADR 0041](0041-compaction-edges-and-quartile-rule.md)
 - Date: 2026-11-08
 - Amends: [ADR 0035](0035-measurement-corrections.md) decision 2 (as built), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) (decisions 1, 2 and 5), [ADR 0034](0034-live-nudges.md) (status line after a compaction), [ADR 0038](0038-real-size-after-compaction.md) (decisions 5 and 6, through ADR 0039)
 

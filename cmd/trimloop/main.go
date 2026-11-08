@@ -2,7 +2,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"errors"
 	"flag"
 	"fmt"
@@ -64,6 +63,13 @@ func setup(args []string, home string) int {
 	write := fs.String("write", "", "add the settings to this Claude Code settings file (a backup is made first), e.g. "+
 		filepath.Join(home, ".claude", "settings.json"))
 	replace := fs.Bool("replace-statusline", false, "replace an existing status line")
+	check := fs.Bool("check", false, "say whether the status line, hooks and usage-limit readings are working; change nothing")
+	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
+	defaultSettings := filepath.Join(home, ".claude", "settings.json")
+	if cfgDir != "" {
+		defaultSettings = filepath.Join(cfgDir, "settings.json")
+	}
+	settingsFile := fs.String("settings", defaultSettings, "the Claude Code settings file --check reads")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -76,6 +82,9 @@ func setup(args []string, home string) int {
 		fmt.Fprintln(os.Stderr, "This trimloop was started by 'go run' from a temporary folder. Build it first, for example:\n"+
 			"  go build -o ~/.local/bin/trimloop ./cmd/trimloop\nthen run that binary's setup.")
 		return 1
+	}
+	if *check {
+		return checkSetup(os.Stdout, *settingsFile, exe, home, cfgDir)
 	}
 	if *write == "" {
 		fmt.Println("Add this to ~/.claude/settings.json (or a project's .claude/settings.json), or run")
@@ -104,18 +113,45 @@ func analyse() {
 	noTitles := flag.Bool("no-titles", false, "leave out session titles, which summarise what was asked")
 	historyPath := flag.String("history", "", "file that keeps weekly figures between runs (default ~/.trimloop/history.json; with CLAUDE_CONFIG_DIR, one file per folder)")
 	noHistory := flag.Bool("no-history", false, "do not read or update the history file")
+	sinceArg := flag.String("since", "", "only sessions started on or after this date (2026-11-01) or this long ago (7d, 2w), with their sub-agents; the history file is not used")
+	open := flag.Bool("open", false, "write the web page and open it in the browser (implies --format html)")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [analyse] [--format summary|text|html|json] [--out FILE] [--no-titles] [--history FILE | --no-history]\n"+
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [analyse] [--format summary|text|html|json] [--out FILE] [--open] [--since DATE]\n"+
+			"                         [--no-titles] [--history FILE | --no-history]\n"+
+			"       trimloop --version\n"+
 			"       trimloop setup [--write SETTINGS_FILE] [--replace-statusline]\n"+
+			"       trimloop setup --check [--settings SETTINGS_FILE]\n"+
 			"       trimloop statusline | trimloop hook stop|prompt   (run by Claude Code)\n\n"+
 			"Analyses Claude Code session logs on this machine for token waste. 'setup' adds live\n"+
 			"nudges to Claude Code: a status line and two hooks.\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("trimloop", version())
+		return
+	}
+	formatSet := false
+	flag.Visit(func(f *flag.Flag) { formatSet = formatSet || f.Name == "format" })
+	if *open && !formatSet {
+		*format = "html"
+	}
 	if flag.NArg() > 0 || !validFormat[*format] {
 		flag.Usage()
 		os.Exit(2)
+	}
+	if *open && *format != "html" {
+		fmt.Fprintln(os.Stderr, "--open opens the web page, so it needs --format html.")
+		os.Exit(2)
+	}
+	var since time.Time
+	if *sinceArg != "" {
+		var err error
+		if since, err = parseSince(*sinceArg, time.Now()); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 
 	home, err := os.UserHomeDir()
@@ -124,9 +160,8 @@ func analyse() {
 	}
 
 	// The harnesses to read. Adding a harness is one line here.
-	readers := []source.Reader{
-		claudecode.Reader{Home: home, ConfigDir: os.Getenv("CLAUDE_CONFIG_DIR")},
-	}
+	claude := claudecode.Reader{Home: home, ConfigDir: os.Getenv("CLAUDE_CONFIG_DIR")}
+	readers := []source.Reader{claude}
 
 	// 1. Find the logs, remembering which reader found each one.
 	var logs []source.Log
@@ -157,6 +192,10 @@ func analyse() {
 		}
 	}
 	st.logs = len(logs)
+	if st.logs == 0 {
+		fmt.Fprintln(os.Stderr, noLogsMessage(claude.Projects()))
+		os.Exit(1)
+	}
 	oldestFirst(data)
 
 	// 3. Build sessions. seen is shared by all logs, so a message copied into
@@ -165,17 +204,36 @@ func analyse() {
 	seen := map[string]bool{}
 	var sessions []event.Session
 	for _, d := range data {
-		if s := buildSession(d, seen); len(s.Turns) > 0 {
+		if s := buildSession(d, seen); len(s.Turns) > 0 || len(s.LimitHits) > 0 {
 			sessions = append(sessions, s)
 		}
 	}
 	inheritProjects(sessions)
+	read := report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines}
+	if !since.IsZero() {
+		// Weekly figures from part of the logs would replace fuller stored
+		// weeks, so a --since run leaves the history file alone.
+		sessions = startedSince(sessions, since)
+		read.Since = since.Format("2006-01-02")
+		*noHistory = true
+		if len(sessions) == 0 {
+			fmt.Fprintf(os.Stderr, "No sessions started on or after %s.\n", since.Format("2 Jan 2006"))
+			os.Exit(1)
+		}
+	}
 
 	// 4. Run the findings and write the report.
 	settings := report.DefaultSettings()
 	settings.Titles = !*noTitles
-	r := report.Analyse(sessions, report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines},
-		settings, time.Now())
+	r := report.Analyse(sessions, read, settings, time.Now())
+	r.Version = version()
+	// Usage limits (ADR 0048): the plan, and readings the status line kept.
+	readings, err := history.LoadLimits(history.LimitsPath(home, os.Getenv("CLAUDE_CONFIG_DIR")))
+	if err != nil {
+		log.Printf("usage-limit readings not used: %v", err)
+	}
+	plan := claude.Plan()
+	report.AddLimits(&r, sessions, report.Plan{Name: plan.Name, Subscription: plan.Subscription}, readings)
 	if !*noHistory {
 		path := *historyPath
 		if path == "" {
@@ -183,24 +241,22 @@ func analyse() {
 		}
 		keepHistory(&r, path, st.oldest)
 	}
-	if err := write(r, *format, *out); err != nil {
+	path, err := write(r, *format, *out)
+	if err != nil {
 		log.Fatal(err)
+	}
+	if *open {
+		if err := openInBrowser(path); err != nil {
+			log.Print(err) // the report is written; say why it did not open
+		}
 	}
 }
 
 // defaultHistory is where weekly figures are kept: one file per set of
 // logs, so runs over another Claude Code folder (CLAUDE_CONFIG_DIR) do not
-// replace each other's weeks. The folder is named by a hash of its path.
+// replace each other's weeks.
 func defaultHistory(home, configDir string) string {
-	dir := filepath.Join(home, ".trimloop")
-	if abs, err := filepath.Abs(configDir); configDir != "" && err == nil {
-		configDir = abs
-	}
-	if configDir == "" || filepath.Clean(configDir) == filepath.Join(home, ".claude") {
-		return filepath.Join(dir, "history.json") // the default logs, however named
-	}
-	sum := sha256.Sum256([]byte(filepath.Clean(configDir)))
-	return filepath.Join(dir, fmt.Sprintf("history-%x.json", sum[:4]))
+	return history.PathFor(home, configDir, "history", ".json")
 }
 
 // partialWeek is the last week whose logs Claude Code may have partly
@@ -239,7 +295,8 @@ func summary(out io.Writer, r report.Results) error { return report.WriteSummary
 // write renders r in format to path, or to standard output if path is empty
 // (HTML always goes to a file). When the report goes to a file, a short
 // summary is printed to the terminal.
-func write(r report.Results, format, path string) error {
+// It returns the path written, "" for standard output.
+func write(r report.Results, format, path string) (string, error) {
 	if format == "html" && path == "" {
 		path = defaultHTML
 	}
@@ -250,29 +307,29 @@ func write(r report.Results, format, path string) error {
 		"html":    report.WriteHTML,
 	}[format]
 	if path == "" {
-		return render(os.Stdout, r)
+		return "", render(os.Stdout, r)
 	}
 	// Readable by the owner only: a report names projects and shows session
 	// titles, which summarise what was asked.
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if err := f.Chmod(0o600); err != nil { // an existing file keeps its mode otherwise
 		_ = f.Close()
-		return err
+		return "", err
 	}
 	if err := render(f, r); err != nil {
 		_ = f.Close() // the write error is the one to report
-		return err
+		return "", err
 	}
 	if err := f.Close(); err != nil {
-		return err
+		return "", err
 	}
 	if format == "summary" {
-		return nil
+		return path, nil
 	}
-	return report.WriteSummary(os.Stdout, r, path, 3)
+	return path, report.WriteSummary(os.Stdout, r, path, 3)
 }
 
 // stats counts what was read.
@@ -346,17 +403,11 @@ func oldestFirst(data []logData) {
 // credited to the log it first appeared in.
 func buildSession(d logData, seen map[string]bool) event.Session {
 	s := sessionFor(d.log.Path)
-	var last time.Time               // latest response time so far in this log
-	turnOf := map[string]int{}       // message id -> index in s.Turns, for ids counted here
-	callAt := map[string][2]int{}    // tool-use id -> turn index, call index
-	compacted := false               // a compaction since the last new turn
-	prompted := false                // a message from the user since the last new turn
-	var preInjected []event.Injected // added before a pending compaction's marker
-	prePrompted := false             // a message from the user before it
-	var compaction event.Compaction
-	var compactedAt time.Time                // when that compaction was logged as happening
+	var last time.Time                       // latest response time so far in this log
+	turnOf := map[string]int{}               // message id -> index in s.Turns, for ids counted here
+	callAt := map[string][2]int{}            // tool-use id -> turn index, call index
+	var pending between                      // what the next new turn inherits (between.go)
 	customTitle := false                     // the user named the session: generated titles no longer replace it
-	var injected []event.Injected            // added since the last new turn
 	var standing *event.Standing             // the latest system prompt and tool list
 	runs := map[string]event.HarnessRecord{} // the harness's latest record per run
 	for _, m := range d.msgs {
@@ -371,30 +422,24 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				}
 			}
 			if answered && !copiedLine(m, seen) {
-				prompted = true
+				pending.prompt()
 			}
 			continue
 		case source.KindCompaction:
 			if copiedLine(m, seen) {
 				continue
 			}
-			if compacted {
-				// Another compaction with no reply in between: keep the first.
-				c := compaction
-				c.At = compactedAt
-				s.Unreplied = append(s.Unreplied, c)
+			// Another compaction with no reply in between: the earlier one
+			// is kept as unreplied.
+			if u := pending.compact(m.Compaction, m.Time); u != nil {
+				s.Unreplied = append(s.Unreplied, *u)
 			}
-			compacted, compaction, compactedAt = true, m.Compaction, m.Time
-			// What came before the marker belongs to the request before the
-			// compaction; what follows it, to the first one after.
-			preInjected, prePrompted = append(preInjected, injected...), prePrompted || prompted
-			injected, prompted = nil, false
 			continue
 		case source.KindInjected:
 			if copiedLine(m, seen) {
 				continue
 			}
-			injected = append(injected, m.Injected...)
+			pending.inject(m.Injected)
 			continue
 		case source.KindStanding:
 			st := m.Standing
@@ -416,7 +461,12 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			continue
 		case source.KindPrompt:
 			if !copiedLine(m, seen) {
-				prompted = true
+				pending.prompt()
+			}
+			continue
+		case source.KindLimitHit:
+			if !copiedLine(m, seen) {
+				s.LimitHits = append(s.LimitHits, event.LimitHit{At: m.Time, Limit: m.Limit})
 			}
 			continue
 		case source.KindTitle:
@@ -448,7 +498,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			// The reply that triggered a compaction can be logged after it,
 			// with an earlier time: it still belongs before the compaction.
-			before := compacted && !compactedAt.IsZero() && !m.Time.IsZero() && m.Time.Before(compactedAt)
+			h := pending.take(m.Time)
 			t := event.Turn{
 				ID:              m.ID,
 				Seq:             len(s.Turns),
@@ -461,26 +511,18 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				USOnly:          m.USOnly,
 				Project:         m.Project,
 				Attribution:     m.Attribution,
-				CompactedBefore: compacted && !before,
-				Prompted:        prompted || prePrompted,
-				Injected:        append(preInjected, injected...),
+				CompactedBefore: h.compaction != nil,
+				Prompted:        h.prompted,
+				Injected:        h.injected,
 				Standing:        standing,
 			}
-			if before {
-				// The triggering reply takes what came before the marker and
-				// leaves what the compaction re-attached for the next turn.
-				t.Injected, t.Prompted = preInjected, prePrompted
-				preInjected, prePrompted = nil, false
-			} else {
-				injected, prompted, preInjected, prePrompted = nil, false, nil, false
-			}
-			if compacted && !before {
-				t.Compaction = compaction
+			if h.compaction != nil {
+				t.Compaction = *h.compaction
 			}
 			if s.Project == "" {
 				s.Project = m.Project
 			}
-			if s.Kind == "subagent" && s.AgentType == "" {
+			if s.Kind == event.SubAgentSession && s.AgentType == "" {
 				s.AgentType = m.Attribution.Agent
 			}
 			if !last.IsZero() && m.Time.After(last) {
@@ -488,9 +530,6 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			t.Cost, t.Priced = price.Cost(m.Model, m.Usage, price.Options{Fast: m.Fast, USOnly: m.USOnly})
 			s.Turns = append(s.Turns, t)
-			if !before {
-				compacted, compaction = false, event.Compaction{}
-			}
 			i, here = len(s.Turns)-1, true
 			if m.ID != "" {
 				turnOf[m.ID] = i
@@ -512,13 +551,11 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 		}
 	}
 	s.Harness = sumRuns(runs)
-	if s.Kind == "subagent" && s.AgentType == "" {
+	if s.Kind == event.SubAgentSession && s.AgentType == "" {
 		s.AgentType = claudecode.AgentType(d.log.Path)
 	}
-	if compacted {
-		c := compaction
-		c.At = compactedAt
-		s.Unreplied = append(s.Unreplied, c)
+	if u := pending.end(); u != nil {
+		s.Unreplied = append(s.Unreplied, *u)
 	}
 	return s
 }
@@ -572,13 +609,13 @@ func sumRuns(runs map[string]event.HarnessRecord) *event.HarnessRecord {
 func inheritProjects(sessions []event.Session) {
 	project := map[string]string{}
 	for _, s := range sessions {
-		if s.Kind == "main" && s.Project != "" {
+		if s.Kind == event.MainSession && s.Project != "" {
 			project[s.ID] = s.Project
 		}
 	}
 	for i, s := range sessions {
 		p, ok := project[s.ParentID]
-		if !ok || s.Kind != "subagent" {
+		if !ok || s.Kind != event.SubAgentSession {
 			continue
 		}
 		if s.Project == "" {
@@ -600,7 +637,7 @@ func sessionFor(path string) event.Session {
 	dir := filepath.Dir(path)
 	if filepath.Base(dir) == "subagents" {
 		parent := filepath.Base(filepath.Dir(dir))
-		return event.Session{ID: parent + "/" + name, Kind: "subagent", ParentID: parent}
+		return event.Session{ID: parent + "/" + name, Kind: event.SubAgentSession, ParentID: parent}
 	}
-	return event.Session{ID: name, Kind: "main"}
+	return event.Session{ID: name, Kind: event.MainSession}
 }

@@ -72,5 +72,5 @@ func FindLongPauses(sessions []event.Session, minGap time.Duration, topN int) Lo
 // took and could have started fresh from: a long pause in a main session
 // that a message from the user ended, with a priced turn.
 func userBreak(s event.Session, t event.Turn, minGap time.Duration) bool {
-	return s.Kind != "subagent" && !t.First && t.Prompted && t.IdleBefore > minGap && t.Priced
+	return s.Kind != event.SubAgentSession && !t.First && t.Prompted && t.IdleBefore > minGap && t.Priced
 }

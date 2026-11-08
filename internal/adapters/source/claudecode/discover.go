@@ -21,15 +21,20 @@ var _ source.Reader = Reader{} // fails to compile if Reader stops meeting the i
 // Name identifies the harness.
 func (Reader) Name() string { return "claude-code" }
 
-// Discover returns every Claude Code session log, including the logs written
-// by subagents. Glob supports single '*' (not '**'), so each folder depth
-// needs its own pattern.
-func (r Reader) Discover() ([]source.Log, error) {
+// Projects is the folder Claude Code keeps its session logs in.
+func (r Reader) Projects() string {
 	dir := r.ConfigDir
 	if dir == "" {
 		dir = filepath.Join(r.Home, ".claude")
 	}
-	base := filepath.Join(dir, "projects")
+	return filepath.Join(dir, "projects")
+}
+
+// Discover returns every Claude Code session log, including the logs written
+// by subagents. Glob supports single '*' (not '**'), so each folder depth
+// needs its own pattern.
+func (r Reader) Discover() ([]source.Log, error) {
+	base := r.Projects()
 	patterns := []string{
 		filepath.Join(base, "*", "*.jsonl"),                   // main sessions
 		filepath.Join(base, "*", "*", "subagents", "*.jsonl"), // subagents

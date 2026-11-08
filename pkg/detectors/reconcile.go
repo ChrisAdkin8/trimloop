@@ -95,7 +95,7 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 
 	byModel := map[string]*ModelGap{}
 	for _, s := range sessions {
-		if s.Kind != "main" {
+		if s.Kind != event.MainSession {
 			continue
 		}
 		mine := ours[s.ID]
@@ -132,7 +132,7 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 	}
 	// Sub-agents whose main session's log is gone have no record either.
 	for _, s := range sessions {
-		if s.Kind == "main" {
+		if s.Kind == event.MainSession {
 			delete(ours, s.ID)
 		}
 	}

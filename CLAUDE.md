@@ -3,25 +3,40 @@
 Trimloop is building M0 (`trimloop analyse`): the design documents are the
 spec, and a Go prototype lives in `cmd/`, `internal/` and `pkg/`. Run it with
 `go run ./cmd/trimloop/` (the package, not `main.go`; it prints a summary,
-and `--format text|html|json`, `--out FILE` and `--no-titles` change the
-output) and test with `go test ./...`. The
-report code is in `internal/report`; all formats render one
-`report.Results`. Weekly figures are kept in `~/.trimloop/history.json`
-(one `history-<id>.json` per other `CLAUDE_CONFIG_DIR`)
-(`internal/history`; pass `--no-history` or `--history FILE` when testing
-against real logs). Live nudges (`trimloop statusline`, `hook`, `setup`)
-are in `internal/live`; they write under `~/.trimloop`, so set `HOME` to a
-scratch folder when trying them by hand. `setup` writes the path of the
-running program into Claude Code's settings, so run it from a built binary
-(`go build -o ~/.local/bin/trimloop ./cmd/trimloop`), not `go run`. Before a commit, run `scripts/check.sh` (gofmt, vet,
-golangci-lint per `.golangci.yml`, race tests, govulncheck; `--offline` skips
-govulncheck) and keep it passing.
+and `--format text|html|json`, `--out FILE`, `--open`, `--since DATE|7d`
+and `--no-titles` change the output; `--since` leaves the history file
+alone) and test with `go test ./...`. To try it without real logs, copy a
+file from `testdata/sessions` into `<dir>/projects/demo/` and set
+`CLAUDE_CONFIG_DIR=<dir>`. The report code is in `internal/report`; all
+formats render one `report.Results`. Weekly figures are kept in
+`~/.trimloop/history.json`, or one `history-<id>.json` per other
+`CLAUDE_CONFIG_DIR` (`internal/history`; pass `--no-history` or
+`--history FILE` when testing against real logs). Live nudges (`trimloop
+statusline`, `hook`, `setup`) are in `internal/live`; they write under
+`~/.trimloop`, so set `HOME` to a scratch folder when trying them by hand.
+`setup` writes the path of the running program into Claude Code's settings,
+so run it from a built binary (`go build -o ~/.local/bin/trimloop
+./cmd/trimloop`), not `go run`. Before a commit, run `scripts/check.sh`
+(gofmt, vet, golangci-lint per `.golangci.yml`, race tests, govulncheck;
+`--offline` skips govulncheck) and keep it passing.
 
-- Read `docs/design.md` first; `docs/patterns.md` and `docs/data-model.md` hold
-  the detail. Decisions live in `docs/adr/` — add a new ADR rather than
-  silently changing a decision. When a measurement method changes, update
-  `docs/measurements.md` (how each reported figure is worked out today) and
-  the figures in `docs/log-signals.md` §8; older docs point there rather than
+- Entry points: `README.md` (what the prototype does today),
+  `docs/measurements.md` (how each reported figure is worked out), the build
+  order in `ROADMAP.md`, and `docs/design.md` for the planned product;
+  `docs/patterns.md` and `docs/data-model.md` hold the detail.
+- Decisions live in `docs/adr/`; `docs/adr/README.md` says which records
+  are in force. Add a new ADR rather than silently changing a decision, and
+  when you do, update both records' status lines, the index's "Built" and
+  "In force" columns, and `ROADMAP.md`. The measurement method in force is
+  ADR 0045. A correction that keeps a decision (a bug fix, a test, a
+  wording change) goes in the commit message, not a new ADR.
+- State machines (what the code remembers between log lines, turns, hook
+  calls and runs, and the files it keeps) are listed in
+  `docs/state-machines.md`. Read the entry before changing one; update it
+  after. Compare reports before and after a refactor on a frozen copy of the
+  logs (`CLAUDE_CONFIG_DIR=<copy> trimloop --no-history --format json`).
+- When a measurement method changes, update `docs/measurements.md` and the
+  figures in `docs/log-signals.md` §8; older docs point there rather than
   restating new figures.
 - Pattern IDs (P01–P19) and safety levels (L0–L3) are referenced across all
   docs. Keep them consistent when editing.
@@ -32,8 +47,18 @@ govulncheck) and keep it passing.
   customer-held key; names are hashed too. Any feature that needs raw content
   must say so explicitly and run locally. Exception (ADR 0032): local
   reports show session titles and project names (`--no-titles` hides them);
-  stored files (history, nudge state) hold numbers only.
+  stored files (history, nudge state, usage-limit readings) hold numbers
+  only. Of Claude Code's account file (`.claude.json`) only the plan fields
+  are read (ADR 0048).
 - Dev environment: `scripts/bootstrap.sh` installs the SDKs; run it with
   `--check` first. Keep its tool list in step with the planned stack.
-- Packaging and releases: `docs/packaging.md` (ADR 0008). Release tooling
-  runs in CI only.
+- Licence: FSL-1.1-ALv2 in `LICENSE.md` (ADR 0046); connector code meant
+  for other tools (gateway plugins) gets its own Apache-2.0 licence file.
+  Do not merge outside contributions: they need a contributor agreement.
+- Packaging and releases: `docs/packaging.md` (ADR 0008). Releases are
+  built by `.goreleaser.yaml` in `.github/workflows/release.yml` on a `v*`
+  tag (ADR 0047); `ci.yml` runs `scripts/check.sh` and a snapshot release.
+  Release tooling runs in CI only; to dry-run locally, use
+  `go run github.com/goreleaser/goreleaser/v2@v2.19.0 release --snapshot
+  --clean --skip=sign,sbom`. Pin new tools and actions to releases at least
+  two weeks old, actions by commit hash.

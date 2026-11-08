@@ -41,6 +41,11 @@ type record struct {
 	AttributionAgent     string `json:"attributionAgent"`
 	Effort               string `json:"effort"` // the effort level the request asked for
 
+	// Assistant lines the harness wrote itself to report a failed request:
+	// error is "rate_limit" when a usage limit was reached.
+	Error             json.RawMessage `json:"error"`
+	IsAPIErrorMessage bool            `json:"isApiErrorMessage"`
+
 	// ai-title and custom-title lines. An AI title is written from the
 	// conversation, so it is derived from content: shown locally only.
 	AITitle     string `json:"aiTitle"`
@@ -179,6 +184,10 @@ func parseLine(line []byte) (source.Message, bool, error) {
 	}
 
 	switch {
+	case rec.Type == "assistant" && rec.IsAPIErrorMessage && limitError(rec.Error):
+		return source.Message{Kind: source.KindLimitHit, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
+			Limit: limitKind(blocks(rec.Message.Content))}, true, nil
+
 	case rec.Type == "assistant" && rec.Message.Usage != nil:
 		u := rec.Message.Usage
 		return source.Message{
@@ -516,4 +525,26 @@ func typedPrompt(rec record) bool {
 	}
 	text = strings.TrimSpace(text)
 	return text != "" && !strings.HasPrefix(text, "<task-notification")
+}
+
+// limitError reports whether an assistant line's error says a usage limit
+// was reached.
+func limitError(raw json.RawMessage) bool {
+	var s string
+	return json.Unmarshal(raw, &s) == nil && s == "rate_limit"
+}
+
+// limitKind tells which limit a harness limit message names, from its text
+// ("You've hit your session limit · resets 11:30pm", "... weekly limit ...").
+func limitKind(bs []block) string {
+	for _, b := range bs {
+		t := strings.ToLower(b.Text)
+		switch {
+		case strings.Contains(t, "weekly limit"):
+			return "weekly"
+		case strings.Contains(t, "session limit"):
+			return "session"
+		}
+	}
+	return "other"
 }

@@ -1,6 +1,6 @@
 # ADR 0036: Prices checked against the pricing page, and what "reconciliation done" means in M0
 
-- Status: Accepted — built in the M0 prototype; decision 3 amended by [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md)
+- Status: Superseded by [ADR 0045](0045-m0-measurement-method.md) (kept as history). Was: Accepted — built in the M0 prototype; decision 3 amended by [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md)
 - Date: 2026-11-08
 - Amends: [ADR 0028](0028-harness-recorded-signals.md) (the reader's acceptance test), [ADR 0031](0031-m0-order-from-measured-spend.md) (item 5), [ADR 0033](0033-reconciliation-history-standing-context.md) (history, P07 sources), [ADR 0034](0034-live-nudges.md) (countdown), [ADR 0035](0035-measurement-corrections.md) (history)
 

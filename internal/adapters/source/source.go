@@ -101,6 +101,10 @@ type Message struct {
 	// KindStanding: the fixed start of later requests.
 	Standing *event.Standing
 
+	// KindLimitHit: which usage limit was reached: "session" (the 5-hour
+	// limit), "weekly", or "other".
+	Limit string
+
 	// KindCostRecord: the record so far for one run of the harness. Runs
 	// are told apart by RunID; within a run, later records include earlier
 	// ones.
@@ -121,6 +125,7 @@ const (
 	KindStanding                // the system prompt and tool definitions, as recorded
 	KindCostRecord              // the harness's running record of the session's cost
 	KindPrompt                  // the user sent a message (only the fact is kept, not the text)
+	KindLimitHit                // the harness refused a request: a usage limit was reached
 )
 
 // Result is one tool result, linked to its call by CallID.

@@ -22,10 +22,14 @@ func WriteText(out io.Writer, r Results) error {
 	readLine(w, r.Read)
 	periodLine(w, r)
 	fmt.Fprintf(w, "Costs are estimates at list prices (%s).", r.Prices)
+	if r.Version != "" {
+		fmt.Fprintf(w, " Made by trimloop %s.", r.Version)
+	}
 	if r.Read.Unpriced > 0 {
 		fmt.Fprintf(w, " %d turns have no price and are left out.", r.Read.Unpriced)
 	}
 	fmt.Fprintln(w)
+	limitLines(w, r)
 
 	fmt.Fprintln(w, "\nCOST BY TOKEN CLASS")
 	for _, row := range []struct {
@@ -51,7 +55,7 @@ func WriteText(out io.Writer, r Results) error {
 	if len(r.Actions) > 0 {
 		fmt.Fprintln(w, "\nWHAT TO DO FIRST (the savings overlap, so do not add them)")
 		for i, a := range r.Actions {
-			fmt.Fprintf(w, "  %d. %s: %s\n", i+1, a.Title, savingText(a, all))
+			fmt.Fprintf(w, "  %d. %s: %s%s\n", i+1, a.Title, savingText(a, all), limitText(a))
 		}
 		fmt.Fprintln(w, "  Each is explained, with how to do it, in its section below.")
 	}
@@ -207,4 +211,16 @@ func readLine(w io.Writer, r Read) {
 		fmt.Fprintf(w, ", %d lines could not be parsed", r.BadLines)
 	}
 	fmt.Fprintln(w, ".")
+	if d := sinceDay(r.Since); d != "" {
+		fmt.Fprintf(w, "Only sessions started on or after %s, with their sub-agents.\n", d)
+	}
+}
+
+// sinceDay formats a --since date for people: "1 Nov 2026"; "" if unset.
+func sinceDay(since string) string {
+	t, err := time.Parse("2006-01-02", since)
+	if err != nil {
+		return since
+	}
+	return t.Format("2 Jan 2006")
 }

@@ -16,7 +16,11 @@ import (
 var htmlSource string
 
 var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
-	"dollars":   money,
+	"dollars":  money,
+	"sinceDay": sinceDay,
+	"limitShare": func(a fixes.Recommendation) string {
+		return strings.TrimPrefix(limitText(a), "; ")
+	},
 	"thousands": thousands,
 	"short":     approx,
 	"pct":       func(part, whole float64) string { return fmt.Sprintf("%.0f%%", pct(part, whole)) },
@@ -116,9 +120,9 @@ type sessionRow struct {
 // Name returns the label for a session id, with the id as a last resort.
 func (v view) Name(id string) Label { return v.Labels[id] }
 
-// Older reports whether a week's figures came from another price list or an
-// older analysis.
-func (v view) Older(k detectors.Week) bool { return olderFigures(k, v.Prices) }
+// OlderReason says why a week's figures came from another price list or an
+// older analysis; "" if they did not.
+func (v view) OlderReason(k detectors.Week) string { return olderReason(k, v.Prices) }
 
 // Untitled is how a session with no title is shown.
 const Untitled = "Untitled session"

@@ -43,7 +43,7 @@ func FindAttribution(sessions []event.Session, topN int) Attribution {
 		}
 		g.Cost += t.Cost.Total()
 		g.Turns++
-		if s.Kind == "subagent" {
+		if s.Kind == event.SubAgentSession {
 			g.SubAgentCost += t.Cost.Total()
 		}
 		convs[kind][name][s.Conversation()] = true

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
+	"github.com/ChrisAdkin8/trimloop/internal/history"
+	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 )
 
 // Input is the JSON Claude Code passes on standard input to a status-line
@@ -23,6 +25,25 @@ type Input struct {
 	Effort *struct {
 		Level string `json:"level"`
 	} `json:"effort"`
+	// RateLimits is sent to the status line for Pro and Max subscribers,
+	// after the session's first reply; either limit may be missing.
+	RateLimits *struct {
+		FiveHour *rateLimit `json:"five_hour"`
+		SevenDay *rateLimit `json:"seven_day"`
+	} `json:"rate_limits"`
+}
+
+// rateLimit is one usage limit as Claude Code reports it.
+type rateLimit struct {
+	UsedPercentage float64 `json:"used_percentage"`
+	ResetsAt       float64 `json:"resets_at"` // Unix seconds
+}
+
+func (r *rateLimit) window() *detectors.LimitWindow {
+	if r == nil {
+		return nil
+	}
+	return &detectors.LimitWindow{Used: r.UsedPercentage, ResetsAt: int64(r.ResetsAt)}
 }
 
 // Env is what the commands need besides their input.
@@ -30,6 +51,7 @@ type Env struct {
 	Settings Settings
 	Store    Store  // per-session nudge state
 	Log      string // file each shown nudge is appended to; "" for none
+	Limits   string // file usage-limit readings are appended to; "" for none (ADR 0048)
 	Now      time.Time
 }
 
@@ -40,6 +62,7 @@ func DefaultEnv(home string) Env {
 		Settings: DefaultSettings(),
 		Store:    Store{Dir: filepath.Join(dir, "live")},
 		Log:      filepath.Join(dir, "nudges.jsonl"),
+		Limits:   history.LimitsPath(home, os.Getenv("CLAUDE_CONFIG_DIR")),
 		Now:      time.Now(),
 	}
 }
@@ -83,6 +106,7 @@ const (
 // problem it prints what it can, and never fails.
 func StatusLine(in io.Reader, out io.Writer, env Env) {
 	inp, r, err := readInput(in)
+	recordLimits(env, inp)
 	cost := -1.0
 	if inp.Cost != nil {
 		cost = inp.Cost.TotalCostUSD
@@ -191,4 +215,18 @@ func logNudge(env Env, nudge string, context int) {
 	defer func() { _ = f.Close() }()
 	b, _ := json.Marshal(map[string]any{"time": env.Now.UTC(), "nudge": nudge, "context": context})
 	_, _ = f.Write(append(b, '\n'))
+}
+
+// recordLimits keeps the usage-limit reading Claude Code sent, if any, so a
+// report can measure how much of the limits list-price spend uses
+// (ADR 0048). A problem is ignored: the status line must still show.
+func recordLimits(env Env, inp Input) {
+	if env.Limits == "" || inp.RateLimits == nil {
+		return
+	}
+	_ = history.AppendLimits(env.Limits, detectors.LimitReading{
+		At:       env.Now.UTC(),
+		FiveHour: inp.RateLimits.FiveHour.window(),
+		SevenDay: inp.RateLimits.SevenDay.window(),
+	})
 }

@@ -333,8 +333,8 @@ func TestFullReportOnFixture(t *testing.T) {
 func TestWrite(t *testing.T) {
 	r := report.Analyse(nil, report.Read{Logs: 1}, report.DefaultSettings(), t0)
 	path := filepath.Join(t.TempDir(), "r.html")
-	if err := write(r, "html", path); err != nil {
-		t.Fatal(err)
+	if got, err := write(r, "html", path); err != nil || got != path {
+		t.Fatalf("write: got %q, %v; want %q", got, err, path)
 	}
 	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
 		t.Errorf("report file mode: got %v, %v; want 0600", info.Mode().Perm(), err)
@@ -342,7 +342,7 @@ func TestWrite(t *testing.T) {
 	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), "<title>Trimloop report</title>") {
 		t.Errorf("got err %v, page %.40q", err, b)
 	}
-	if err := write(r, "json", filepath.Join(t.TempDir(), "missing", "r.json")); err == nil {
+	if _, err := write(r, "json", filepath.Join(t.TempDir(), "missing", "r.json")); err == nil {
 		t.Error("got no error writing into a missing folder")
 	}
 }
@@ -453,7 +453,7 @@ func TestWriteMakesExistingReportPrivate(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := report.Analyse(nil, report.Read{}, report.DefaultSettings(), t0)
-	if err := write(r, "json", path); err != nil {
+	if _, err := write(r, "json", path); err != nil {
 		t.Fatal(err)
 	}
 	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
@@ -570,5 +570,25 @@ func TestBuildSessionKeepsUnrepliedCompactions(t *testing.T) {
 	}
 	if len(s.Unreplied) != 2 || s.Unreplied[0].At.Minute() != 1 || s.Unreplied[1].At.Minute() != 4 {
 		t.Errorf("unreplied: got %+v, want the 09:01 and 09:04 compactions", s.Unreplied)
+	}
+}
+
+func TestBuildSessionKeepsLimitHits(t *testing.T) {
+	hit := func(uuid string) string {
+		return `{"type":"assistant","uuid":"` + uuid + `","timestamp":"2026-10-09T21:52:07Z","isApiErrorMessage":true,"error":"rate_limit",` +
+			`"message":{"model":"<synthetic>","content":[{"type":"text","text":"You've hit your weekly limit"}],"usage":{"output_tokens":0}}}` + "\n"
+	}
+	seen := map[string]bool{}
+	s, _, err := readSession(cc, writeLog(t, "a.jsonl", hit("h1")), seen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Turns) != 0 || len(s.LimitHits) != 1 || s.LimitHits[0].Limit != "weekly" {
+		t.Errorf("limit hit: got %d turns, hits %+v; want no turns and one weekly hit", len(s.Turns), s.LimitHits)
+	}
+	// A copy of the same line in a resumed session counts once.
+	s, _, _ = readSession(cc, writeLog(t, "b.jsonl", hit("h1")), seen)
+	if len(s.LimitHits) != 0 {
+		t.Errorf("copied limit hit counted again: %+v", s.LimitHits)
 	}
 }

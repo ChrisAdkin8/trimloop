@@ -19,10 +19,11 @@ func WriteSummary(out io.Writer, r Results, path string, actions int) error {
 		fmt.Fprintf(w, "Claude Code's own records show %s (%.0f%%) more than its logs: requests the logs do not record.\n",
 			money(c.Gap), pct(c.Gap, c.Ours))
 	}
+	limitLines(w, r)
 	if len(r.Actions) > 0 {
 		fmt.Fprintln(w, "\nWhat to do first (these savings overlap, so do not add them):")
 		for i, a := range r.Actions[:min(actions, len(r.Actions))] {
-			fmt.Fprintf(w, "  %d. %s: %s\n", i+1, a.Title, savingText(a, r.Total))
+			fmt.Fprintf(w, "  %d. %s: %s%s\n", i+1, a.Title, savingText(a, r.Total), limitText(a))
 			fmt.Fprintf(w, "     %s\n", a.Primary.What)
 		}
 	}

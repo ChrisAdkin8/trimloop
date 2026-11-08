@@ -45,8 +45,11 @@ type Recommendation struct {
 	LikelyNote string          `json:"likely_note,omitempty"` // how Likely was estimated
 	// LikelyLow and LikelyHigh bound Likely when it rests on a measured
 	// quantity that varies (the size after a compaction); 0 if not given.
-	LikelyLow    float64  `json:"likely_low,omitempty"`
-	LikelyHigh   float64  `json:"likely_high,omitempty"`
+	LikelyLow  float64 `json:"likely_low,omitempty"`
+	LikelyHigh float64 `json:"likely_high,omitempty"`
+	// WeeklyLimit is the saving per week as a percentage of a subscriber's
+	// weekly usage limit, where that was measured (ADR 0048); 0 otherwise.
+	WeeklyLimit  float64  `json:"weekly_limit_share,omitempty"`
 	Examples     []string `json:"examples"` // the shapes or tools that cost most
 	Primary      Fix      `json:"primary"`
 	Alternatives []Fix    `json:"alternatives"`

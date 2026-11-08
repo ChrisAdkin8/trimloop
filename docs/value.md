@@ -24,11 +24,12 @@ every turn. Two consequences drive the economics:
 
    | Provider | Cache read | Cache write |
    |---|---|---|
-   | Anthropic | ≈ 0.1 × input price | ≈ 1.25 × input price (5-minute TTL); higher for the 1-hour TTL |
+   | Anthropic | 0.025–0.1 × input price, by model (0.05 × on Opus 5.5 and Sonnet 5.5, 0.025 × on Fable 5.1) | 1.25 × input price (5-minute TTL); 2 × for the 1-hour TTL |
    | OpenAI | ≈ 10–50 % of input price, depending on model | Not billed |
 
    Prices change; the authoritative figures are the price catalogue
-   ([data-model.md](data-model.md#price-catalogue)).
+   ([data-model.md](data-model.md#price-catalogue)); the prices M0 uses are
+   in [measurements.md](measurements.md#1-reading-and-pricing).
 
 So an agent that breaks its cache, or carries dead weight in its context, pays
 for the same tokens again and again. The same work can cost several times
@@ -38,7 +39,7 @@ more than it needs to.
 
 | Rank | Lever | Patterns | Why this rank |
 |---|---|---|---|
-| 1 | **Fix broken caching** | P01 cache-prefix churn, P02 cache TTL expiry | Applies to almost every turn; moving the cache-hit rate from ~70 % to ~95 % roughly halves the cost of a turn (§3) |
+| 1 | **Fix broken caching** | P01 cache-prefix churn, P02 cache TTL expiry | Applies to almost every turn; moving the cache-hit rate from ~70 % to ~95 % more than halves the cost of a turn (§3) |
 | 2 | **Trim bloated or stale context** | P04 oversized tool output, P07 bloated standing and injected context, P08 stale context, P19 large working context | Shrinks the base that every later turn pays for; research reports 40–60 % input-token reductions (§4) |
 | 3 | **Stop loops and wasted runs** | P05 tool-call loops, P11 post-failure burn | Rarer, but each occurrence wastes a whole run's tokens and the developer's time |
 | 4 | **Use cheaper models for easy steps** | P13 model over-provisioning | Large per-turn saving, but needs outcome data and carries the most quality risk |
@@ -50,36 +51,30 @@ will re-rank by measured waste.
 
 **First measurement (one developer, 2026-11-06 to 11-08):** on the founder's
 Claude Code sessions the order was different. Large working context (P19)
-and re-caching after long breaks (P09) were the largest levers: keeping
-turns under 200k could save up to about 31 % of spend, compacting earlier
-somewhat less as a likely figure, and starting fresh after the breaks the
-user took up to about 14 %; cache churn (P01) was about 1.5 % and P02 below
-zero. Current figures are in
-[log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance), and how
-each is worked out in [measurements.md](measurements.md). One heavy user of a 1M-context model is not
-representative, so the table above is re-ranked only after §8 step 2. Details
-and figures: [ADR 0027](adr/0027-measured-m0-findings.md).
+and re-caching after long breaks (P09) were the largest levers, then
+sub-agents on a cheaper model (lever 4, priced without outcome data, so
+quality is untested). Cache churn (P01) was about 1.5 % of spend
+([ADR 0027](adr/0027-measured-m0-findings.md)). P02, the cache expiring
+during short waits, is a real but smaller finding. A different idea,
+moving every session on the 5-minute cache to the hour's cache, would cost
+slightly more than it saves. One heavy user of a 1M-context model is not representative,
+so the table above is re-ranked only after §8 step 2
+([ADR 0031](adr/0031-m0-order-from-measured-spend.md)).
 
-A second pass on the same logs priced lever 4 without outcome data:
-sub-agents inherited the main model, and running them on a cheaper one
-would have saved about 13 % of spend, quality untested; noisy tool output
-(P04) carried about 12 %, and what every request carries (P07: system
-prompt, tool definitions and injected text) about 11 %
-([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07),
-[ADR 0031](adr/0031-m0-order-from-measured-spend.md)). Those are 2026-11-07
-figures; once rebuilt-cache turns were priced as writes they became about
-15 % and 12 % ([log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); [measurements.md](measurements.md) says how each is worked out).
+Current figures, with their dates and how they changed, are in
+[log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance), and how
+each is worked out is in [measurements.md](measurements.md).
 
 ## 3. Worked example: one turn
 
 Assumptions, priced relative to the normal input price (shape of Anthropic's
-pricing):
+pricing for Opus 5.5 and Sonnet 5.5, the models measured most):
 
 | Token class | Relative price |
 |---|---|
 | Input (uncached) | 1 |
-| Cache read | 0.1 |
-| Cache write | 1.25 |
+| Cache read | 0.05 |
+| Cache write (5-minute) | 1.25 |
 | Output | 5 |
 
 One turn: 60,000 tokens of context, 1,000 tokens of output. Uncached context
@@ -88,16 +83,20 @@ cache breakpoints).
 
 | Scenario | Calculation | Relative cost | Saving vs A |
 |---|---|---|---|
-| **A.** 70 % of context read from cache | 42,000 × 0.1 + 18,000 × 1.25 + 1,000 × 5 | 31,700 | — |
-| **B.** Caching fixed: 95 % read from cache | 57,000 × 0.1 + 3,000 × 1.25 + 1,000 × 5 | 14,450 | 54 % |
-| **C.** B, plus context trimmed by 30 % (42,000 tokens) | 39,900 × 0.1 + 2,100 × 1.25 + 1,000 × 5 | 11,615 | 63 % |
+| **A.** 70 % of context read from cache | 42,000 × 0.05 + 18,000 × 1.25 + 1,000 × 5 | 29,600 | — |
+| **B.** Caching fixed: 95 % read from cache | 57,000 × 0.05 + 3,000 × 1.25 + 1,000 × 5 | 11,600 | 61 % |
+| **C.** B, plus context trimmed by 30 % (42,000 tokens) | 39,900 × 0.05 + 2,100 × 1.25 + 1,000 × 5 | 9,620 | 68 % |
+
+Models whose cache reads cost 0.1 × input (Opus 5, Haiku) give 31,700,
+14,450 (54 %) and 11,615 (63 %); Fable 5.1, at 0.025 ×, saves a little
+more than the table shows.
 
 Observations:
 
 - The cache-hit rate is the dominant variable: in scenario A, cache writes are
-  71 % of the turn's cost.
-- Once caching is fixed, output becomes a much larger share of the bill (35 %
-  in B, 43 % in C), which is why context trimming has a smaller marginal effect
+  76 % of the turn's cost.
+- Once caching is fixed, output becomes a much larger share of the bill (43 %
+  in B, 52 % in C), which is why context trimming has a smaller marginal effect
   than fixing caching.
 - On providers without a write premium (OpenAI), the A → B gap is smaller;
   context trimming matters relatively more.
@@ -161,7 +160,7 @@ before/after measurement in the recommendation engine is what makes
 | Vendors improve their own caching and analytics | Easy single-harness wins shrink over time | Durable value is cross-harness, team-wide, and measured — vendors will not do this across competitors |
 | Flat-fee plans | Savings are not cash unless the team moves to a cheaper plan | Sell headroom and speed for these users |
 | Behaviour-changing fixes (L3) | Risk to quality | Canary rollout and outcome signals; L3 is opt-in |
-| Unmeasured | Every figure above is a hypothesis | §8 |
+| Mostly unmeasured | Only one developer's logs are measured (§2); the other figures above are hypotheses | §8 |
 
 ## 8. Validation plan
 
@@ -175,8 +174,8 @@ before/after measurement in the recommendation engine is what makes
    levers, publish the measured waste-share range.
 4. For one or two applied L1 fixes (e.g. CLAUDE.md reordering), measure the
    before/after cache-hit rate and cost on the same developers and repos.
-5. Update this document's status from *Hypothesis* to *Measured*, with dates
-   and sample sizes.
+5. Update this document's status from *Partly measured* to *Measured*, with
+   dates and sample sizes.
 
 ## Sources
 

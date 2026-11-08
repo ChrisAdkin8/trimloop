@@ -1,6 +1,6 @@
 # ADR 0037: Partly deleted weeks, breaks the user took, and nudges after a compaction
 
-- Status: Accepted — built in the M0 prototype; decisions 1–4 amended by [ADR 0038](0038-real-size-after-compaction.md)
+- Status: Superseded by [ADR 0045](0045-m0-measurement-method.md) (kept as history). Was: Accepted — built in the M0 prototype; decisions 1–4 amended by [ADR 0038](0038-real-size-after-compaction.md)
 - Date: 2026-11-08
 - Amends: [ADR 0033](0033-reconciliation-history-standing-context.md) and [ADR 0035](0035-measurement-corrections.md) (which stored week wins), [ADR 0036](0036-prices-reconciliation-status.md) decision 3, [ADR 0034](0034-live-nudges.md) (what the nudges read), [ADR 0032](0032-readable-reports.md) (the compaction replay), [patterns.md P09](../patterns.md#p09--resume-bloat) (which breaks the fix counts)
 

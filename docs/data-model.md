@@ -1,16 +1,76 @@
 # Data model
 
-Status: target model. The M0 prototype keeps no store; its JSON report
-(`trimloop --format json`, layout `trimloop-report/1`) holds the figures, and
-its recommendations carry `saving` (an upper bound), `likely`, `likely_note`,
-`likely_low` and `likely_high` (a range, where the likely figure rests on a
-measured size that varies), `finding` and the fixes ([ADR 0032](adr/0032-readable-reports.md),
-[ADR 0035](adr/0035-measurement-corrections.md)).
-
 One event model for every harness and provider. Taps produce raw envelopes;
 the normaliser turns them into these records. Field names are provisional.
 
+Most of this document is the **target model**: the store, segments,
+fingerprints and the team collector's records are not built. What the M0
+prototype does build is collected in the next section, and marked
+"**Built:**" where it touches a target field.
+
+## Built in the prototype
+
+The prototype keeps no store. It reads Claude Code's logs into memory on
+every run, and keeps only weekly figures between runs. How each figure is
+worked out is in [measurements.md](measurements.md).
+
+- **Report JSON** (`trimloop --format json`, layout `trimloop-report/1`;
+  adding a field keeps the version, removing or changing one bumps it).
+  It holds the figures behind every finding, the plan (`plan`) and usage
+  limits (`usage_limits`: hits, readings, the measured rates) for
+  subscribers, each action's `weekly_limit_share` where measured
+  ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)), the price
+  catalogue version used, the build that made it (`trimloop_version`) and, for a `--since`
+  run, the date it starts from (`read.since`). Each recommendation carries `pattern`, `title`, `finding` (a
+  sentence), `saving` (an upper bound, "up to"), `likely` (a likelier
+  figure, 0 if not estimated), `likely_note` (how it was estimated),
+  `likely_low` and `likely_high` (a range, where the likely figure rests on
+  a measured size that varies), the `primary` fix and `alternatives`.
+  Actions are ranked by the upper bound, the one figure every
+  recommendation has ([ADR 0032](adr/0032-readable-reports.md),
+  [ADR 0045](adr/0045-m0-measurement-method.md)).
+- **Week**, the history file: below.
+- **Limit readings** (`~/.trimloop/limits.jsonl`, one `limits-<id>.jsonl`
+  per other `CLAUDE_CONFIG_DIR`): one JSON line per change in a
+  subscriber's usage limits, as the status line saw them: `time`, and for
+  `five_hour` and `seven_day` the percentage `used` and `resets_at` (Unix
+  seconds). Numbers only.
+- **Turn fields read from the logs**: a yes/no form of `origin`, and
+  `effort` (see [Turn](#turn)); the session `title`, shown in local reports
+  only.
+- **Usage**: the Anthropic row of [usage normalisation](#usage-normalisation)
+  and its de-duplication rules.
+- **Prices**: a Go table, not the YAML file ([price catalogue](#price-catalogue)).
+
+### Week (history file)
+
+Figures per calendar week, kept between runs in `~/.trimloop/history.json`
+(one `history-<id>.json` per other `CLAUDE_CONFIG_DIR` folder)
+so a fix can be compared before and after once the harness has deleted the
+logs ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)).
+Numbers only: no names, titles, paths or session ids.
+
+| Field | Type | Notes |
+|---|---|---|
+| `week` | date | The Monday the week starts, local time |
+| `spend` / `turns` | number / int | |
+| `large_context` | number | Input cost of turns over the P19 threshold |
+| `sub_agents` | number | Spend in sub-agents |
+| `pause_rewrite` | number | Cache re-writes after long breaks the user took, in main sessions (P09; analysis version 4; a stored week from an earlier version counted other waits too, and reports mark it as older) |
+| `tool_output` | number | Carried cost of tool output added that week (P04; since version 4, carried history on rebuilt-cache turns is priced as a write) |
+| `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
+| `short_waits` | number | What a 5-minute cache expiring after 5–60 minute waits cost, against the cache still there (P02; added in version 5, [ADR 0043](adr/0043-weekly-trend-for-new-findings.md); this meaning from version 6, [ADR 0045](adr/0045-m0-measurement-method.md)). A week stored before version 5 has none: reports show a dash |
+| `top_effort` | number | Output cost of xhigh and max turns: the spend the P14 card is about, not its saving (version 5) |
+| `older_models` | number | Main-session spend on a model with a newer, cheaper version or a cheaper tier, shown as "cheaper choice": the spend the P13 cards are about, not their saving (version 5) |
+| `limit_hits` | int | Requests Claude Code refused because a subscription usage limit was reached (version 7, [ADR 0048](adr/0048-usage-limits-for-subscribers.md)) |
+| `compactions` | int | |
+| `prices` | string | Price catalogue version the figures used |
+| `analysis` | int | Analysis version that worked the figures out. A week the logs still hold replaces the stored copy, except a week Claude Code may have partly deleted (up to the week of the oldest log on disk): there the stored copy stays when it has more turns and counted them the same way (version 2 on) ([ADR 0045](adr/0045-m0-measurement-method.md)) |
+| `kept` | bool | Shown, not stored: the week's figures came from the history file, because its logs are gone or the stored copy was fuller |
+
 ## Entities
+
+Target model; not built except where marked **Built:**.
 
 ```mermaid
 erDiagram
@@ -45,7 +105,7 @@ One run of a harness, from start to exit (or resume chain).
 | `harness_cost` | json? | The harness's own per-model usage and cost for the session (`harness.cost_record`); reconciled against Trimloop's totals |
 | `lines_added` / `lines_removed` | int? | From the harness record (`outcome.lines_changed`) |
 | `capture_source` | enum | `proxy`, `otel`, `transcript`, `gateway` |
-| `title` | string? | The harness's or user's title for the session. Generated titles summarise the conversation, so this is content: shown in local reports only, never stored or sent ([ADR 0032](adr/0032-readable-reports.md)) |
+| `title` | string? | The harness's or user's title for the session. Generated titles summarise the conversation, so this is content: shown in local reports only, never stored or sent. **Built:** read from the logs for local reports ([ADR 0032](adr/0032-readable-reports.md)) |
 
 ### Turn
 
@@ -59,8 +119,8 @@ One model request and its response.
 | `provider` | enum | `anthropic`, `openai`, `google`, … |
 | `provider_request_id` | string? | Provider or gateway request id, where available — de-duplicates the same turn seen by two taps |
 | `response_id` | string? | Provider response or message id — usage is counted once per response |
-| `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`). Built so far only as a yes/no: the prototype's `Prompted` is true when the user sent a message, answered Claude's question or decided on a permission since the previous turn; the text is not kept ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
-| `effort` | string? | Reasoning effort or budget requested (`request.effort`). Built: the prototype reads Claude Code's `effort` on each turn (P14, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
+| `origin` | enum? | `human`, `automation`, `notification`, `schedule`, `continuation` (`session.origin`). **Built:** only as a yes/no: the prototype's `Prompted` is true when the user sent a message, answered Claude's question or decided on a permission since the previous turn; the text is not kept ([ADR 0045](adr/0045-m0-measurement-method.md)) |
+| `effort` | string? | Reasoning effort or budget requested (`request.effort`). **Built:** the prototype reads Claude Code's `effort` on each turn (P14, [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
 | `repo` | string? | Where the turn ran, when it differs from the session's: sessions can move between repos ([ADR 0031](adr/0031-m0-order-from-measured-spend.md)); keyed like Session `repo` |
 | `attribution` | json? | Skill, plugin, MCP server and agent type the harness names as the turn's cause (`harness.attribution`); keyed with `skill`, `plugin`, `mcp` and `agent` unless opted in |
 | `requested_model` | string? | Model asked for, where it differs from `model` (fallbacks) |
@@ -149,8 +209,10 @@ Output of a detector. This is the single definition; other docs refer here.
 | `scope_id` | string | Session id, or the repo / gateway-key / developer / org key |
 | `evidence` | json | Typed per pattern: turn ids, segment fingerprints, counts. No free text |
 | `wasted_tokens` | json | By token class: `input_uncached`, `cache_read`, `cache_write_5m`, `cache_write_1h`, `output` |
-| `est_saving` | decimal | Money, from the price catalogue |
-| `price_catalogue_version` | string | Makes `est_saving` reproducible |
+| `est_saving` | decimal | Upper bound ("up to"), money from the price catalogue. Findings and recommendations are ranked by it, the one figure every finding has ([ADR 0032](adr/0032-readable-reports.md), [ADR 0045](adr/0045-m0-measurement-method.md)) |
+| `likely_saving` | decimal? | A likelier saving, where the fix can be replayed against the measured sessions; null if not estimated. Never above `est_saving` |
+| `likely_low` / `likely_high` | decimal? | A range around `likely_saving`, where it rests on a measured size that varies (for example the size after a compaction); null otherwise |
+| `price_catalogue_version` | string | Makes the savings reproducible |
 | `confidence` | float | 0–1 |
 | `fidelity` | enum | `transcript`, `gateway` (canonical re-serialisation of the provider-bound body) or `wire` (bytes as sent, local proxy) |
 | `fix_ref` | string | Recommendation template or actuator op that applies |
@@ -183,35 +245,12 @@ exact change is rendered on a developer machine (design §6.2).
 | `alternatives` | json (up to two alternative fixes of other kinds: kind and template id) |
 | `params` | json (keyed hashes and counts the template needs, e.g. segment and line hashes) |
 | `title` / `body` | text (rendered from the template without content) |
-| `est_weekly_saving` | decimal |
+| `est_weekly_saving` | decimal (upper bound; recommendations are ranked by it) |
+| `likely_weekly_saving` | decimal? (likely figure, where the findings have one) |
+| `likely_weekly_low` / `likely_weekly_high` | decimal? (range around the likely figure, where it has one) |
 | `status` | `open`, `applied`, `dismissed`, `measured`, `escalated`, `rolled_back` |
 | `measured_saving` | decimal? (after/before comparison) |
 | `side_effects` | json? (re-runs, turns per session, tool errors, extra reads: before and after) |
-
-### Week (history file)
-
-Figures per calendar week, kept between runs in `~/.trimloop/history.json`
-(one `history-<id>.json` per other `CLAUDE_CONFIG_DIR` folder)
-so a fix can be compared before and after once the harness has deleted the
-logs ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)).
-Numbers only: no names, titles, paths or session ids.
-
-| Field | Type | Notes |
-|---|---|---|
-| `week` | date | The Monday the week starts, local time |
-| `spend` / `turns` | number / int | |
-| `large_context` | number | Input cost of turns over the P19 threshold |
-| `sub_agents` | number | Spend in sub-agents |
-| `pause_rewrite` | number | Cache re-writes after long breaks the user took, in main sessions (P09; analysis version 4; a stored week from an earlier version counted other waits too, and reports mark it as older) |
-| `tool_output` | number | Carried cost of tool output added that week (P04; since version 4, carried history on rebuilt-cache turns is priced as a write) |
-| `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
-| `short_waits` | number | What a 5-minute cache expiring after 5–60 minute waits cost, against the cache still there (P02; added in version 5, [ADR 0043](adr/0043-weekly-trend-for-new-findings.md); this meaning from version 6, [ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)). A week stored before version 5 has none: reports show a dash |
-| `top_effort` | number | Output cost of xhigh and max turns: the spend the P14 card is about, not its saving (version 5) |
-| `older_models` | number | Main-session spend on a model with a newer, cheaper version or a cheaper tier, shown as "cheaper choice": the spend the P13 cards are about, not their saving (version 5) |
-| `compactions` | int | |
-| `prices` | string | Price catalogue version the figures used |
-| `analysis` | int | Analysis version that worked the figures out. A week the logs still hold replaces the stored copy, except a week Claude Code may have partly deleted (up to the week of the oldest log on disk): there the stored copy stays when it has more turns and counted them the same way (version 2 on) ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
-| `kept` | bool | Shown, not stored: the week's figures came from the history file, because its logs are gone or the stored copy was fuller |
 
 ## Usage normalisation
 
@@ -238,6 +277,9 @@ cache_write_1h`. The cache-hit ratio used by P01 and P02 is
 | OpenAI Chat Completions | `prompt_tokens − prompt_tokens_details.cached_tokens` | `prompt_tokens_details.cached_tokens` | 0 | `completion_tokens` | `completion_tokens_details.reasoning_tokens` |
 | Gemini | `promptTokenCount − cachedContentTokenCount` | `cachedContentTokenCount` | 0 (managed-cache storage is priced separately) | `candidatesTokenCount + thoughtsTokenCount` | `thoughtsTokenCount` |
 
+**Built:** the prototype applies the Anthropic row (`pkg/normalize/anthropic`)
+and the first rule below, de-duplication.
+
 Rules:
 
 - Usage is counted **once per provider response** (response or message id).
@@ -245,7 +287,7 @@ Rules:
   line of a multi-block message — are de-duplicated, across all logs a run
   reads, not per log ([ADR 0026](adr/0026-usage-dedup-across-logs.md)).
   Within a log, the fullest of those blocks counts: an early line can carry
-  a partial output count ([ADR 0035](adr/0035-measurement-corrections.md)).
+  a partial output count ([ADR 0045](adr/0045-m0-measurement-method.md)).
 - For streamed responses, only the final usage is used.
 - Where the harness keeps its own cost record (`harness.cost_record`), calls
   it billed but did not log as turns — Claude Code's title generation, for
@@ -255,7 +297,7 @@ Rules:
   auxiliary calls included; the report shows unobserved spend where they do
   not ([ADR 0028](adr/0028-harness-recorded-signals.md)). Not built in M0:
   the prototype has no auxiliary turns, and reports the gap (about 13 %)
-  instead of passing the test ([ADR 0036](adr/0036-prices-reconciliation-status.md)).
+  instead of passing the test ([ADR 0045](adr/0045-m0-measurement-method.md)).
 - The Anthropic row was confirmed against usage blocks in local Claude Code
   transcripts (2026-11-05). The OpenAI and Gemini rows are from provider
   documentation and must be confirmed by recorded fixtures (conformance kit).
@@ -431,15 +473,18 @@ them.
 
 ## What leaves the machine
 
+Target. Today nothing leaves the machine: the prototype has no collector.
+
 In the default `hashes` capture mode, the team collector receives:
 
 - Session, Turn, ToolCall, Outcome, Finding and DetectorCoverage records.
 - Segments **without** `content`: keyed exact, content and line hashes, sizes,
   kinds.
 - Names as keyed hashes: file paths, URLs, repo, branch, MCP server and MCP
-  tool names. Each can be sent in plain text only if the organisation opts in
-  for that field (`privacy.plain_names`: `skill`, `plugin`, `repo`, `branch`, `path`, `url`,
-  `mcp` — MCP server and tool names — `developer` and `alias`).
+  tool names, skill, plugin and agent type names. Each can be sent in plain text only if the organisation opts in
+  for that field (`privacy.plain_names`: `skill`, `plugin`, `agent`, `repo`, `branch`,
+  `path`, `url`, `mcp` — MCP server and tool names — `developer` and
+  `alias`).
 - Developer ids and gateway key aliases as keyed hashes; the mapping to
   people stays on the customer side ([ADR 0024](adr/0024-developer-identity-and-key-handling.md)). The harness's own built-in tool names
   (for example `Read`, `Bash`) are sent in plain text; they reveal nothing about
@@ -452,6 +497,9 @@ which sessions share an (unnamed) item — is listed in
 
 ## Storage
 
+Target. Today the prototype stores only the
+[history file](#week-history-file).
+
 | Where | Engine | Retention (default) |
 |---|---|---|
 | Developer machine | DuckDB file `~/.trimloop/trimloop.duckdb`, mode 0600; encrypted only with full-content capture (ADR 0015) | 30 days of events; findings kept 1 year |
@@ -462,8 +510,16 @@ described in [packaging.md](packaging.md#bundled-components).
 
 ## Price catalogue
 
-A versioned YAML file of per-model prices by token class (input, output, cache
-write by TTL, cache read) and per-request prices for server-side tools (web
-search, web fetch), with effective dates. Shipped with each release and
-overridable for negotiated rates. Every cost figure records the catalogue
-version used.
+**Target:** a versioned YAML file of per-model prices by token class (input,
+output, cache write by TTL, cache read) and per-request prices for
+server-side tools (web search, web fetch), with effective dates. Shipped with
+each release and overridable for negotiated rates. Every cost figure records
+the catalogue version used.
+
+**Built:** a Go table in `pkg/price/price.go`, holding the data that file
+will hold, with one version string that every report records. Per model it
+has the five token-class rates, plus a long-prompt tier (different rates
+above an input size, cache reads and writes included), a fast-mode
+multiplier and a US-only inference multiplier, where the provider publishes
+them. Web search has one per-request price. It has no effective dates and
+cannot be overridden yet.

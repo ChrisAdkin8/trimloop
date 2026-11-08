@@ -445,3 +445,24 @@ func TestParseLineSumsIterations(t *testing.T) {
 		t.Errorf("split only: got %+v", m.Usage)
 	}
 }
+
+func TestParseLineLimitHit(t *testing.T) {
+	line := func(err, text string) string {
+		return `{"type":"assistant","uuid":"u9","sessionId":"s1","timestamp":"2026-10-09T21:52:07Z","isApiErrorMessage":true,"error":` + err +
+			`,"message":{"model":"<synthetic>","content":[{"type":"text","text":"` + text + `"}],"usage":{"input_tokens":0,"output_tokens":0}}}`
+	}
+	for _, c := range []struct{ text, want string }{
+		{"You've hit your session limit · resets 11:30pm (Europe/London)", "session"},
+		{"You've hit your weekly limit · resets 8am (Europe/London)", "weekly"},
+		{"You've hit your Opus limit", "other"},
+	} {
+		m, ok, err := parseLine([]byte(line(`"rate_limit"`, c.text)))
+		if err != nil || !ok || m.Kind != source.KindLimitHit || m.Limit != c.want || m.LineID != "u9" || m.Time.IsZero() {
+			t.Errorf("%q: got %+v, %v, %v; want a %s limit hit", c.text, m, ok, err, c.want)
+		}
+	}
+	// Another API error stays an empty reply, as before.
+	if m, ok, _ := parseLine([]byte(line(`"unknown"`, "API Error: Connection lost"))); !ok || m.Kind != source.KindTurn {
+		t.Errorf("other error: got %+v, %v", m, ok)
+	}
+}

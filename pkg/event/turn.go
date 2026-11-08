@@ -80,7 +80,7 @@ func (t Turn) Context() int { return t.Usage.InputTotal() }
 // out per Session.
 type Session struct {
 	ID       string // display id: session id, or session/agent for a subagent
-	Kind     string // "main" or "subagent"
+	Kind     SessionKind
 	ParentID string // for a subagent, the main session's id
 	Turns    []Turn // in time order
 
@@ -103,7 +103,27 @@ type Session struct {
 	// its last reply (the session ended, or the log was read, before another
 	// reply), or one followed straight away by another.
 	Unreplied []Compaction
+
+	// LimitHits are requests the harness refused because a usage limit was
+	// reached (subscription plans).
+	LimitHits []LimitHit
 }
+
+// LimitHit is a request refused because a usage limit was reached.
+type LimitHit struct {
+	At    time.Time
+	Limit string // "session" (the 5-hour limit), "weekly" or "other"
+}
+
+// SessionKind says whose session it is: one the user ran, or a sub-agent
+// Claude started for a side task.
+type SessionKind string
+
+// The kinds of session. Every session read from the logs is one of these.
+const (
+	MainSession     SessionKind = "main"
+	SubAgentSession SessionKind = "subagent"
+)
 
 // Start and End are the times of the session's first and last turns, zero
 // if no turn has a time.

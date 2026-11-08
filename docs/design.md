@@ -5,7 +5,17 @@
 | Status | Draft |
 | Last updated | 2026-11-08 |
 | Scope | Whole system, MVP through auto-fix |
-| Built | Only the M0 prototype: `trimloop analyse` (reports from Claude Code's logs) and the live nudges (`statusline`, `hook`, `setup`). Everything else here is design; [ROADMAP.md](../ROADMAP.md) and the Built column of the [ADR index](adr/README.md) say what exists |
+
+> **Today.** Only the M0 prototype is built. `trimloop analyse` reads Claude
+> Code's logs, finds waste and writes a summary, text, HTML or JSON report;
+> `trimloop setup`, `statusline` and `hook` give live nudges inside Claude
+> Code. The code is in `cmd/`, `internal/` and `pkg/` (see the
+> [README](../README.md#development)). How each figure is worked out:
+> [measurements.md](measurements.md). The measured figures:
+> [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance). What
+> is next: [ROADMAP.md](../ROADMAP.md) and the Built column of the
+> [ADR index](adr/README.md). **Everything else in this document is the
+> target design.**
 
 ## 1. Goals and non-goals
 
@@ -142,9 +152,10 @@ bodies) but zero-friction and safe to enable everywhere.
 ### 4.3 Transcript importer
 
 Reads session files the harness already writes, e.g. Claude Code's JSONL
-transcripts under `~/.claude/projects/` and Codex session logs. Works on
-history, so a new user gets findings on day one with no proxy. This is the MVP
-tap (see [ROADMAP.md](../ROADMAP.md)).
+transcripts under `~/.claude/projects/`. Works on history, so a new user gets
+findings on day one with no proxy. This is the MVP tap: the Claude Code
+reader is built; a reader for Codex session logs follows in M1 (see
+[ROADMAP.md](../ROADMAP.md)).
 
 ### 4.4 Gateway taps
 
@@ -152,11 +163,11 @@ Two forms, both covering traffic that never touches a developer machine (CI
 agents, background agents):
 
 - **Plugin plus sidecar (M1).** A thin plugin inside the gateway (LiteLLM
-  first) forwards raw events over loopback to a `trimloop serve` sidecar on the
-  same host, which normalises, fingerprints and runs the detectors. Only
-  hashes, counts, cost and findings go on to the team collector
-  ([analyzer.md §5.2](analyzer.md#52-gateway-sidecar-trimloop-serve),
-  ADRs [0005](adr/0005-thin-python-plugin-for-litellm.md) and
+  first) forwards raw events over loopback to a `trimloop serve` sidecar on
+  the same host. Only hashes, counts, cost and findings leave the host. The
+  sidecar is specified in
+  [analyzer.md §5.2](analyzer.md#52-gateway-sidecar-trimloop-serve)
+  (ADRs [0005](adr/0005-thin-python-plugin-for-litellm.md) and
   [0006](adr/0006-gateway-plugin-forwards-to-sidecar.md)).
 - **Log connectors (M2).** For gateways without a plugin (Portkey/Helicone log
   export, OpenRouter activity API): pulled or received by `trimloop serve` in
@@ -214,30 +225,25 @@ in a host is specified in [analyzer.md](analyzer.md).
 ### 6.1 Detectors
 
 A detector emits zero or more `Finding`s, each with evidence, wasted tokens by
-class, an estimated saving, a confidence and a reference to the fix that
-applies. The schema is defined once, in [data-model.md](data-model.md#finding).
+class, an estimated saving (an upper bound, plus a likely figure where one
+can be measured), a confidence and a reference to the fix that applies. The
+schema is defined once, in [data-model.md](data-model.md#finding).
 
-Turn- and session-scope detectors are versioned Go state machines that run
-unchanged over history and live traffic; cross-session detectors are SQL
-aggregates over the store ([ADR 0010](adr/0010-go-detectors-sql-aggregates.md),
-[analyzer.md §7](analyzer.md#7-detector-execution)). The full catalogue is in
-[patterns.md](patterns.md); their expected value is ranked in
-[value.md](value.md#2-the-levers-ranked-by-expected-value). The highest-value
-ones for the MVP, as first expected (measurement then put P19 large context,
-P09 resume bloat and P13 sub-agents first; the
-[ROADMAP build order](../ROADMAP.md#m0--transcript-analyser-mvp) has the
-measured order):
+In the target design, turn- and session-scope detectors will be versioned Go
+state machines that run unchanged over history and live traffic, and
+cross-session detectors will be SQL aggregates over the store
+([ADR 0010](adr/0010-go-detectors-sql-aggregates.md),
+[analyzer.md §7](analyzer.md#7-detector-execution)). Today the prototype's
+detectors are one-pass Go functions over finished sessions, in
+`pkg/detectors` (for example `FindLongPauses` for P09 and `FindEffort` for
+P14).
 
-- **Cache-prefix churn**: which segment broke the cached prefix, and how often.
-- **Cache TTL expiry**: idle gaps longer than the cache lifetime, forcing
-  re-writes.
-- **Repeated reads**: the same file fingerprint entering context N times.
-- **Oversized and noisy tool output**: whole-file views and broad searches
-  through the shell, verbose build and test logs, data dumps — costed by how
-  long each result is carried.
-- **Unused tool definitions**: MCP tools sent on every request, never called.
-- **Loops**: repeated identical tool calls, or edit → test → fail cycles with
-  no diff progress.
+The full catalogue is in [patterns.md](patterns.md); the expected value of
+each is ranked in [value.md](value.md#2-the-levers-ranked-by-expected-value).
+Which findings are built, and the order of the rest, are in the
+[ROADMAP build order](../ROADMAP.md#m0--transcript-analyser-mvp) and
+patterns.md; how each built one is worked out is in
+[measurements.md](measurements.md).
 
 ### 6.2 Recommendation engine (team collector)
 
@@ -326,9 +332,16 @@ the transform version, the sent request can be reproduced exactly.
 
 ## 8. Security and privacy
 
+**Today.** The M0 prototype reads logs on the developer machine and sends
+nothing anywhere. Its local reports show project names and session titles
+([ADR 0032](adr/0032-readable-reports.md)); its stored files hold numbers
+only; `trimloop setup --write` edits Claude Code's settings only when asked,
+after a backup ([ADR 0034](adr/0034-live-nudges.md)). The table below is the
+target design: keyed fingerprints, redaction, the proxy and signed policies
+are not built yet.
+
 | Threat | Mitigation |
 |---|---|
-| The M0 prototype | Reads logs on the developer machine and sends nothing anywhere. Its local reports show project names and session titles ([ADR 0032](adr/0032-readable-reports.md)); its stored files hold numbers only; `trimloop setup --write` edits Claude Code's settings only when asked, after a backup ([ADR 0034](adr/0034-live-nudges.md)). Keyed fingerprints below are not built yet |
 | Source code / secrets leaving the machine | Default `capture.content = hashes`; the team collector receives only keyed fingerprints, counts, cost and findings. Content is never uploaded; full capture is a per-repo opt-in that stays on the developer machine and never applies to a sidecar |
 | Guessing attacks on fingerprints (hash a likely path, URL or secret and look for a match) | Fingerprints are HMAC-SHA-256 with a customer-held key the collector never receives; names (paths, URLs, repo, branch, MCP servers) are keyed by default ([ADR 0011](adr/0011-keyed-fingerprints.md)) |
 | Secrets stored locally | Redaction before storage; by default the store holds only keyed hashes and is protected by file permissions. Encryption at rest becomes required when full-content capture is enabled ([ADR 0015](adr/0015-defer-local-store-encryption.md)) |

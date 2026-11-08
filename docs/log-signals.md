@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Analysis, 2026-11-07 — its §4 proposals were adopted in [ADR 0028](adr/0028-harness-recorded-signals.md); §7, a second pass measured in money, led to [ADR 0031](adr/0031-m0-order-from-measured-spend.md) |
-| Sample | One developer's machine: 598 logs (422 main sessions, 176 sub-agent logs), ~16,000 turns, $2,021 at list prices; Claude Code versions 2.1.288–2.1.318 |
+| Status | Analysis, 2026-11-07 — its §4 proposals were adopted in [ADR 0028](adr/0028-harness-recorded-signals.md); §7, a second pass measured in money, led to [ADR 0031](adr/0031-m0-order-from-measured-spend.md). §8 is kept current (last run 2026-11-08) |
+| Sample | §§1–7: one developer's machine, 598 logs (422 main sessions, 176 sub-agent logs), ~16,000 turns, $2,021 at list prices; Claude Code versions 2.1.288–2.1.318 |
 | Method | Structure-only survey (field names, counts, sizes, timings); no prompt or file content was read |
 | Builds on | [ADR 0027](adr/0027-measured-m0-findings.md) (measured P19 and P09), the M0 prototype's report, [patterns.md](patterns.md), [analyzer.md §10](analyzer.md#10-extensibility-harnesses-and-providers) |
 
@@ -23,6 +23,7 @@ Each `.jsonl` line has a `type`. Counts are from this sample.
 | `api-request` / `api-request-blob` / `api-request-shape` | 10,318 / 11,021 / 505 | The request as sent: `shapeHash` → shape (system prompt and tool list, sizes), `cacheControl` breakpoint paths, `keep` / `base` / `tail` (history editing), `params` (`max_tokens`, `thinking`, `context_management.edits`, `output_config.effort`, `betas`), `promptCacheRequested` (5m / 1h) |
 | `attachment` | 26,495 | Context the harness injects: kind, `renderedRole`, rendered bytes — `skill_listing`, `instructions`, `mcp_instructions_delta`, `environment`, `agent_listing_delta`, `deferred_tools_delta`, `sandbox_instructions`, `edited_text_file`, `total_tokens_reminder`, `queued_command`, `budget_usd`; `prompt_snapshot` records the full system prompt and tool list |
 | `system` | 2,886 | `subtype`: `turn_duration` (`durationMs`, `messageCount`), `api_error` (`retryAttempt`, `retryInMs`, `source`, `apiError`), `compact_boundary` with `compactMetadata` (`preTokens`, `postTokens`, `cumulativeDroppedTokens`, `durationMs`, `trigger`), `stop_hook_summary` with `hookInfos[].durationMs`, `away_summary` |
+| `assistant` with `error: "rate_limit"` | 2 | A usage limit was reached: `isApiErrorMessage`, `apiErrorStatus` 429, model `<synthetic>`, text naming the session (5-hour) or weekly limit and when it resets ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)) |
 | `cost-state` | 467 | **Claude Code's own accounting per session**: `totalCostUSD`, `modelUsage` per model (every token class, `costUSD`, `webSearchRequests`), `totalAPIDuration`, `totalAPIDurationWithoutRetries`, `totalToolDuration`, `totalDuration`, `totalLinesAdded`, `totalLinesRemoved` |
 | `queue-operation` | 3,110 | User queued a prompt while the agent was busy (`enqueue` / `dequeue` / `remove`) |
 | `tools-used`, `agent-setting`, `agent-name`, `fork-context-ref`, `relocated`, `ai-title`, `custom-title` | small | Session lineage (fork parent, relocation), sub-agent type and name, auto-generated titles |
@@ -220,7 +221,7 @@ they are not needed to explain P01 locally.
 | Turn record lacks fields the logs provide | data-model.md Turn | `effort`, `origin`, `entrypoint`, `requested_model`, `stop_reason`, `shape_hash`, `cache_ttl_requested`, `history_keep`; Session: `agent_type`, `spawn_depth`, `entrypoint` |
 | Outcome signals are thin | design.md §6.3 | Add lines changed, tool error rate, denials, queued interruptions, stale-file conflicts, retry time |
 | P07 scope | patterns.md P07 | Standing context includes harness-injected attachment kinds; attribute by kind |
-| P10, P12 and P14 wait for M3/M4 but need no fingerprints | patterns.md table; ROADMAP M0 | Candidates for M0 in reduced fidelity, like P09 (ADR 0027) — a decision for an ADR |
+| P10, P12 and P14 waited for M3/M4 but need no fingerprints | patterns.md table; ROADMAP M0 | Done for P10 and P14: built in M0 in reduced fidelity ([ADR 0031](adr/0031-m0-order-from-measured-spend.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)). P12 is adopted for M0 in reduced fidelity ([ADR 0028](adr/0028-harness-recorded-signals.md)) but not built |
 | Price catalogue has no per-request charges | data-model.md price catalogue | Add server-tool request prices |
 | New name-bearing fields | ADR 0011 / 0024 label registry | `agentName`, `customTitle`, `aiTitle`, `attributionSkill/Plugin/McpServer`, skill names in `skill_listing`: key them (`alias`, `mcp`, `tool`; add `skill`, `plugin`) or drop them |
 | Thinking content unavailable | analyzer.md `content.local` | State that reasoning text is not in transcripts; P14 uses counts and `effort` only |
@@ -292,31 +293,37 @@ of what a sub-agent returns could not be measured from it.
 
 ## 8. Measured figures at a glance
 
+**Latest run (2026-11-08):** 628 logs (627 sessions, about 18,200 turns)
+from 25 Sep to 8 Nov 2026 (44 days); $2,263 at list prices.
+
 The same developer's logs were measured several times as the code grew.
-Totals differ because the logs grew and the oldest were deleted, and some
-methods changed. How each figure is worked out today is in [measurements.md](measurements.md); this table keeps the values and why they changed. This table is the reference for figures other documents quote; where they differ, this table is the later measurement.
+Each value chain below shows changes of method; the logs also grew between
+runs (and the oldest were deleted), so steps caused only by that are left
+out. How each figure is worked out today is in
+[measurements.md](measurements.md); this table keeps the values and why
+they changed. It is the reference for figures other documents quote; where
+they differ, this table is the later measurement.
 
 | Figure | Value | When | Method |
 |---|---|---|---|
-| Total spend at list prices | $2,003 → $2,021 → $2,057 → $2,134 → $2,149 → $2,166 → $2,180 → $2,191 → $2,200 → $2,252 | 2026-11-06 → 11-08 | Usage counted once per message id, fullest line kept (ADR 0026, 0035); the logs kept growing |
-| Spend in turns over 200k tokens (P19) | 57–58 % | 11-06 → 11-08 | Input cost of those turns |
-| P19 saving, keeping turns under 200k | 31 % → 19 % ($415, then $424 as the logs grew) → **31 %** ($673) | 11-06 → 11-08 | Removed history first priced at the turn's average input price; then as a cache read (ADR 0035); then as a write where the cache was rebuilt (ADR 0039), by position (ADR 0040) |
-| Compact earlier, likely saving | $820–841 → $463 → $462 → $314 → $531 → $535 → **$554** ($533–$666; up to $849) | 11-07 → 11-08 | Replay of compacting at 200k; the steps are ADR 0035, 0037, 0038, 0039 and 0040, the current method is in [measurements.md](measurements.md) |
+| Total spend at list prices | $2,003 → **$2,263** | 2026-11-06 → 11-08 | Usage counted once per message id (ADR 0026), the fullest line kept (ADR 0035, about 0.9 % more output tokens); otherwise the rise is the logs growing |
+| Spend in turns over 200k tokens (P19) | **58 %** | 11-06 → 11-08 | Input cost of those turns |
+| P19 saving, keeping turns under 200k | 31 % → 19 % ($415) → **31 %** ($698) | 11-06 → 11-08 | Removed history first priced at the turn's average input price; then as a cache read (ADR 0035); then as a write where the cache was rebuilt (ADR 0039), by position (ADR 0040) |
+| Compact earlier, likely saving | $820–841 → $463 → $314 → $531 → **$558** ($537–$670; up to $854) | 11-07 → 11-08 | Replay of compacting at 200k: removed history as a cache read (ADR 0035), the real size after a compaction (ADR 0038), rebuilt-cache turns as writes (ADR 0039), then by position (ADR 0040); the current method is in [measurements.md](measurements.md) |
 | Size after a compaction | summary median 22–29k; first request after it median 80k → **92k** (middle half 57k–98k, 15 compactions) | 11-08 | The harness records only the summary; the next request also sends the system prompt, tools and re-attached files ([ADR 0038](adr/0038-real-size-after-compaction.md)) |
-| Re-writes after a break of over an hour (P09) | 17 % ($353–368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
+| Re-writes after a break of over an hour (P09) | **16 %** ($368) | 11-06 → 11-08 | Cache-write cost of the first turn back |
 | Of those, waits not on the user | 36 of 137, $72 → 31, $60 → **32, $62** | 11-08 | "Start fresh" counts only breaks the user took: up to $296 (likely $285) → $308 ($296) → **$306 ($294)**; who ended a wait: ADR 0037, 0038, 0039 |
-| Tool output (P04) | 2.2 % above 8k tokens per result; 12 % → **15 %** ($341) carried in all | 11-06; 11-07; 11-08 | 2.2 % is the saving from capping each result at 8k tokens (ADR 0027); 12 % is the cost of carrying all tool output; the report now uses a 2k target (about 3 %); 15 % prices rebuilt-cache turns as writes ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)) |
-| What every request carries (P07) | 4.3 % injected text → 11 % → **12 %** ($264) with system prompt and tool definitions | 11-07 → 11-08 | Carried like tool output (ADR 0033); injected text priced as a write on rebuilt-cache turns ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)) |
-| Sub-agents on a cheaper model (P13) | $235 → $271–274 → $281 → $284 → $287 → $289 → $291 → **$299** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)); every Opus and Fable model ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)); the logs kept growing |
-| Read only the lines you need (P03/P04) | about $76 of carried cost → card up to $48 → **$58** (rebuilt-cache turns as writes, ADR 0039) | 11-07 → 11-08 | $76 was the carried cost of file-view output the fix aims at; $48 is the card's upper bound, keeping each file-view result under the 2k-token target |
-| Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 409 sessions) | 11-07 → 11-08 | $0.18 of it is Claude Code pricing Sonnet 5.5 cache reads at $0.20, where the pricing page says $0.10 (ADR 0036). The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
-| Re-writes after breaks: earlier quotes | about $314–340 | 11-07 | The first message back after more than an hour, sessions over 200k; the same money as the P09 row |
-| Cache expiring during short waits (P02) | 86 waits, 84 in sub-agents; $101 → **$102** (what the expiry cost). Every 5-minute session on the hour's cache instead: **$22–23 more** (hindsight on the 34 that waited said $65 less) | 11-08 | First priced against the hour's cache; then against the cache still there; the hour's option over all 5-minute sessions, as ADR 0027 measured it ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
+| Tool output (P04) | 2.2 % above 8k tokens per result; 12 % → **15 %** ($350) carried in all | 11-06; 11-07; 11-08 | 2.2 % is the saving from capping each result at 8k tokens (ADR 0027); 12 % is the cost of carrying all tool output; the report now uses a 2k target (about 3 %); 15 % prices rebuilt-cache turns as writes ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)) |
+| Tool output: one-off script against the detector (P04) | script ≈ $379 carried (Bash $197, Read tool $136), 38 % of file views re-reads; detector ≈ $251, 23 % | 11-07 | The script carried output past compactions; the detector drops it there, as the harness does (≈ $449 if it did not), and an edit or compaction resets a re-read. The noisiest shell programs were file viewing and searching (`sed -n`, `grep`, `cat`), not builds or tests |
+| What every request carries (P07) | 4.3 % injected text → 11 % → **12 %** ($274) with system prompt and tool definitions | 11-07 → 11-08 | Carried like tool output (ADR 0033); injected text priced as a write on rebuilt-cache turns ([ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md)) |
+| Sub-agents on a cheaper model (P13) | $235 → $271 → $281 → $284 → **$301** (13 %) | 11-07 → 11-08 | First Opus 5.5 turns only; then Fable too, forks left out; prices checked against the pricing page ([ADR 0036](adr/0036-prices-reconciliation-status.md)); every Opus and Fable model ([ADR 0037](adr/0037-partial-weeks-prompts-compaction-nudges.md)) |
+| Read only the lines you need (P03/P04) | about $76 of carried cost → card up to $48 → **$59** (rebuilt-cache turns as writes, ADR 0039) | 11-07 → 11-08 | $76 was the carried cost of file-view output the fix aims at; $48 is the card's upper bound, keeping each file-view result under the 2k-token target |
+| Claude Code's records above the logs | 4.2 % → 3 % → 2.1 % → **13 %** ($202, 410 sessions) | 11-07 → 11-08 | $0.18 of it is Claude Code pricing Sonnet 5.5 cache reads at $0.20, where the pricing page says $0.10 (ADR 0036). The earlier figures compared records written partway through a session as if complete (their shortfalls cancelled real gaps); 13 % compares only sessions the records cover ([ADR 0035](adr/0035-measurement-corrections.md)) |
+| Cache expiring during short waits (P02) | 86 waits, 84 in sub-agents; $101 → **$102** (what the expiry cost). Every 5-minute session on the hour's cache instead: **about $24 more** (hindsight on the 34 that waited said $65 less) | 11-08 | First priced against the hour's cache; then against the cache still there; the hour's option over all 5-minute sessions, as ADR 0027 measured it ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
 | The hour's cache against 5 minutes | $761 → $376–$822 → about $593 → **$380–$825** | 11-08 | All turns of sessions on the hour, priced on the 5-minute cache; a range: only waits over 10 minutes losing the cache, against every wait over 5 (neither exact, the low end not a floor); a single likely figure from a thin sub-agent sample was tried and dropped ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
 | Main-session models (P13) | newer version **$29**; Fable 5.1 to Opus 5.5 **$79** (quality untested) | 11-08 | Same turns priced on the other model ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) |
-| Weekly totals of the new columns | short waits $102, top effort $110, cheaper choice $214 | 11-08 | Sums of the weekly figures; they equal the findings ([ADR 0043](adr/0043-weekly-trend-for-new-findings.md)) |
-| Effort above high (P14) | about $67 → $77 → $47 → **$41** | 11-07 → 11-08 | Turn by turn above high's mean output; then by each level's mean thinking per turn above high's; then within each model (every xhigh turn was Fable, most high turns Opus) ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
-| Spend in the costliest sessions | top 1: 23–24 % → **22 %**, top 5: 59 % → 60 % → **61 %**, top 10: 75 % → **76 %** | 11-07 → 11-08 | Main session with its sub-agents; the logs kept growing |
-| Sessions past 500k that never compacted | 6, about $292 | 11-07 → 11-08 | |
-| Costliest project | 22 % → 32 % | 11-07 | 22 % used each session's starting folder; 32 % counts each turn's own project, with worktrees under their project |
-
+| Effort above high (P14) | about $67 → $77 → $47 → **$42** | 11-07 → 11-08 | Turn by turn above high's mean output; then by each level's mean thinking per turn above high's; then within each model (every xhigh turn was Fable, most high turns Opus) ([ADR 0044](adr/0044-effort-thinking-and-cache-figures.md)) |
+| Spend in the costliest conversations | top 1 **22 %**, top 5 **61 %**, top 10 **76 %** | 11-07 → 11-08 | Main session with its sub-agents |
+| Sessions past 500k that never compacted | **6**, about $291 | 11-07 → 11-08 | |
+| Costliest project | 22 % → 32 % → **29 %** | 11-07 → 11-08 | 22 % used each session's starting folder; 32 % counts each turn's own project, with worktrees under their project; 29 % is the same method on the grown logs |
+| Usage limits reached | **2** in 45 days: 1 session (5-hour) limit on 9 Oct, 1 weekly limit on 10 Oct; plan Max 5× | 11-08 | Claude Code's own limit messages ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)); the share of the weekly limit each action saves needs status-line readings, none kept yet |

@@ -1,6 +1,6 @@
 # ADR 0008: One binary, one image, one Python package
 
-- Status: Proposed — build approach amended by [ADR 0014](0014-release-builds-per-os.md) (per-OS builds with open-source GoReleaser)
+- Status: Proposed — build approach amended by [ADR 0014](0014-release-builds-per-os.md) (per-OS builds with open-source GoReleaser); licensing settled by [ADR 0046](0046-licensing.md)
 - Date: 2026-11-05
 - Amends: [ADR 0002](0002-go-for-agent-and-proxy.md) (build and platform claims)
 
