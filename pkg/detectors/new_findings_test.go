@@ -81,3 +81,29 @@ func TestFindEffort(t *testing.T) {
 		t.Errorf("levels: got %+v", f.ByLevel)
 	}
 }
+
+// The weekly figures for P02, P14 and main-session models add up to the
+// findings.
+func TestFindWeeklyNewFigures(t *testing.T) {
+	mon := time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)
+	at := func(x event.Turn, d time.Duration) event.Turn { x.Time = mon.Add(d); return x }
+	m := "claude-opus-5-5"
+	sub := event.Session{ID: "m/a", Kind: "subagent", Turns: []event.Turn{
+		at(pricedTurn(m, event.Usage{CacheWrite5m: 100_000}, 0), 0),
+		at(pricedTurn(m, event.Usage{CacheWrite5m: 103_000}, 20*time.Minute), 20*time.Minute),
+	}}
+	maxTurn := at(pricedTurn("claude-opus-5", event.Usage{CacheRead: 1000, Output: 1000}, 0), time.Hour)
+	maxTurn.Effort = "max"
+	main := event.Session{ID: "m", Kind: "main", Turns: []event.Turn{maxTurn}}
+	sessions := []event.Session{sub, main}
+	w := FindWeekly(sessions, 200_000, time.Hour, time.UTC)
+	if len(w) != 1 {
+		t.Fatalf("got %+v", w)
+	}
+	if want := FindCacheLife(sessions, 1).Saving; !near(w[0].ShortWaits, want) || want == 0 {
+		t.Errorf("short waits: got %v, want %v", w[0].ShortWaits, want)
+	}
+	if !near(w[0].TopEffort, maxTurn.Cost.Output) || !near(w[0].OlderModels, maxTurn.Cost.Total()) {
+		t.Errorf("effort and models: got %+v", w[0])
+	}
+}

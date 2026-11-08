@@ -89,7 +89,7 @@ Decided in ADR 0035 (decision 2), 0039 (decision 1) and 0040.
 | **P14** effort | Spend by the effort level each request asked for; saving: on xhigh and max turns, output above the mean output of a high-effort turn, at the turn's output price (an upper bound) | `FindEffort`, `ForEffort` | ADR 0028, 0042 |
 | **P13** | Sub-agent turns priced again on the suggested cheaper model; forks left out. Also: the share of sub-agent spend that is cache writes, and how many times each written token is read again, against main sessions; runs whose context passed 200k | `FindSubAgents` | ADR 0031, 0036, 0037 |
 | Reconciliation | Claude Code's own cost record for each main session it covers, against the logged cost of that session and its sub-agents. The difference is reported as spend the logs do not record; ADR 0028's test (within 2 %) is not passed in M0. Web searches are priced at $0.01 each here; they are not in total spend, which comes from the logs | `FindReconciliation` | ADR 0033, 0035, 0036 |
-| Weekly figures | By calendar week, local time; kept in a history file; the oldest weeks keep a fuller stored copy when turns were counted the same way | `FindWeekly`, `history.Merge` | ADR 0033, 0035, 0037, 0038, 0039 |
+| Weekly figures | By calendar week, local time; kept in a history file; the oldest weeks keep a fuller stored copy when turns were counted the same way. Each week also keeps the P02 short-wait saving, the output cost of xhigh and max turns, and main-session spend on older models, so the cards can be checked week by week | `FindWeekly`, `history.Merge` | ADR 0033, 0035, 0037, 0038, 0039, 0043 |
 
 ## 4. Live nudges
 

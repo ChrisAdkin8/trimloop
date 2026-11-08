@@ -41,64 +41,81 @@ type CacheLife struct {
 	Top []SessionStat `json:"top"`
 }
 
+// shortWait is one P02 turn: its index in the session and what the hour's
+// cache would have saved on it.
+type shortWait struct {
+	turn   int
+	saving float64
+}
+
+// shortWaits finds the P02 turns of a session: after a wait of 5 minutes to
+// an hour, in a session whose latest cache write was on the 5-minute cache,
+// with the cache expired. The saving is the turn's cost less what it would
+// have cost on the hour's cache (the earlier context read, the new part
+// written).
+func shortWaits(s event.Session) []shortWait {
+	var out []shortWait
+	life := time.Duration(0) // the lifetime of the session's latest cache write so far
+	prev := 0                // the previous turn's context
+	for i, t := range s.Turns {
+		u := t.Usage
+		ctx := t.Context()
+		if i > 0 && t.Priced && !t.CompactedBefore && life == shortLife &&
+			t.IdleBefore > shortLife && t.IdleBefore <= longLife &&
+			t.Model == s.Turns[i-1].Model && u.CacheRead < ctx/5 {
+			warm := event.Usage{InputUncached: u.InputUncached, Output: u.Output,
+				CacheRead: min(prev, ctx-u.InputUncached), CacheWrite1h: max(0, ctx-u.InputUncached-prev)}
+			if alt, ok := price.Cost(t.Model, warm, price.Options{Fast: t.Fast, USOnly: t.USOnly}); ok && t.Cost.Total() > alt.Total() {
+				out = append(out, shortWait{turn: i, saving: t.Cost.Total() - alt.Total()})
+			}
+		}
+		switch {
+		case u.CacheWrite1h > 0:
+			life = longLife
+		case u.CacheWrite5m > 0:
+			life = shortLife
+		}
+		prev = ctx
+	}
+	return out
+}
+
 // FindCacheLife reports P02 and the 1-hour comparison.
 func FindCacheLife(sessions []event.Session, topN int) CacheLife {
 	var f CacheLife
 	stats := map[string]*SessionStat{}
 	for _, s := range sessions {
-		life := time.Duration(0) // the lifetime of the session's latest cache write so far
-		prev := 0                // the previous turn's context
-		for i, t := range s.Turns {
+		for _, w := range shortWaits(s) {
+			t := s.Turns[w.turn]
+			f.Waits++
+			if s.Kind == "subagent" {
+				f.SubAgent++
+			}
+			f.Cost += t.Cost.Total()
+			f.Saving += w.saving
+			st := stat(stats, s.ID)
+			st.Turns++
+			st.Cost += t.Cost.Total()
+			st.Saving += w.saving
+			st.Peak = max(st.Peak, t.Context())
+		}
+		for _, t := range s.Turns {
 			u := t.Usage
-			ctx := t.Context()
-			opts := price.Options{Fast: t.Fast, USOnly: t.USOnly}
-
-			// P02: expired after a 5-minute-to-an-hour wait on the 5-minute cache.
-			if i > 0 && t.Priced && !t.CompactedBefore && life == shortLife &&
-				t.IdleBefore > shortLife && t.IdleBefore <= longLife &&
-				t.Model == s.Turns[i-1].Model && u.CacheRead < ctx/5 {
-				// On the hour's cache, the previous context would have been read
-				// and only what is new written.
-				warm := event.Usage{InputUncached: u.InputUncached, Output: u.Output,
-					CacheRead: min(prev, ctx-u.InputUncached), CacheWrite1h: max(0, ctx-u.InputUncached-prev)}
-				if alt, ok := price.Cost(t.Model, warm, opts); ok && t.Cost.Total() > alt.Total() {
-					saving := t.Cost.Total() - alt.Total()
-					f.Waits++
-					if s.Kind == "subagent" {
-						f.SubAgent++
-					}
-					f.Cost += t.Cost.Total()
-					f.Saving += saving
-					st := stat(stats, s.ID)
-					st.Turns++
-					st.Cost += t.Cost.Total()
-					st.Saving += saving
-					st.Peak = max(st.Peak, ctx)
-				}
+			if !t.Priced || u.CacheWrite1h == 0 {
+				continue
 			}
-
 			// The hour against 5 minutes, for turns that wrote with the hour.
-			if t.Priced && u.CacheWrite1h > 0 {
-				short := u
-				short.CacheWrite5m, short.CacheWrite1h = u.CacheWrite5m+u.CacheWrite1h, 0
-				if u.CacheRead > 0 && t.IdleBefore > shortLife {
-					// The 5-minute cache would have expired: all of it written again.
-					short.CacheWrite5m += short.CacheRead
-					short.CacheRead = 0
-				}
-				if alt, ok := price.Cost(t.Model, short, opts); ok {
-					f.HourActual += t.Cost.Total()
-					f.HourAsShort += alt.Total()
-				}
+			short := u
+			short.CacheWrite5m, short.CacheWrite1h = u.CacheWrite5m+u.CacheWrite1h, 0
+			if u.CacheRead > 0 && t.IdleBefore > shortLife {
+				// The 5-minute cache would have expired: all of it written again.
+				short.CacheWrite5m += short.CacheRead
+				short.CacheRead = 0
 			}
-
-			switch {
-			case u.CacheWrite1h > 0:
-				life = longLife
-			case u.CacheWrite5m > 0:
-				life = shortLife
+			if alt, ok := price.Cost(t.Model, short, price.Options{Fast: t.Fast, USOnly: t.USOnly}); ok {
+				f.HourActual += t.Cost.Total()
+				f.HourAsShort += alt.Total()
 			}
-			prev = ctx
 		}
 	}
 	f.Sessions = len(stats)

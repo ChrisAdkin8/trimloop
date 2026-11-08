@@ -247,6 +247,9 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 	for _, s := range r.Pause.Top {
 		want[s.SessionID] = true
 	}
+	for _, s := range r.CacheLife.Top {
+		want[s.SessionID] = true
+	}
 	for _, c := range r.Growth.Top {
 		want[c.ID] = true
 	}

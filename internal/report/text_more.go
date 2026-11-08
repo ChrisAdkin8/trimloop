@@ -71,7 +71,8 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 		return
 	}
 	fmt.Fprintln(w, "\nWEEK BY WEEK")
-	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s %9s %7s\n", "week of", "spend", "turns", "large ctx", "sub-agents", "tool out", "re-reads", "breaks", "compact")
+	fmt.Fprintf(w, "    %-11s %9s %8s %10s %10s %10s %8s %9s %7s %9s %9s %9s\n", "week of", "spend", "turns", "large ctx", "sub-agents",
+		"tool out", "re-reads", "breaks", "compact", "short wt", "top eff", "old mdl")
 	for _, k := range weeks {
 		kept := ""
 		if k.Kept {
@@ -80,9 +81,10 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 		if olderFigures(k, prices) {
 			kept += "  (older prices or method)"
 		}
-		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%% %9s %7d%s\n", k.Week, money(k.Spend), thousands(k.Turns),
+		fmt.Fprintf(w, "    %-11s %9s %8s %9.0f%% %9.0f%% %10s %7.0f%% %9s %7d %9s %9s %9s%s\n", k.Week, money(k.Spend), thousands(k.Turns),
 			pct(k.LargeContext, k.Spend), pct(k.SubAgents, k.Spend), money(k.ToolOutput),
-			pct(float64(k.Rereads), float64(k.FileViews)), money(k.PauseRewrite), k.Compactions, kept)
+			pct(float64(k.Rereads), float64(k.FileViews)), money(k.PauseRewrite), k.Compactions,
+			money(k.ShortWaits), money(k.TopEffort), money(k.OlderModels), kept)
 	}
 }
 

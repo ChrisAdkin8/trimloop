@@ -205,6 +205,9 @@ Numbers only: no names, titles, paths or session ids.
 | `pause_rewrite` | number | Cache re-writes after long breaks the user took, in main sessions (P09; analysis version 4; a stored week from an earlier version counted other waits too, and reports mark it as older) |
 | `tool_output` | number | Carried cost of tool output added that week (P04; since version 4, carried history on rebuilt-cache turns is priced as a write) |
 | `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
+| `short_waits` | number | What the hour's cache would have saved after 5–60 minute waits on the 5-minute cache (P02; version 5, [ADR 0043](adr/0043-weekly-trend-for-new-findings.md)) |
+| `top_effort` | number | Output cost of xhigh and max turns (P14; version 5) |
+| `older_models` | number | Main-session spend on a model with a newer version or a cheaper tier (P13; version 5) |
 | `compactions` | int | |
 | `prices` | string | Price catalogue version the figures used |
 | `analysis` | int | Analysis version that worked the figures out. A week the logs still hold replaces the stored copy, except a week Claude Code may have partly deleted (up to the week of the oldest log on disk): there the stored copy stays when it has more turns and counted them the same way (version 2 on) ([ADR 0038](adr/0038-real-size-after-compaction.md)) |

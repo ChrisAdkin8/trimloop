@@ -50,6 +50,7 @@ and M4 automatic fixes).
 | [0040](0040-position-pricing-and-one-method-page.md) | Removed history priced by position; one page for the current method | Measurements, docs (M0) | Yes |
 | [0041](0041-compaction-edges-and-quartile-rule.md) | Compaction edge cases and the quartile rule | Measurements (M0) | Yes |
 | [0042](0042-p02-p14-and-main-session-models.md) | P02, P14 and main-session models in M0 | Detectors (M0) | Yes |
+| [0043](0043-weekly-trend-for-new-findings.md) | Weekly figures for P02, P14 and main-session models | Reports, history (M0) | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

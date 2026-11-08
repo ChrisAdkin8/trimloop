@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
+	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
 // Week is one calendar week's figures, so a change can be compared before
@@ -23,6 +24,12 @@ type Week struct {
 	Rereads      int     `json:"rereads"`
 	Compactions  int     `json:"compactions"`
 
+	// Added in analysis version 5, so the P02, P14 and P13 main-session
+	// cards can be checked week by week (ADR 0043).
+	ShortWaits  float64 `json:"short_waits"`  // what the hour's cache would have saved after 5-60 minute waits (P02)
+	TopEffort   float64 `json:"top_effort"`   // output cost of xhigh and max turns (P14)
+	OlderModels float64 `json:"older_models"` // main-session spend on a model with a newer version or a tier down (P13)
+
 	Prices string `json:"prices,omitempty"` // price catalogue the figures used
 	// Analysis is the AnalysisVersion that worked the figures out.
 	Analysis int `json:"analysis,omitempty"`
@@ -38,8 +45,9 @@ type Week struct {
 // version 3 counts only breaks the user took in PauseRewrite; version 4
 // prices carried tool output as a write on rebuilt-cache turns, leaves
 // sub-agent pauses out of PauseRewrite, counts refusals as the user's and
-// compactions after a session's last reply (ADR 0039).
-const AnalysisVersion = 4
+// compactions after a session's last reply (ADR 0039); version 5 adds the
+// short-wait, top-effort and older-model figures (ADR 0043).
+const AnalysisVersion = 5
 
 // TurnsCountedSince is the first AnalysisVersion that counts turns as this
 // one does, so turn counts from it on can be compared.
@@ -66,11 +74,26 @@ func FindWeekly(sessions []event.Session, threshold int, pauseGap time.Duration,
 		return w
 	}
 	for _, s := range sessions {
+		for _, sw := range shortWaits(s) {
+			if t := s.Turns[sw.turn]; !t.Time.IsZero() {
+				get(t.Time).ShortWaits += sw.saving
+			}
+		}
 		for _, t := range s.Turns {
 			if t.Time.IsZero() {
 				continue
 			}
 			w := get(t.Time)
+			if t.Priced && (t.Effort == "xhigh" || t.Effort == "max") {
+				w.TopEffort += t.Cost.Output
+			}
+			if t.Priced && s.Kind != "subagent" {
+				_, newer := price.Successor(t.Model)
+				_, tier := price.LowerTier(t.Model)
+				if newer || tier {
+					w.OlderModels += t.Cost.Total()
+				}
+			}
 			w.Spend += t.Cost.Total()
 			w.Turns++
 			if t.Context() > threshold && t.Priced {

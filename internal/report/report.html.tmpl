@@ -195,18 +195,18 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table>
-    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="barcell"></th></tr></thead>
+    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="n">Short waits</th><th class="n">Top effort</th><th class="n">Older models</th><th class="barcell"></th></tr></thead>
     <tbody>
     {{range .Weeks}}<tr>
       <td style="white-space:nowrap">{{weekStart .Week}}{{if .Kept}} <span class="muted small">(kept)</span>{{end}}{{if $.Older .}} <span class="muted small">(older prices or method)</span>{{end}}{{if eq .Week $.ThisWeek}} <span class="muted small">(so far)</span>{{end}}</td>
       <td class="n">{{dollars .Spend}}</td><td class="n">{{thousands .Turns}}</td>
       <td class="n">{{pct .LargeContext .Spend}}</td><td class="n">{{pct .SubAgents .Spend}}</td>
-      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td>
+      <td class="n">{{dollars .ToolOutput}}</td><td class="n">{{pct (float .Rereads) (float .FileViews)}}</td><td class="n">{{dollars .PauseRewrite}}</td><td class="n">{{.Compactions}}</td><td class="n">{{dollars .ShortWaits}}</td><td class="n">{{dollars .TopEffort}}</td><td class="n">{{dollars .OlderModels}}</td>
       <td class="barcell"><div class="bar" style="width: {{width .Spend $.MaxWeek}}%"></div></td>
     </tr>{{end}}
     </tbody>
   </table></div>
-  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
+  <p class="muted small">"In large turns": the week's spend sent in turns over {{short .Context.Threshold}} tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Short waits": what the hour's cache would have saved after waits of 5 minutes to an hour. "Top effort": the output cost of xhigh and max turns. "Older models": main-session spend on a model with a newer version or a cheaper tier. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older prices or method": worked out with an earlier price list or analysis, so they may not compare exactly.</p>
 </div>
 </details>
 </section>
@@ -240,7 +240,13 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   {{end}}
   {{with .CacheLife}}
   <h3>Shorter waits</h3>
-  {{if .Waits}}<p>Sub-agents keep their cache for 5 minutes, not an hour. {{.Waits}} times ({{.SubAgent}} in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: {{dollars .Cost}}, of which {{dollars .Saving}} the hour's cache would have saved.</p>{{else}}<p>No session on the 5-minute cache waited long enough to lose it.</p>{{end}}
+  {{if .Waits}}<p>Sub-agents keep their cache for 5 minutes, not an hour. {{.Waits}} times ({{.SubAgent}} in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: {{dollars .Cost}}, of which {{dollars .Saving}} the hour's cache would have saved.</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Session</th><th class="n" data-sort>Waits</th><th class="n" data-sort>Largest context</th><th class="n" data-sort>Hour's cache saves</th></tr></thead>
+    <tbody>
+    {{range .Top}}{{$l := $.Name .SessionID}}<tr><td class="name session">{{template "session" (args $l .SessionID)}}</td><td class="n" data-v="{{.Turns}}">{{.Turns}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td><td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td></tr>{{end}}
+    </tbody>
+  </table></div>{{else}}<p>No session on the 5-minute cache waited long enough to lose it.</p>{{end}}
   {{if gt .HourAsShort .HourActual}}<p class="muted small">Keeping the cache for an hour cost {{dollars (sub .HourAsShort .HourActual)}} less than the 5-minute cache would have, on the turns that used it: the hour pays for itself here.</p>{{end}}
   {{end}}
 </div>
@@ -381,6 +387,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   <dt>Session</dt><dd>One Claude Code conversation, with any sub-agents it started. Every turn sends the whole session so far.</dd>
   <dt>Session size</dt><dd>How many tokens a turn sends: everything said so far, including tool output.</dd>
   <dt>Cache</dt><dd>A saved copy of the session that Claude can re-read cheaply. It expires after 5 minutes or 1 hour without use.</dd>
+  <dt>Effort level</dt><dd>How hard Claude is asked to think before answering: low, medium, high, xhigh or max. Higher levels write more output, which costs more, and suit hard problems.</dd>
   <dt>Compact</dt><dd>Replace the session with a short summary (/compact in Claude Code).</dd>
   <dt>Sub-agent</dt><dd>A helper Claude starts for a side task; only its final report returns to the main session.</dd>
   <dt>MCP server</dt><dd>A connected tool provider, such as a browser or an issue tracker.</dd>
