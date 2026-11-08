@@ -349,7 +349,10 @@ request has no safe, defined operation.) The M0 report recommends starting a new
 over an hour (or compacting *before* the break, while the cache is warm:
 compacting after it re-sends the whole conversation), with a likely saving
 from pricing each post-pause turn as a new session's first request
-([ADR 0032](adr/0032-readable-reports.md)).
+([ADR 0032](adr/0032-readable-reports.md)). Live nudges show the cache
+countdown and, once it has expired, the cost of the next message; over
+500k tokens the first message back is held once
+([ADR 0034](adr/0034-live-nudges.md)).
 
 ## P10 — Compaction thrash
 
@@ -574,7 +577,9 @@ Overlaps P09; the two are never added.
 limit), or start a new session per task. The report estimates a likely
 saving for compacting by replaying each session as if compacted to the
 typical post-compaction size whenever it passed the threshold, including
-each compaction's cost ([ADR 0032](adr/0032-readable-reports.md)). Where P04, P07 or P08 are
+each compaction's cost ([ADR 0032](adr/0032-readable-reports.md)). Live
+nudges remind the user at 200k and 500k tokens and show the size in the
+status line ([ADR 0034](adr/0034-live-nudges.md)). Where P04, P07 or P08 are
 detected, report them as the causes: they say *what* fills the context.
 
 **Requires:** `usage.cache_read`. **Optional:** `usage.cache_write`,

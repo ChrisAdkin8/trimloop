@@ -48,7 +48,9 @@ and compaction point, with P10 from compaction records; spend by project,
 skill, plugin and MCP server; reconciliation with the harness cost record;
 P07 priced by carried cost, including the system prompt and tool
 definitions; weekly figures kept between runs
-([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
+([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md));
+live nudges in Claude Code — status line, after-reply and before-send hooks,
+and `trimloop setup` ([ADR 0034](docs/adr/0034-live-nudges.md)).
 
 1. Saved offsets, so a re-run reads only new lines.
 2. Command-line options: `analyse`, `--since`, `--repo` (`--format` and

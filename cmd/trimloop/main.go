@@ -16,20 +16,98 @@ import (
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/internal/history"
+	"github.com/ChrisAdkin8/trimloop/internal/live"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "statusline", "hook", "setup":
+			os.Exit(runLive(os.Args[1], os.Args[2:]))
+		case "analyse", "analyze":
+			os.Args = append(os.Args[:1], os.Args[2:]...)
+		}
+	}
+	analyse()
+}
+
+// runLive runs the commands Claude Code calls while a session is open, and
+// the setup that tells Claude Code about them (ADR 0034).
+func runLive(cmd string, args []string) int {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 0 // the nudges must never get in the way
+	}
+	env := live.DefaultEnv(home)
+	switch cmd {
+	case "statusline":
+		live.StatusLine(os.Stdin, os.Stdout, env)
+	case "hook":
+		if len(args) == 1 {
+			live.Hook(args[0], os.Stdin, os.Stdout, env)
+		}
+	case "setup":
+		return setup(args, home)
+	}
+	return 0
+}
+
+// setup prints the Claude Code settings for the nudges, or adds them to a
+// settings file with --write.
+func setup(args []string, home string) int {
+	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
+	write := fs.String("write", "", "add the settings to this Claude Code settings file (a backup is made first), e.g. "+
+		filepath.Join(home, ".claude", "settings.json"))
+	replace := fs.Bool("replace-statusline", false, "replace an existing status line")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	if strings.Contains(exe, "go-build") {
+		fmt.Fprintln(os.Stderr, "This trimloop was started by 'go run' from a temporary folder. Build it first, for example:\n"+
+			"  go build -o ~/.local/bin/trimloop ./cmd/trimloop\nthen run that binary's setup.")
+		return 1
+	}
+	if *write == "" {
+		fmt.Println("Add this to ~/.claude/settings.json (or a project's .claude/settings.json), or run")
+		fmt.Println("'trimloop setup --write <file>' to add it for you:")
+		fmt.Println()
+		fmt.Println(live.SetupSnippet(exe))
+		return 0
+	}
+	backup, err := live.WriteSettings(*write, exe, *replace)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	fmt.Printf("Added trimloop's status line and hooks to %s.\n", *write)
+	if backup != "" {
+		fmt.Printf("The previous file is saved as %s.\n", backup)
+	}
+	fmt.Println("They take effect in new Claude Code sessions.")
+	return 0
+}
+
+// analyse reads every session log and writes the report.
+func analyse() {
 	format := flag.String("format", "summary", "report format: summary (a few lines), text (the full report), html or json")
 	out := flag.String("out", "", "write the report to this file (default: standard output, or "+defaultHTML+" for html)")
 	noTitles := flag.Bool("no-titles", false, "leave out session titles, which summarise what was asked")
 	historyPath := flag.String("history", "", "file that keeps weekly figures between runs (default ~/.trimloop/history.json)")
 	noHistory := flag.Bool("no-history", false, "do not read or update the history file")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [--format summary|text|html|json] [--out FILE] [--no-titles] [--history FILE | --no-history]\n\n"+
-			"Analyses Claude Code session logs on this machine for token waste.\n\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: trimloop [analyse] [--format summary|text|html|json] [--out FILE] [--no-titles] [--history FILE | --no-history]\n"+
+			"       trimloop setup [--write SETTINGS_FILE] [--replace-statusline]\n"+
+			"       trimloop statusline | trimloop hook stop|prompt   (run by Claude Code)\n\n"+
+			"Analyses Claude Code session logs on this machine for token waste. 'setup' adds live\n"+
+			"nudges to Claude Code: a status line and two hooks.\n\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()

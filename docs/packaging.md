@@ -49,6 +49,8 @@ before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.m
 | Command | Purpose |
 |---|---|
 | `trimloop analyse` | Standalone analysis of session transcripts (M0) |
+| `trimloop statusline`, `trimloop hook stop\|prompt` | Live nudges, run by Claude Code (M0, [ADR 0034](adr/0034-live-nudges.md)) |
+| `trimloop setup` | Print or add the Claude Code settings for the live nudges |
 | `trimloop serve` | Sidecar, connector or team collector, depending on configuration |
 | `trimloop serve --extproc` | Envoy external-processing server |
 | `trimloop proxy` | Local forward/reverse proxy |

@@ -1,9 +1,11 @@
 package claudecode
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -273,5 +275,40 @@ func TestParseLineCostRecord(t *testing.T) {
 	want := event.ModelRecord{Cost: 0.5, InputUncached: 10, CacheRead: 3, CacheWrite: 4, Output: 2, WebSearches: 7}
 	if m.Record.ByModel["claude-haiku-5-5"] != want {
 		t.Errorf("got %+v", m.Record.ByModel)
+	}
+}
+
+func TestLastResponse(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.jsonl")
+	writeFile(t, p, ""+
+		`{"type":"assistant","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","usage":{"cache_read_input_tokens":100}}}`+"\n"+
+		`{"type":"assistant","timestamp":"2026-11-01T09:05:00Z","message":{"id":"m2","usage":{"cache_read_input_tokens":200}}}`+"\n"+
+		`{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":"ok"}]}}`+"\n"+
+		`{"type":"assistant","message":{"id":"m3","usage":{"cache_read_input_tokens":3`) // still being written
+	m, err := LastResponse(p)
+	if err != nil || m.ID != "m2" || m.Usage.CacheRead != 200 {
+		t.Errorf("got %+v, %v; want m2", m, err)
+	}
+
+	empty := filepath.Join(t.TempDir(), "e.jsonl")
+	writeFile(t, empty, `{"type":"user","message":{"role":"user","content":"hi"}}`+"\n")
+	if _, err := LastResponse(empty); !errors.Is(err, ErrNoResponse) {
+		t.Errorf("got %v, want ErrNoResponse", err)
+	}
+	if _, err := LastResponse(filepath.Join(t.TempDir(), "missing")); err == nil {
+		t.Error("got no error for a missing file")
+	}
+}
+
+// Only the end of a large log is read; a line cut by the start is skipped.
+func TestLastResponseLargeLog(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "big.jsonl")
+	filler := `{"type":"user","message":{"role":"user","content":"` + strings.Repeat("x", 4000) + `"}}` + "\n"
+	writeFile(t, p, `{"type":"assistant","message":{"id":"early","usage":{"output_tokens":1}}}`+"\n"+
+		strings.Repeat(filler, 400)+
+		`{"type":"assistant","message":{"id":"late","usage":{"output_tokens":2}}}`+"\n")
+	m, err := LastResponse(p)
+	if err != nil || m.ID != "late" {
+		t.Errorf("got %+v, %v", m, err)
 	}
 }

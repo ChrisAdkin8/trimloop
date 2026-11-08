@@ -8,7 +8,9 @@ output) and test with `go test ./...`. The
 report code is in `internal/report`; all formats render one
 `report.Results`. Weekly figures are kept in `~/.trimloop/history.json`
 (`internal/history`; pass `--no-history` or `--history FILE` when testing
-against real logs). Before a commit, run `scripts/check.sh` (gofmt, vet,
+against real logs). Live nudges (`trimloop statusline`, `hook`, `setup`)
+are in `internal/live`; they write under `~/.trimloop`, so set `HOME` to a
+scratch folder when trying them by hand. Before a commit, run `scripts/check.sh` (gofmt, vet,
 golangci-lint per `.golangci.yml`, race tests, govulncheck; `--offline` skips
 govulncheck) and keep it passing.
 

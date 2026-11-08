@@ -106,6 +106,21 @@ even once Claude Code has deleted the old logs. `--history FILE` moves the
 file; `--no-history` neither reads nor writes it
 ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
 
+### Live nudges in Claude Code
+
+Trimloop can also nudge you while you work: a status line showing the
+conversation's size, its cost and the cache countdown, a message when a
+session passes 200k and 500k tokens, and a one-time pause before an
+expensive message after a long break
+([ADR 0034](docs/adr/0034-live-nudges.md)). Build the binary, then add its
+settings to Claude Code:
+
+```bash
+go build -o ~/.local/bin/trimloop ./cmd/trimloop
+~/.local/bin/trimloop setup                                   # print the settings to add
+~/.local/bin/trimloop setup --write ~/.claude/settings.json   # or add them (a backup is made)
+```
+
 ## Development setup
 
 Install the SDKs and tools needed to build Trimloop (macOS with Homebrew, or
