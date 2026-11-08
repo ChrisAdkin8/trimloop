@@ -35,8 +35,11 @@ type Week struct {
 // AnalysisVersion changes whenever a fix changes how the weekly figures are
 // worked out, so figures kept from an older version can be replaced.
 // Version 2 stopped counting made-up replies as turns and copied lines twice;
-// version 3 counts only breaks the user took in PauseRewrite.
-const AnalysisVersion = 3
+// version 3 counts only breaks the user took in PauseRewrite; version 4
+// prices carried tool output as a write on rebuilt-cache turns, leaves
+// sub-agent pauses out of PauseRewrite, counts refusals as the user's and
+// compactions after a session's last reply (ADR 0039).
+const AnalysisVersion = 4
 
 // TurnsCountedSince is the first AnalysisVersion that counts turns as this
 // one does, so turn counts from it on can be compared.

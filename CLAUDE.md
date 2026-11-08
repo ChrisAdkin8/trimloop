@@ -19,7 +19,10 @@ govulncheck) and keep it passing.
 
 - Read `docs/design.md` first; `docs/patterns.md` and `docs/data-model.md` hold
   the detail. Decisions live in `docs/adr/` — add a new ADR rather than
-  silently changing a decision.
+  silently changing a decision. When a measurement method changes, update
+  `docs/measurements.md` (how each reported figure is worked out today) and
+  the figures in `docs/log-signals.md` §8; older docs point there rather than
+  restating new figures.
 - Pattern IDs (P01–P19) and safety levels (L0–L3) are referenced across all
   docs. Keep them consistent when editing.
 - Planned stack: Go (agent, proxy, CLI, detectors), SQL aggregates on DuckDB

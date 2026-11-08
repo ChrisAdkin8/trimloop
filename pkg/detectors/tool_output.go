@@ -210,6 +210,38 @@ func historyRate(t event.Turn) float64 {
 	return prefixRate(t)
 }
 
+// removedCost is what n tokens of history would have cost on turn t, priced
+// by where they sit in its request. The request reads [0, R) from the
+// cache, writes [R, R+W) to it, and sends the rest uncached; removed history
+// is the oldest, just after the fixed start (system prompt and tools, F
+// tokens: as recorded, else none). So on a turn that rebuilt its cache the
+// history is priced as written, and on a turn that read a long history and
+// wrote large new output it stays priced as read (ADR 0040).
+func removedCost(t event.Turn, n int) float64 {
+	if n <= 0 {
+		return 0
+	}
+	u, c := t.Usage, t.Cost
+	from := 0
+	if t.Standing != nil {
+		from = (t.Standing.Bytes() + event.BytesPerToken - 1) / event.BytesPerToken
+	}
+	r, w := u.CacheRead, u.CacheWrite5m+u.CacheWrite1h
+	from = min(from, max(0, u.InputTotal()-n)) // the fixed start cannot push history past the request's end
+	overlap := func(lo, hi int) int { return max(0, min(from+n, hi)-max(from, lo)) }
+	cost := 0.0
+	if k := overlap(0, r); k > 0 {
+		cost += float64(k) * c.CacheRead / float64(r)
+	}
+	if k := overlap(r, r+w); k > 0 {
+		cost += float64(k) * c.CacheWrites() / float64(w)
+	}
+	if k := overlap(r+w, u.InputTotal()); k > 0 && u.InputUncached > 0 {
+		cost += float64(k) * c.InputUncached / float64(u.InputUncached)
+	}
+	return cost
+}
+
 // prefixRate is a turn's price per token for its fixed start (the system
 // prompt and tool definitions): a cache read if it read from the cache, else
 // a cache write, else uncached input.

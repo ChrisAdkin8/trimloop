@@ -409,11 +409,11 @@ func TestBuildSessionCountsCopiedLinesOnce(t *testing.T) {
 	seen := map[string]bool{}
 	skills := source.Message{Kind: source.KindInjected, LineID: "u1", Injected: []event.Injected{{Kind: "skill_listing", Bytes: 40}}}
 	compact := source.Message{Kind: source.KindCompaction, LineID: "u2"}
-	first := buildSession(logData{log: source.Log{Path: "/p/a.jsonl"}, msgs: []source.Message{skills, compact, {ID: "a"}}}, seen)
+	first := buildSession(logData{log: source.Log{Path: "/p/a.jsonl"}, msgs: []source.Message{compact, skills, {ID: "a"}}}, seen)
 	if len(first.Turns[0].Injected) != 1 || !first.Turns[0].CompactedBefore {
 		t.Fatalf("original: got %+v", first.Turns[0])
 	}
-	second := buildSession(logData{log: source.Log{Path: "/p/b.jsonl"}, msgs: []source.Message{skills, compact, {ID: "b"},
+	second := buildSession(logData{log: source.Log{Path: "/p/b.jsonl"}, msgs: []source.Message{compact, skills, {ID: "b"},
 		{ID: "c", Model: "<synthetic>"}}}, seen)
 	if len(second.Turns) != 1 || len(second.Turns[0].Injected) != 0 || second.Turns[0].CompactedBefore {
 		t.Errorf("resumed: got %+v, want one turn with nothing copied counted again", second.Turns)
@@ -537,6 +537,7 @@ func TestBuildSessionReplyLoggedAfterItsCompaction(t *testing.T) {
 	l := writeLog(t, "s.jsonl", ""+
 		`{"type":"assistant","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","usage":{"cache_read_input_tokens":900000}}}`+"\n"+
 		`{"type":"system","subtype":"compact_boundary","timestamp":"2026-11-01T09:05:00Z","compactMetadata":{"preTokens":960000,"postTokens":30000}}`+"\n"+
+		`{"type":"attachment","uuid":"a1","attachment":{"type":"session_context"},"rendered":[{"content":"re-attached"}]}`+"\n"+
 		`{"type":"assistant","timestamp":"2026-11-01T09:04:57Z","message":{"id":"m2","usage":{"cache_read_input_tokens":960000}}}`+"\n"+
 		`{"type":"assistant","timestamp":"2026-11-01T09:06:00Z","message":{"id":"m3","usage":{"cache_read_input_tokens":80000}}}`+"\n")
 	s, _, err := readSession(cc, l, map[string]bool{})
@@ -545,5 +546,9 @@ func TestBuildSessionReplyLoggedAfterItsCompaction(t *testing.T) {
 	}
 	if s.Turns[1].CompactedBefore || !s.Turns[2].CompactedBefore || s.Turns[2].Compaction.After != 30000 {
 		t.Errorf("got compacted-before %v, %v; want only the third turn", s.Turns[1].CompactedBefore, s.Turns[2].CompactedBefore)
+	}
+	if len(s.Turns[1].Injected) != 0 || len(s.Turns[2].Injected) != 1 {
+		t.Errorf("re-attached text: got %d on the triggering reply, %d after; want 0 and 1",
+			len(s.Turns[1].Injected), len(s.Turns[2].Injected))
 	}
 }

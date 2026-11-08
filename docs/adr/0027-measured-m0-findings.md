@@ -20,7 +20,7 @@ about 16,000 turns, $2,003 of spend at list prices, mostly Claude Opus 5.5.
 
 | Candidate | Measured | Likely saving |
 |---|---|---|
-| Turns sending more than 200k tokens of context | 57% of spend is the input cost of these turns | up to 31% (cost of the tokens above 200k; corrected to about 19% on 2026-11-08, see [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance)) |
+| Turns sending more than 200k tokens of context | 57% of spend is the input cost of these turns | up to 31% (cost of the tokens above 200k, as measured on 2026-11-06; see [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance)) |
 | Turns after more than 1 hour idle, re-writing the cache | 17% of spend | up to 17% |
 | P02: turns after 5–60 minutes idle that lost their cached prefix (nearly all in subagents, which use the 5-minute cache) | 6% | below zero: moving subagents to the 1-hour cache costs more than it saves |
 | P02: using the 5-minute cache everywhere instead of 1 hour | — | below zero: about −42% |

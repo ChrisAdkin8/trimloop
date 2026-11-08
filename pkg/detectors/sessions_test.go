@@ -247,10 +247,10 @@ func TestLikelyCompactionPricesHistoryNotNewTokens(t *testing.T) {
 	turn := event.Turn{Usage: event.Usage{CacheRead: 300_000, CacheWrite1h: 100_000},
 		Cost: event.Cost{CacheRead: 0.3, CacheWrite1h: 1}, Priced: true}
 	s := event.Session{Turns: []event.Turn{turn, turn}}
-	got, _ := LikelyCompactionSaving([]event.Session{s}, 350_000, 50_000, 50_000)
+	got, _ := LikelyCompactionSaving([]event.Session{s}, 350_000, 150_000, 150_000)
 	// Nothing comes before the first turn, so the replay compacts before the
-	// second: 350k removed, at $1 per million.
-	if want := 350_000 / 1e6; !near(got, want) {
+	// second: 250k removed, all of it read from the cache, at $1 per million.
+	if want := 250_000 / 1e6; !near(got, want) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 	f := FindContextSize([]event.Session{s}, 300_000, 1)
@@ -274,5 +274,42 @@ func TestHistoryRateAfterARebuild(t *testing.T) {
 		Cost: event.Cost{CacheRead: 0.3, CacheWrite1h: 0.02}, Priced: true}
 	if got := historyRate(warm); !near(got, 1e-6) {
 		t.Errorf("warm cache: got %v per token, want the read price", got)
+	}
+}
+
+// Removed history is priced by where it sits: on a turn that read a long
+// history and wrote large new output, the oldest tokens were read, not
+// written; on a turn that rebuilt its cache, they were written.
+func TestRemovedCostByPosition(t *testing.T) {
+	st := &event.Standing{SystemBytes: 40_000} // a 10k-token fixed start
+	busy := event.Turn{Usage: event.Usage{CacheRead: 180_000, CacheWrite1h: 220_000},
+		Cost: event.Cost{CacheRead: 0.18, CacheWrite1h: 2.2}, Standing: st, Priced: true}
+	if got := removedCost(busy, 150_000); !near(got, 0.15) {
+		t.Errorf("long cached history, large new output: got %v, want 0.15 (all read)", got)
+	}
+	rebuilt := event.Turn{Usage: event.Usage{CacheRead: 10_000, CacheWrite1h: 300_000},
+		Cost: event.Cost{CacheRead: 0.01, CacheWrite1h: 3}, Standing: st, Priced: true}
+	if got := removedCost(rebuilt, 100_000); !near(got, 1) {
+		t.Errorf("rebuilt cache: got %v, want 1 (all written)", got)
+	}
+	if got := removedCost(busy, 0); got != 0 {
+		t.Errorf("nothing removed: got %v", got)
+	}
+}
+
+func TestQuantile(t *testing.T) {
+	xs := []int{40, 10, 30, 20} // sorted: 10 20 30 40
+	if q1, q3 := quantile(xs, 0.25), quantile(xs, 0.75); q1 != 10 || q3 != 30 {
+		t.Errorf("n=4: got %d and %d, want 10 and 30 (nearest rank)", q1, q3)
+	}
+	fifteen := make([]int, 15)
+	for i := range fifteen {
+		fifteen[i] = (i + 1) * 10
+	}
+	if q1, q3 := quantile(fifteen, 0.25), quantile(fifteen, 0.75); q1 != 40 || q3 != 120 {
+		t.Errorf("n=15: got %d and %d, want 40 and 120", q1, q3)
+	}
+	if quantile(nil, 0.5) != 0 || median(xs) != 30 {
+		t.Error("empty or median")
 	}
 }

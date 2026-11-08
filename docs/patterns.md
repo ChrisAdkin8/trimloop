@@ -164,7 +164,8 @@ views, broad searches and repeats.
 These figures came from a one-off script that carried output past
 compactions. The M0 detector drops output at each compaction, as the harness
 does, and measures less on the same logs: ≈ $251 carried in all (Bash $163,
-Read $62; `sed -n` $48), and 23 % of file views re-reading a file unchanged
+Read $62; `sed -n` $48; 2026-11-07, before ADR 0039 priced rebuilt-cache
+turns as writes: [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance) has the current figure), and 23 % of file views re-reading a file unchanged
 since it was last viewed (an edit or a compaction resets that). Ignoring
 compactions, the detector gives ≈ $449, so compaction accounts for the gap.
 
@@ -295,7 +296,8 @@ prompt and tool definitions are priced on every turn (cache-read price, or
 the write price when new or changed), tool definitions grouped by MCP
 server; injected text is carried like P04's tool output. In the founder's
 sample: $221 (11 % of spend) — built-in tool definitions $102, the skill
-listing $36, MCP servers $18, memory files $4.
+listing $36, MCP servers $18, memory files $4 (2026-11-07; [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance) has
+the current figure, [measurements.md](measurements.md) the current method).
 
 **Saving:** Hard to estimate precisely; reported as an upper bound with low
 confidence. Injected kinds can be priced like tool output (P04): carried
@@ -599,8 +601,10 @@ limit), or start a new session per task. The report estimates a likely
 saving for compacting by replaying each main session as if compacted to the
 typical size of the first request after a compaction (the summary plus the
 system prompt and re-attached files) whenever it passed the threshold,
-including each compaction's cost ([ADR 0032](adr/0032-readable-reports.md),
-[ADR 0038](adr/0038-real-size-after-compaction.md)). Live
+including each compaction's cost, with a range from how much that size
+varies ([ADR 0032](adr/0032-readable-reports.md),
+[ADR 0038](adr/0038-real-size-after-compaction.md),
+[ADR 0039](adr/0039-rebuilt-cache-and-likely-ranges.md); [measurements.md](measurements.md)). Live
 nudges remind the user at 200k and 500k tokens and show the size in the
 status line ([ADR 0034](adr/0034-live-nudges.md)). Where P04, P07 or P08 are
 detected, report them as the causes: they say *what* fills the context.

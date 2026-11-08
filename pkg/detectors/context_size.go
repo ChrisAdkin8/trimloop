@@ -31,12 +31,12 @@ func FindContextSize(sessions []event.Session, threshold, topN int) ContextSize 
 			if ctx <= threshold || !t.Priced {
 				continue
 			}
-			// The tokens above the threshold are old history, so price them at
-			// what history cost on this turn: a cache read, or a cache write
-			// when the cache had to be rebuilt. The turn's average input price
-			// would also count writing its new tokens, which a smaller context
-			// still pays.
-			saving := float64(ctx-threshold) * historyRate(t)
+			// The tokens above the threshold are the oldest history, so price
+			// them by where they sit in this turn's request: read from the
+			// cache, or written when the cache had to be rebuilt. The turn's
+			// average input price would also count writing its new tokens,
+			// which a smaller context still pays.
+			saving := removedCost(t, ctx-threshold)
 
 			f.Turns++
 			f.Cost += t.Cost.Input()

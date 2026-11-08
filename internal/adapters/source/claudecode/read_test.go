@@ -367,7 +367,10 @@ func TestReadTailSeesCompaction(t *testing.T) {
 	if tl, err := ReadTail(p); err != nil || tl.Compaction != nil {
 		t.Errorf("got %+v, %v; want no compaction after the reply", tl, err)
 	}
-	early := `{"type":"assistant","timestamp":"2026-11-01T09:00:30Z","message":{"id":"m0","usage":{"cache_read_input_tokens":552000}}}` + "\n"
+	// As in the real logs: zero counts but a stray cache-write split, so it
+	// reads as a reply that wrote to the cache.
+	early := `{"type":"assistant","timestamp":"2026-11-01T09:00:30Z","message":{"id":"m0","usage":{"input_tokens":0,"output_tokens":0,` +
+		`"cache_creation_input_tokens":0,"cache_creation":{"ephemeral_1h_input_tokens":862},"iterations":[{"cache_read_input_tokens":552000}]}}}` + "\n"
 	writeFile(t, p, compact+early) // the triggering reply, logged after the compaction
 	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "m0" {
 		t.Errorf("got %+v, %v; want the compaction seen after m0", tl, err)

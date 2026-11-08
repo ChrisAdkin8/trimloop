@@ -3,7 +3,8 @@
 Status: target model. The M0 prototype keeps no store; its JSON report
 (`trimloop --format json`, layout `trimloop-report/1`) holds the figures, and
 its recommendations carry `saving` (an upper bound), `likely`, `likely_note`,
-`finding` and the fixes ([ADR 0032](adr/0032-readable-reports.md),
+`likely_low` and `likely_high` (a range, where the likely figure rests on a
+measured size that varies), `finding` and the fixes ([ADR 0032](adr/0032-readable-reports.md),
 [ADR 0035](adr/0035-measurement-corrections.md)).
 
 One event model for every harness and provider. Taps produce raw envelopes;

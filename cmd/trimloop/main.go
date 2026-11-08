@@ -346,11 +346,13 @@ func oldestFirst(data []logData) {
 // credited to the log it first appeared in.
 func buildSession(d logData, seen map[string]bool) event.Session {
 	s := sessionFor(d.log.Path)
-	var last time.Time            // latest response time so far in this log
-	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
-	callAt := map[string][2]int{} // tool-use id -> turn index, call index
-	compacted := false            // a compaction since the last new turn
-	prompted := false             // a message from the user since the last new turn
+	var last time.Time               // latest response time so far in this log
+	turnOf := map[string]int{}       // message id -> index in s.Turns, for ids counted here
+	callAt := map[string][2]int{}    // tool-use id -> turn index, call index
+	compacted := false               // a compaction since the last new turn
+	prompted := false                // a message from the user since the last new turn
+	var preInjected []event.Injected // added before a pending compaction's marker
+	prePrompted := false             // a message from the user before it
 	var compaction event.Compaction
 	var compactedAt time.Time                // when that compaction was logged as happening
 	customTitle := false                     // the user named the session: generated titles no longer replace it
@@ -377,6 +379,10 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				continue
 			}
 			compacted, compaction, compactedAt = true, m.Compaction, m.Time
+			// What came before the marker belongs to the request before the
+			// compaction; what follows it, to the first one after.
+			preInjected, prePrompted = injected, prePrompted || prompted
+			injected, prompted = nil, false
 			continue
 		case source.KindInjected:
 			if copiedLine(m, seen) {
@@ -449,11 +455,18 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Project:         m.Project,
 				Attribution:     m.Attribution,
 				CompactedBefore: compacted && !before,
-				Prompted:        prompted,
+				Prompted:        prompted || prePrompted,
 				Injected:        injected,
 				Standing:        standing,
 			}
-			injected, prompted = nil, false
+			if before {
+				// The triggering reply takes what came before the marker and
+				// leaves what the compaction re-attached for the next turn.
+				t.Injected, t.Prompted = preInjected, prePrompted
+				preInjected, prePrompted = nil, false
+			} else {
+				injected, prompted, preInjected, prePrompted = nil, false, nil, false
+			}
 			if compacted && !before {
 				t.Compaction = compaction
 			}

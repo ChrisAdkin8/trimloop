@@ -60,9 +60,8 @@ func LikelyCompactionSaving(sessions []event.Session, at, after, summary int) (l
 			}
 			prev = ctx
 			if cut := min(removed, ctx-after); cut > 0 {
-				rate := historyRate(t)
-				likely += float64(cut) * rate
-				upTo += float64(ctx-after) * rate
+				likely += removedCost(t, cut)
+				upTo += removedCost(t, ctx-after)
 			}
 		}
 	}

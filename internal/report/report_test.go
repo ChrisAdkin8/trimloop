@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -354,5 +355,46 @@ func TestOlderFigures(t *testing.T) {
 		if got := olderFigures(tc.w, "p"); got != tc.want {
 			t.Errorf("%+v: got %v, want %v", tc.w, got, tc.want)
 		}
+	}
+}
+
+// The likely compaction saving comes with a range from the quartiles of the
+// size after a compaction: a smaller size saves more, and likely lies inside.
+func TestCompactionLikelyRange(t *testing.T) {
+	turn := func(ctx int) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: float64(ctx) / 1e6}, Priced: true}
+	}
+	var sessions []event.Session
+	// Four sessions compacted once each, sending 40k to 100k afterwards.
+	for i, after := range []int{40_000, 60_000, 80_000, 100_000} {
+		resumed := turn(after)
+		resumed.CompactedBefore = true
+		resumed.Compaction = event.Compaction{Before: 400_000, After: 20_000}
+		sessions = append(sessions, event.Session{ID: fmt.Sprint("c", i), Kind: "main",
+			Turns: []event.Turn{turn(390_000), resumed}})
+	}
+	// One long session that never compacted.
+	var long []event.Turn
+	for ctx := 100_000; ctx <= 900_000; ctx += 50_000 {
+		long = append(long, turn(ctx))
+	}
+	sessions = append(sessions, event.Session{ID: "long", Kind: "main", Turns: long})
+
+	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	f := r.CompactFix
+	if f == nil {
+		t.Fatal("no compaction card")
+	}
+	if !(f.LikelyLow <= f.Likely && f.Likely <= f.LikelyHigh && f.LikelyLow < f.LikelyHigh) {
+		t.Errorf("range: got %v ≤ %v ≤ %v", f.LikelyLow, f.Likely, f.LikelyHigh)
+	}
+	g := r.Growth
+	if g.ResumeLow != 40_000 || g.ResumeHigh != 80_000 || g.Resumes != 4 {
+		t.Errorf("quartiles: got %d–%d of %d", g.ResumeLow, g.ResumeHigh, g.Resumes)
+	}
+	// The smaller size pairs with the larger saving.
+	if want := "at 40k the likely saving is " + money(f.LikelyHigh); !strings.Contains(f.LikelyNote, want) {
+		t.Errorf("note %q has no %q", f.LikelyNote, want)
 	}
 }

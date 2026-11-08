@@ -69,7 +69,7 @@ On the founder's logs (2026-11-08, $2,166 over 44 days):
 - "Start fresh after a long break": up to $296, likely about $285 (was up
   to $368); P09 itself still reports $368, of which $72 was waits on tools.
 - Compacting earlier: likely about $462, up to $700 (was $463 and $701 on
-  the same day's logs). Corrected by ADR 0038: about $314, up to $547.
+  the same day's logs). Figures of this ADR's day; current figures: [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance); current method: [measurements.md](../measurements.md).
 - "Remove MCP servers you don't use" falls from $19 to $5: the rest was
   servers the desktop app adds.
 - Running sub-agents on Sonnet 5.5: up to $284 (was $281), now that every

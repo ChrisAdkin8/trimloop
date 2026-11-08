@@ -67,7 +67,9 @@ would have saved about 13 % of spend, quality untested; noisy tool output
 (P04) carried about 12 %, and what every request carries (P07: system
 prompt, tool definitions and injected text) about 11 %
 ([log-signals.md §7](log-signals.md#7-second-pass-measured-in-money-2026-11-07),
-[ADR 0031](adr/0031-m0-order-from-measured-spend.md)).
+[ADR 0031](adr/0031-m0-order-from-measured-spend.md)). Those are 2026-11-07
+figures; once rebuilt-cache turns were priced as writes they became about
+15 % and 12 % ([log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance); [measurements.md](measurements.md) says how each is worked out).
 
 ## 3. Worked example: one turn
 

@@ -56,7 +56,9 @@ were wrong:
 On the founder's logs (2026-11-08, $2,134 over 44 days):
 
 - Compacting earlier: likely about $463, up to $688 (was $841 and $1,146).
-- P19's saving: about 19 % (was 31 %). (ADR 0039: decision 2 was not built as written; built as written, about 31 %.)
+- P19's saving: about 19 % (was 31 %). Decision 2 was not built as written
+  until ADR 0039. These are the figures of 2026-11-08 before ADRs 0036–0040;
+  current figures: [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance); current method: [measurements.md](../measurements.md).
 - Claude Code's records show about 13 % ($202 on 409 sessions) more than
   the logs, not 2–4 %; 4 sessions are left out as not covered.
 - [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance)

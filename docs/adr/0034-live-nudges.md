@@ -1,15 +1,14 @@
 # ADR 0034: Live nudges in Claude Code
 
-- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction) and [ADR 0038](0038-real-size-after-compaction.md) (status after compaction, re-arming)
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0036](0036-prices-reconciliation-status.md) (countdown), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (compaction), [ADR 0038](0038-real-size-after-compaction.md) (status after compaction, re-arming), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0040](0040-position-pricing-and-one-method-page.md) (status line after a compaction)
 - Date: 2026-11-08
 - Amends: [ROADMAP.md](../../ROADMAP.md) (M0 scope), [packaging.md §3](../packaging.md#3-the-trimloop-binary) (commands)
 
 ## Context
 
 The two largest savings in the founder's logs are habits: compacting long
-sessions earlier (likely about $820 over 44 days; corrected on 2026-11-08 to
-about $460, see [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance)) and starting fresh after
-a long break (about $340). A report read days later does not change a habit
+sessions earlier (likely about $820 over 44 days, as measured on 2026-11-07)
+and starting fresh after a long break (about $340); current figures: [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance); current method: [measurements.md](../measurements.md). A report read days later does not change a habit
 at the moment it matters. Claude Code can run a command for its status line
 and commands at hook events, passing each a small JSON document that names
 the session's log.

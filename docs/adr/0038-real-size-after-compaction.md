@@ -1,6 +1,6 @@
 # ADR 0038: The real size after a compaction, and who ended a wait
 
-- Status: Accepted — built in the M0 prototype; decisions 1, 3 and 4 amended by [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md)
+- Status: Accepted — built in the M0 prototype; decisions 1 and 3–6 amended by [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md) and [ADR 0040](0040-position-pricing-and-one-method-page.md)
 - Date: 2026-11-08
 - Amends: [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md) (decisions 1–4), [ADR 0035](0035-measurement-corrections.md) and [ADR 0032](0032-readable-reports.md) (the compaction replay), [ADR 0034](0034-live-nudges.md) (status line and re-arming), [ADR 0033](0033-reconciliation-history-standing-context.md) (P07 sources, history file), [data-model.md](../data-model.md) (Turn, Week), [patterns.md P09](../patterns.md#p09--resume-bloat)
 
@@ -62,7 +62,7 @@ logs, and that its history rule could keep wrong figures:
 On the founder's logs (2026-11-08, $2,180 over 44 days):
 
 - Compacting earlier: likely about $314, up to $547 (was $462 and $700).
-  Corrected by ADR 0039: about $531, up to $820.
+  Figures of this ADR's day; current figures: [log-signals.md §8](../log-signals.md#8-measured-figures-at-a-glance); current method: [measurements.md](../measurements.md).
 - Start fresh after a long break: up to $308, likely about $296; 31 waits
   ($60) were not on the user (was 36, $72).
 - "Remove MCP servers you don't use" is $2.56: the rest of the instruction

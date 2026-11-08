@@ -49,7 +49,7 @@ type Tail struct {
 // every status-line refresh. A last line still being written is ignored.
 func ReadTail(path string) (Tail, error) {
 	var t Tail
-	found := false
+	found, latestWrote := false, false
 	f, err := os.Open(path)
 	if err != nil {
 		return t, err
@@ -99,12 +99,16 @@ func ReadTail(path string) (Tail, error) {
 			continue
 		}
 		wrote := m.Usage.CacheWrite5m+m.Usage.CacheWrite1h > 0
-		if !found {
-			t.Latest, found = m, true
-			if wrote {
-				return t, nil
-			}
-		} else if wrote {
+		switch {
+		case !found:
+			t.Latest, found, latestWrote = m, true, wrote
+		case m.ID != "" && m.ID == t.Latest.ID:
+			// Another line of the latest reply.
+		case latestWrote:
+			// An earlier reply: a compaction that belongs after the latest
+			// one is logged after this line, so it has been seen by now.
+			return t, nil
+		case wrote:
 			t.Writer = m
 			return t, nil
 		}

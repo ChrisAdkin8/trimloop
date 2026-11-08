@@ -161,9 +161,9 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 			high, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, lo, min(summary, lo))
 			low, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, hi, min(summary, hi))
 			f.LikelyLow, f.LikelyHigh = min(low, likely), max(high, likely)
-			f.LikelyNote += fmt.Sprintf(" The size after a compaction varies: at %s to %s tokens (the middle half "+
-				"of %d compactions measured) the likely saving is %s to %s.",
-				approx(lo), approx(hi), r.Growth.Resumes, money(f.LikelyLow), money(f.LikelyHigh))
+			f.LikelyNote += fmt.Sprintf(" The size after a compaction varies (the middle half of %d measured "+
+				"runs from %s to %s tokens): at %s the likely saving is %s, at %s it is %s.",
+				r.Growth.Resumes, approx(lo), approx(hi), approx(lo), money(f.LikelyHigh), approx(hi), money(f.LikelyLow))
 		}
 		r.CompactFix = &f
 	}

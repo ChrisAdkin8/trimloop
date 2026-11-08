@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -194,15 +195,23 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 
 // median returns the middle value of xs (the upper middle for an even
 // count), or 0 if xs is empty. It sorts a copy.
-func median(xs []int) int { return quantile(xs, 0.5) }
+func median(xs []int) int {
+	if len(xs) == 0 {
+		return 0
+	}
+	s := append([]int(nil), xs...)
+	sort.Ints(s)
+	return s[len(s)/2]
+}
 
-// quantile returns the value at fraction q of the sorted xs (q 0.5 is the
-// median as above), or 0 for none.
+// quantile returns the nearest-rank value at fraction q of xs (the smallest
+// value with at least q of them at or below it), or 0 for none.
 func quantile(xs []int, q float64) int {
 	if len(xs) == 0 {
 		return 0
 	}
 	s := append([]int(nil), xs...)
 	sort.Ints(s)
-	return s[min(len(s)-1, int(q*float64(len(s))))]
+	i := int(math.Ceil(q*float64(len(s)))) - 1
+	return s[min(len(s)-1, max(0, i))]
 }
