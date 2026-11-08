@@ -41,12 +41,20 @@ jobs:
           distribution: goreleaser
           version: v2.19.0
           # Without a tap token, build everything except the Homebrew cask.
-          args: release --clean ${{ secrets.HOMEBREW_TAP_TOKEN == '' && '--skip=homebrew' || '' }}
+          # While the repository is private, skip the keyless signature: it
+          # would publish the repository's name in Sigstore's public log.
+          args: >-
+            release --clean
+            ${{ secrets.HOMEBREW_TAP_TOKEN == '' && '--skip=homebrew' || '' }}
+            ${{ github.event.repository.private && '--skip=sign' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
+      # Attestations for private repositories need a paid GitHub plan, so
+      # provenance is added once the repository is public.
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: ${{ !github.event.repository.private }}
         with:
           subject-path: |
             dist/*.tar.gz

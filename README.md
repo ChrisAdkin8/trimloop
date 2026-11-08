@@ -238,7 +238,9 @@ Pushing a version tag (`git tag v0.1.0 && git push origin v0.1.0`) runs
 a draft GitHub release with [GoReleaser](.goreleaser.yaml): archives for
 macOS and Linux (Apple silicon, Intel and arm64), `.deb` and `.rpm`
 packages, signed checksums, a software bill of materials and build
-provenance. Check the draft, then publish it. With a `HOMEBREW_TAP_TOKEN`
+provenance. Check the draft, then publish it. While the repository is private,
+releases skip the signature and provenance (both would need it public or a
+paid plan). With a `HOMEBREW_TAP_TOKEN`
 secret the release also updates the `ChrisAdkin8/homebrew-tap` cask, for
 `brew install --cask chrisadkin8/tap/trimloop`. Every pull request runs
 the checks and a release dry run ([ci.yml](.github/workflows/ci.yml)).
