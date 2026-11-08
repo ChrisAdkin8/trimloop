@@ -108,3 +108,22 @@ func TestTotalCost(t *testing.T) {
 		t.Errorf("got %v, want 6", got.Total())
 	}
 }
+
+func TestLikelyCompactionResetsOnAnUnmarkedDrop(t *testing.T) {
+	turn := func(ctx int, compacted bool) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Priced: true, CompactedBefore: compacted,
+			Usage: event.Usage{CacheRead: ctx - 1000, CacheWrite1h: 1000}, Cost: event.Cost{CacheRead: float64(ctx) / 1e6}}
+	}
+	session := func(marked bool) []event.Session {
+		return []event.Session{{ID: "a", Kind: event.MainSession, Turns: []event.Turn{
+			turn(150_000, false), turn(190_000, false), turn(230_000, false), turn(260_000, false),
+			turn(40_000, marked), // cleared: marked as a compaction, or not
+			turn(60_000, false), turn(80_000, false),
+		}}}
+	}
+	l1, u1 := LikelyCompactionSaving(session(true), 200_000, 50_000, 5_000)
+	l2, u2 := LikelyCompactionSaving(session(false), 200_000, 50_000, 5_000)
+	if l1 != l2 || u1 != u2 {
+		t.Errorf("unmarked drop: got %v/%v, want the same as a marked compaction %v/%v", l2, u2, l1, l2)
+	}
+}

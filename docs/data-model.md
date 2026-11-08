@@ -67,6 +67,7 @@ Numbers only: no names, titles, paths or session ids.
 | `prices` | string | Price catalogue version the figures used |
 | `analysis` | int | Analysis version that worked the figures out. A week the logs still hold replaces the stored copy, except a week Claude Code may have partly deleted (up to the week of the oldest log on disk): there the stored copy stays when it has more turns and counted them the same way (version 2 on) ([ADR 0045](adr/0045-m0-measurement-method.md)) |
 | `kept` | bool | Shown, not stored: the week's figures came from the history file, because its logs are gone or the stored copy was fuller |
+| `kept_why` | string? | Shown, not stored: why a kept week came from the history file: "logs deleted", or "logs partly deleted, stored copy fuller" |
 
 ## Entities
 

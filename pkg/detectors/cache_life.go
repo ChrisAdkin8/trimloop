@@ -9,8 +9,8 @@ import (
 
 // Cache lifetimes Anthropic offers (docs/measurements.md §0).
 const (
-	shortLife = 5 * time.Minute
-	longLife  = time.Hour
+	shortLife = event.ShortCacheLife
+	longLife  = event.LongCacheLife
 )
 
 // CacheLife is P02, cache TTL expiry, in reduced fidelity (ADR 0042). A
@@ -98,11 +98,8 @@ func shortWaits(s event.Session) []shortWait {
 				out = append(out, shortWait{turn: i, saving: t.Cost.Total() - alt.Total(), hour: t.Cost.Total() - alt1h.Total()})
 			}
 		}
-		switch {
-		case u.CacheWrite1h > 0:
-			life = longLife
-		case u.CacheWrite5m > 0:
-			life = shortLife
+		if l := u.WriteLife(); l != 0 {
+			life = l
 		}
 		prev = ctx
 	}
@@ -114,10 +111,10 @@ func FindCacheLife(sessions []event.Session, topN int) CacheLife {
 	var f CacheLife
 	stats := map[string]*SessionStat{}
 	for _, s := range sessions {
-		short, hour := false, false
+		short, hour := false, false // whether the session ever wrote for 5 minutes, for the hour
 		for _, t := range s.Turns {
 			short = short || t.Usage.CacheWrite5m > 0
-			hour = hour || t.Usage.CacheWrite1h > 0
+			hour = hour || t.Usage.WriteLife() == longLife
 		}
 		switch {
 		case hour && s.Kind == event.SubAgentSession:
@@ -169,7 +166,7 @@ func FindCacheLife(sessions []event.Session, topN int) CacheLife {
 		onHour := false // from the session's first write on the hour
 		for _, t := range s.Turns {
 			u := t.Usage
-			onHour = onHour || u.CacheWrite1h > 0
+			onHour = onHour || u.WriteLife() == longLife
 			if t.Priced && onHour {
 				opts := price.Options{Fast: t.Fast, USOnly: t.USOnly}
 				hi, okHi := price.Cost(t.Model, onShort(u, t.IdleBefore, shortLife), opts)

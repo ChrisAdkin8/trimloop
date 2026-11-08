@@ -2,6 +2,28 @@
 // and normaliser produce, whatever the harness or provider.
 package event
 
+import "time"
+
+// The cache lifetimes Anthropic offers (docs/measurements.md §0).
+const (
+	ShortCacheLife = 5 * time.Minute
+	LongCacheLife  = time.Hour
+)
+
+// WriteLife is the cache lifetime a response's writes asked for: the hour if
+// any write was for the hour, else five minutes if any was for five minutes,
+// else 0 (it wrote nothing). It is the one rule every finding and the status
+// line use to tell which cache a session is on.
+func (u Usage) WriteLife() time.Duration {
+	switch {
+	case u.CacheWrite1h > 0:
+		return LongCacheLife
+	case u.CacheWrite5m > 0:
+		return ShortCacheLife
+	}
+	return 0
+}
+
 // Usage is one provider response's token usage, sorted into the classes in
 // docs/data-model.md ("Usage normalisation"). Every cost, ratio and saving is
 // computed from these fields, never from raw provider fields.

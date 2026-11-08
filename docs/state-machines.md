@@ -21,12 +21,12 @@ each such entry says why it was left that way.
 | 1 | What the next turn inherits | `cmd/trimloop/between.go` | Explicit | No |
 | 2 | Building a session from a log | `cmd/trimloop/main.go` `buildSession` | Implicit, small | No |
 | 3 | Trimloop's entries in Claude Code's settings | `internal/live/setup.go` `EntryState` | Explicit | Claude Code's settings file |
-| 4 | Size and pause nudges per session | `internal/live/state.go`, `rules.go`, `run.go` `Hook` | Implicit | `~/.trimloop/live/<session>.json` |
+| 4 | Size and pause nudges per session | `internal/live/state.go` `afterReply`, `beforeSend` | Explicit | `~/.trimloop/live/<session>.json` |
 | 5 | Usage-limit readings | `internal/history/limits.go`, `pkg/detectors/limits.go` | Explicit rule | `~/.trimloop/limits.jsonl` |
-| 6 | Weekly history | `internal/history/history.go` `Merge`; `internal/report` `olderReason` | Implicit | `~/.trimloop/history.json` |
-| 7 | Status-line phase | `internal/adapters/source/claudecode/tail.go`, `internal/live/run.go` | Implicit | No |
+| 6 | Weekly history | `internal/history/history.go` `decide`, `weekOutcome`; `internal/report` `olderReason` | Explicit | `~/.trimloop/history.json` |
+| 7 | Status-line phase | `internal/adapters/source/claudecode/tail.go`, `internal/live/run.go` | Implicit, small | No |
 | 8 | Log reading offset | `internal/adapters/source/jsonl` | Implicit | Not yet |
-| 9 | Detectors that walk a session's turns | `pkg/detectors` | Implicit | No |
+| 9 | Detectors that walk a session's turns | `pkg/detectors`; the shared rule `event.Usage.WriteLife` | Implicit, one shared rule | No |
 | 10 | Which card text applies | `pkg/fixes` | Decision tables | No |
 
 ## 1. What the next turn inherits (explicit)
@@ -84,9 +84,11 @@ Known edges, left alone: replacing a status line drops its other keys (for
 example `padding`); duplicate trimloop hooks are updated, not removed; there
 is no `--remove`; each changing write leaves a backup file.
 
-## 4. Size and pause nudges per session (implicit)
+## 4. Size and pause nudges per session (explicit)
 
-Stored per session in `~/.trimloop/live/<session>.json` (ADR 0034):
+Stored per session in `~/.trimloop/live/<session>.json` (ADR 0034). The
+state changes only through two methods on `State`, which `Hook` calls:
+`afterReply` (hook stop) and `beforeSend` (hook prompt).
 
 - **Size nudges.** `Crossed` is the set of size thresholds already
   announced. After each reply (`hook stop`): thresholds the session is now
@@ -98,7 +100,9 @@ Stored per session in `~/.trimloop/live/<session>.json` (ADR 0034):
 
 It could be one "highest level announced" value rather than a set, but the
 set is stored in users' files; changing it needs a migration for no change
-in behaviour, so it stays. Known edges: a stop hook and a prompt hook
+in behaviour, so it stays. Tests: `TestStateAfterReply` (a session growing,
+compacted and growing again), `TestStateBeforeSendPausesOncePerBreak`, and
+the `TestHook*` tests. Known edges: a stop hook and a prompt hook
 running at the same moment can each lose the other's update (a nudge may
 repeat); a damaged file starts fresh; files untouched for 30 days are
 removed, so a session resumed after a month can see its nudges again.
@@ -119,16 +123,18 @@ Tests: `TestAppendAndLoadLimits`, `TestLoadLimitsSurvivesALongDamagedLine`,
 status lines writing at the same instant can both append; the measure uses
 each window's first and last reading, so a duplicate changes nothing.
 
-## 6. Weekly history (implicit)
+## 6. Weekly history (explicit)
 
-Each run merges its weeks into the history file (ADR 0045 rule 10). Per
-week:
+Each run merges its weeks into the history file (ADR 0045 rule 10). `decide`
+gives each week one `weekOutcome`:
 
-| Case | Result |
-|---|---|
-| the logs hold the whole week | this run's figures replace the stored ones |
-| Claude Code may have deleted part of the week (up to the week of the oldest log) | the stored copy stays if it counted more turns the same way (analysis ≥ `TurnsCountedSince`) |
-| the logs no longer hold the week | the stored copy is shown, marked "kept" |
+| Outcome | When | Result | Shown as |
+|---|---|---|---|
+| `fromLogs` | the logs hold the week, and no fuller stored copy wins | this run's figures replace the stored ones | — |
+| `keptFuller` | the week is at or before the week of the oldest log (Claude Code may have deleted part of it), and the stored copy counted more turns the same way (analysis ≥ `TurnsCountedSince`) | the stored copy stays | "kept: logs partly deleted, stored copy fuller" |
+| `logsGone` | the logs no longer hold the week | the stored copy is shown | "kept: logs deleted" |
+
+Tests: `TestMergeSaysWhyAWeekWasKept` and the other `TestMerge*` tests.
 
 A week worked out by an older analysis or another price list is marked
 with the reason (`olderReason`): "older method: analysis 4, now 7", "older
@@ -147,9 +153,11 @@ reply wrote nothing to the cache, on to the latest one that did (its
 lifetime sets the countdown); and it notes a compaction logged after the
 latest reply. The status line is then in one of three phases: no reply yet
 (cost only), replied (size, cost, countdown), or compacted (size unknown
-until the next reply: "compacted"). Known edges: a latest reply with no
-time makes any earlier compaction look newer; a final line over 1 MB shows
-the cost only.
+until the next reply: "compacted"). A compaction logged before the latest
+reply counts as after it only when both have times and the compaction's is
+later (the triggering reply can be logged late). The scan's two flags are
+local to one function and read clearly, so they stay. Known edge: a final
+line over 1 MB shows the cost only.
 
 ## 8. Log reading offset (implicit; not saved yet)
 
@@ -163,9 +171,9 @@ replaced or rotated file is noticed.
 
 | Detector | What it remembers across turns | Note |
 |---|---|---|
-| P02 short waits (`cache_life.go`) | the session's cache lifetime from its latest write; whether it ever wrote for 5 minutes or an hour | "Wholly on the 5-minute cache" (for the hour's option) means it never wrote for an hour, by design (ADR 0045 rule 7) |
-| P09 long breaks, weekly `userBreak` (`long_pause.go`) | nothing but the turn's idle time and who ended it | P02 counts waits of 5 minutes to an hour; P09 waits longer than its gap setting, an hour by default |
-| Compaction replay (`likely.go`) | how much a simulated compaction has removed so far; reset by a real compaction | A sharp drop in size with no compaction marker (rare) is not treated as one |
+| P02 short waits (`cache_life.go`) | the session's cache lifetime from its latest write; whether it ever wrote for 5 minutes or an hour; from its first hour write on (for the hour-against-5-minutes range) | Three questions on purpose, all from one rule, `Usage.WriteLife` (the hour if any write was for the hour, else 5 minutes, else none), which the status line's countdown also uses. "Wholly on the 5-minute cache" means it never wrote for an hour, by design (ADR 0045 rule 7) |
+| P09 long breaks, weekly `userBreak` (`long_pause.go`) | nothing but the turn's idle time and who ended it | P02 counts waits of 5 minutes to an hour; P09 waits longer than its gap setting, an hour by default, and the card names the gap it used |
+| Compaction replay (`likely.go`) | how much a simulated compaction has removed so far | Reset by a real compaction, and by a fall of more than half with no marker (`TestLikelyCompactionResetsOnAnUnmarkedDrop`) |
 | Carried tool output (`tool_output.go` `carry`) and carried text (`standing.go`) | what is still in the session, cleared by a compaction; files viewed since their last change | Two implementations of one idea (ADR 0045 rule 4). On a compaction turn, tool output from before is dropped, while text arriving on that turn is new and priced as such. Merging them is possible, but each is covered by its own tests and the merge would be all risk for no change in figures |
 | Weekly figures (`weekly.go`) | the week of each turn | |
 | Reconciliation (`reconcile.go`) | per main session: recorded, unpriced, behind, or compared | Decided by the order of its checks |

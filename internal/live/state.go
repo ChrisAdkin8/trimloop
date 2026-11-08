@@ -10,10 +10,49 @@ import (
 )
 
 // State remembers, per session, which nudges were shown, so each appears
-// once. It holds numbers and times only.
+// once. It holds numbers and times only. Its two parts change only through
+// afterReply and beforeSend (see docs/state-machines.md §4):
+//
+//   - Crossed is the size thresholds already announced. A reply under a
+//     threshold re-arms it (the session was compacted or cleared); a reply
+//     past an armed one announces the highest, once.
+//   - PausedFor is the reply a pause before sending was shown after, so a
+//     long break pauses once.
 type State struct {
 	Crossed   map[int]bool `json:"crossed"`    // after-reply thresholds already shown
 	PausedFor time.Time    `json:"paused_for"` // the reply a pause before sending was shown after
+}
+
+// afterReply moves the size nudges on after reply r. It returns the message
+// to show and the threshold it announces ("" and 0 if none is due), and
+// whether any threshold was re-armed (the state changed even with no
+// message).
+func (st *State) afterReply(s Settings, r Reply) (msg string, threshold int, rearmed bool) {
+	for t := range st.Crossed {
+		if r.Context <= t {
+			delete(st.Crossed, t)
+			rearmed = true
+		}
+	}
+	if rearmed && r.Context > s.Large {
+		st.Crossed[s.Large] = true // re-armed but still past it: not news
+	}
+	msg, threshold = s.AfterReply(r, st.Crossed)
+	if msg != "" {
+		st.Crossed[threshold] = true
+	}
+	return msg, threshold, rearmed
+}
+
+// beforeSend decides whether to pause the message the user just sent, and
+// remembers the pause so the same break pauses once. It returns the reason
+// to show, or "".
+func (st *State) beforeSend(s Settings, r Reply, now time.Time) string {
+	reason := s.BeforeSend(r, now, st.PausedFor)
+	if reason != "" {
+		st.PausedFor = r.Time
+	}
+	return reason
 }
 
 // Store keeps State files in Dir, one per session.

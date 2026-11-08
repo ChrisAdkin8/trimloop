@@ -51,14 +51,14 @@ type Reply struct {
 // that wrote nothing keeps the lifetime of the latest one that did; with
 // none, an hour (Claude Code asks for the hour for main sessions).
 func (r Reply) CacheLife() time.Duration {
-	u := r.Usage
-	if u.CacheWrite5m+u.CacheWrite1h == 0 {
-		u = r.Writer
+	life := r.Usage.WriteLife()
+	if life == 0 {
+		life = r.Writer.WriteLife()
 	}
-	if u.CacheWrite5m > 0 && u.CacheWrite1h == 0 {
-		return 5 * time.Minute
+	if life == event.ShortCacheLife {
+		return life
 	}
-	return time.Hour
+	return event.LongCacheLife
 }
 
 // ResendCost estimates what the next message costs to send the whole

@@ -3,6 +3,7 @@ package fixes
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -198,5 +199,15 @@ func TestForSubAgentsNamesTheModel(t *testing.T) {
 	f.ByType[0].Alternative = "" // a saving with no named model
 	if r, _ := ForSubAgents(f, 1); strings.Contains(r.Finding, "moved to .") || !strings.Contains(r.Finding, "a cheaper model") {
 		t.Errorf("no named model: got %q", r.Finding)
+	}
+}
+
+func TestForPausesNamesTheGap(t *testing.T) {
+	for gap, want := range map[time.Duration]string{time.Hour: "more than an hour away", 2 * time.Hour: "more than 2 hours away",
+		90 * time.Minute: "more than 90 minutes away", 0: "more than an hour away"} {
+		r, ok := ForPauses(detectors.LongPause{MinGap: gap, Pauses: 3, Saving: 50}, 0, 30_000, 1)
+		if !ok || !strings.Contains(r.Finding, want) {
+			t.Errorf("gap %v: got %q, want %q", gap, r.Finding, want)
+		}
 	}
 }

@@ -3,6 +3,7 @@ package fixes
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
@@ -102,8 +103,9 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float
 	if saving < minSaving {
 		return Recommendation{}, false
 	}
-	finding := fmt.Sprintf("%d times, you carried on after more than an hour away. The saved copy of the "+
-		"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses-p.Unprompted)
+	gap := spanText(p.MinGap)
+	finding := fmt.Sprintf("%d times, you carried on after more than %s away. The saved copy of the "+
+		"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses-p.Unprompted, gap)
 	switch {
 	case p.Unprompted == 1:
 		finding += " Another long wait was on a tool, a sub-agent, a timer or another agent, not on you; it is left out of this saving."
@@ -120,7 +122,7 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float
 		LikelyNote: fmt.Sprintf("As if each of those turns had started a new session of about %s tokens.", thousandsInt(fresh)),
 		Overlap:    "Shares money with the compaction fix: do not add them",
 		Primary: Fix{Advise,
-			"After a break of over an hour, start a new session with a short note instead of carrying on.",
+			"After a break of over " + gap + ", start a new session with a short note instead of carrying on.",
 			"Before the break, ask Claude for a short note of where things stand; afterwards, /clear and paste it in."},
 		Alternatives: []Fix{
 			{Structure,
@@ -160,4 +162,16 @@ func agentAlias(model string) string {
 		}
 	}
 	return "sonnet"
+}
+
+// spanText writes the length of a break for a sentence: "an hour",
+// "2 hours", "90 minutes". The P09 gap is an hour unless set otherwise.
+func spanText(d time.Duration) string {
+	switch {
+	case d == time.Hour || d <= 0:
+		return "an hour"
+	case d%time.Hour == 0:
+		return fmt.Sprintf("%d hours", int(d.Hours()))
+	}
+	return fmt.Sprintf("%d minutes", int(d.Minutes()))
 }

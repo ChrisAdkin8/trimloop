@@ -52,6 +52,11 @@ func LikelyCompactionSaving(sessions []event.Session, at, after, summary int) (l
 			if !t.Priced || ctx == 0 {
 				continue
 			}
+			if prev > 0 && ctx < prev/2 {
+				// More than half gone with no compaction marker: cleared or
+				// compacted some other way, so it resets the replay too.
+				removed, prev = 0, 0
+			}
 			// Compact before this turn when it would pass the limit: the
 			// session is then its size after the previous turn, and this
 			// turn's own new tokens stay.

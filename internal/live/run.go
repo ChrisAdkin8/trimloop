@@ -155,34 +155,20 @@ func Hook(event string, in io.Reader, out io.Writer, env Env) {
 	var nudge string
 	switch event {
 	case "stop":
-		// Compacted or cleared: a nudge for a size the session is now under
-		// can be useful again.
-		rearmed := false
-		for threshold := range st.Crossed {
-			if r.Context <= threshold {
-				delete(st.Crossed, threshold)
-				rearmed = true
-			}
-		}
-		if rearmed {
-			if r.Context > env.Settings.Large {
-				st.Crossed[env.Settings.Large] = true // still past it: not news
-			}
-			_ = env.Store.Save(inp.SessionID, st)
-		}
-		msg, threshold := env.Settings.AfterReply(r, st.Crossed)
+		msg, threshold, rearmed := st.afterReply(env.Settings, r)
 		if msg == "" {
+			if rearmed {
+				_ = env.Store.Save(inp.SessionID, st)
+			}
 			return
 		}
-		st.Crossed[threshold] = true
 		output = map[string]any{"systemMessage": msg}
 		nudge = fmt.Sprintf("after-reply-%d", threshold)
 	case "prompt":
-		reason := env.Settings.BeforeSend(r, env.Now, st.PausedFor)
+		reason := st.beforeSend(env.Settings, r, env.Now)
 		if reason == "" {
 			return
 		}
-		st.PausedFor = r.Time
 		output = map[string]any{"decision": "block", "reason": reason}
 		nudge = "pause-after-break"
 	default:

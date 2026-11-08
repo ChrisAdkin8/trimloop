@@ -518,3 +518,49 @@ func TestCheckSettingsStates(t *testing.T) {
 		t.Error("a settings file that is not an object: want an error")
 	}
 }
+
+func TestStateAfterReply(t *testing.T) {
+	s := DefaultSettings()
+	st := State{Crossed: map[int]bool{}}
+	steps := []struct {
+		context    int
+		wantThresh int
+		rearmed    bool
+	}{
+		{150_000, 0, false},       // small: nothing
+		{250_000, s.Large, false}, // passed large: announced once
+		{260_000, 0, false},       // still large: not news
+		{600_000, s.VeryLarge, false},
+		{650_000, 0, false},
+		{120_000, 0, true},            // compacted: both re-armed, nothing shown
+		{550_000, s.VeryLarge, false}, // straight past very large: only the highest
+		{300_000, 0, true},            // under very large again: re-armed, large stays announced
+		{520_000, s.VeryLarge, false},
+	}
+	for i, c := range steps {
+		msg, th, re := st.afterReply(s, Reply{Context: c.context})
+		if th != c.wantThresh || (msg != "") != (c.wantThresh != 0) || re != c.rearmed {
+			t.Errorf("step %d (%d tokens): got threshold %d, rearmed %v, msg %q; want %d, %v",
+				i, c.context, th, re, msg, c.wantThresh, c.rearmed)
+		}
+	}
+}
+
+func TestStateBeforeSendPausesOncePerBreak(t *testing.T) {
+	s := DefaultSettings()
+	st := State{Crossed: map[int]bool{}}
+	r := Reply{Time: t0, Context: 600_000, Model: "claude-opus-5-5", Usage: event.Usage{CacheWrite1h: 1000}}
+	if st.beforeSend(s, r, t0.Add(30*time.Minute)) != "" {
+		t.Error("cache still warm: no pause")
+	}
+	if st.beforeSend(s, r, t0.Add(2*time.Hour)) == "" || !st.PausedFor.Equal(t0) {
+		t.Error("cache expired, very large: pause, and remember it")
+	}
+	if st.beforeSend(s, r, t0.Add(3*time.Hour)) != "" {
+		t.Error("the same break: no second pause")
+	}
+	r.Time = t0.Add(4 * time.Hour) // a new reply, then another long break
+	if st.beforeSend(s, r, r.Time.Add(2*time.Hour)) == "" {
+		t.Error("a new break: pause again")
+	}
+}

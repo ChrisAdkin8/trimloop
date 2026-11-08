@@ -56,25 +56,54 @@ func Load(path string) (File, error) {
 // and replaces the stored copy. partialUpTo "" means no week is treated as
 // partial. Weeks whose figures come from the history file are marked Kept.
 func Merge(f *File, current []detectors.Week, prices, partialUpTo string) []detectors.Week {
-	fromLogs := map[string]bool{}
+	outcomes := map[string]weekOutcome{}
 	for _, w := range current {
 		w.Prices = prices
 		w.Analysis = detectors.AnalysisVersion
-		w.Kept = false
-		old, ok := f.Weeks[w.Week]
-		if ok && w.Week <= partialUpTo && old.Turns > w.Turns && old.Analysis >= detectors.TurnsCountedSince {
-			continue // partly deleted: the stored copy is fuller
+		w.Kept, w.KeptWhy = false, ""
+		old, stored := f.Weeks[w.Week]
+		o := decide(old, stored, w, partialUpTo)
+		outcomes[w.Week] = o
+		if o == fromLogs {
+			f.Weeks[w.Week] = w
 		}
-		f.Weeks[w.Week] = w
-		fromLogs[w.Week] = true
 	}
 	out := make([]detectors.Week, 0, len(f.Weeks))
 	for k, w := range f.Weeks {
-		w.Kept = !fromLogs[k]
+		o, inLogs := outcomes[k]
+		if !inLogs {
+			o = logsGone
+		}
+		w.Kept, w.KeptWhy = o != fromLogs, o.why()
 		out = append(out, w)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Week < out[j].Week })
 	return out
+}
+
+// weekOutcome is where a week's figures come from after a merge
+// (docs/state-machines.md §6).
+type weekOutcome int
+
+const (
+	fromLogs   weekOutcome = iota // this run's figures, from the logs
+	keptFuller                    // the logs were partly deleted; the stored copy counted more turns the same way
+	logsGone                      // the logs no longer hold the week; the stored copy
+)
+
+func (o weekOutcome) why() string {
+	return [...]string{"", "logs partly deleted, stored copy fuller", "logs deleted"}[o]
+}
+
+// decide picks between this run's week w and the stored copy old (stored
+// reports whether there is one). Only weeks up to partialUpTo can be partly
+// deleted, and a stored copy wins only if it counted turns as this version
+// does (detectors.TurnsCountedSince) and counted more of them.
+func decide(old detectors.Week, stored bool, w detectors.Week, partialUpTo string) weekOutcome {
+	if stored && w.Week <= partialUpTo && old.Turns > w.Turns && old.Analysis >= detectors.TurnsCountedSince {
+		return keptFuller
+	}
+	return fromLogs
 }
 
 // Save writes the history to path, creating its folder. It writes a new file

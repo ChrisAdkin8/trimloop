@@ -76,7 +76,11 @@ func weeksSection(w io.Writer, weeks []detectors.Week, prices string) {
 	for _, k := range weeks {
 		kept := ""
 		if k.Kept {
-			kept = "  (kept from an earlier run)"
+			kept = "  (kept from an earlier run"
+			if k.KeptWhy != "" {
+				kept += ": " + k.KeptWhy
+			}
+			kept += ")"
 		}
 		if reason := olderReason(k, prices); reason != "" {
 			kept += "  (" + reason + ")"

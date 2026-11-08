@@ -41,6 +41,10 @@ type Week struct {
 	// logs are gone, or partly gone and the stored copy was fuller (the
 	// harness deletes old logs). Shown, not stored.
 	Kept bool `json:"kept,omitempty"`
+	// KeptWhy says why a kept week's figures came from the history file:
+	// "logs deleted", or "logs partly deleted, stored copy fuller". Shown,
+	// not stored.
+	KeptWhy string `json:"kept_why,omitempty"`
 }
 
 // AnalysisVersion changes whenever a fix changes how the weekly figures are

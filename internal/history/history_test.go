@@ -91,3 +91,22 @@ func TestMergeOlderFigures(t *testing.T) {
 		t.Errorf("complete week: got %+v, want this run's figures", w)
 	}
 }
+
+func TestMergeSaysWhyAWeekWasKept(t *testing.T) {
+	now := detectors.AnalysisVersion
+	f := File{Version: Version, Weeks: map[string]detectors.Week{
+		"2026-09-21": {Week: "2026-09-21", Turns: 50, Analysis: now},  // logs gone
+		"2026-09-28": {Week: "2026-09-28", Turns: 400, Analysis: now}, // partly deleted; fuller
+		"2026-10-05": {Week: "2026-10-05", Turns: 10, Analysis: now},  // the logs hold more now
+	}}
+	got := Merge(&f, []detectors.Week{{Week: "2026-09-28", Turns: 120}, {Week: "2026-10-05", Turns: 300}}, "p", "2026-09-28")
+	want := map[string]string{"2026-09-21": "logs deleted", "2026-09-28": "logs partly deleted, stored copy fuller", "2026-10-05": ""}
+	for _, w := range got {
+		if w.KeptWhy != want[w.Week] || w.Kept != (want[w.Week] != "") {
+			t.Errorf("week %s: kept %v %q, want %q", w.Week, w.Kept, w.KeptWhy, want[w.Week])
+		}
+	}
+	if f.Weeks["2026-10-05"].Turns != 300 || f.Weeks["2026-09-28"].Turns != 400 || f.Weeks["2026-09-21"].KeptWhy != "" {
+		t.Errorf("stored weeks: %+v", f.Weeks)
+	}
+}

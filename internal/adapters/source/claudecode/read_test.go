@@ -387,6 +387,13 @@ func TestReadTailSeesCompaction(t *testing.T) {
 	if tl, err := ReadTail(p); err != nil || tl.Compaction == nil || tl.Latest.ID != "" {
 		t.Errorf("got %+v, %v; want the compaction alone", tl, err)
 	}
+	// A reply with no time, logged after the compaction, cannot be placed
+	// before it: the compaction is behind it.
+	untimed := `{"type":"assistant","message":{"id":"m3","usage":{"cache_read_input_tokens":80000}}}` + "\n"
+	writeFile(t, p, compact+untimed)
+	if tl, err := ReadTail(p); err != nil || tl.Compaction != nil || tl.Latest.ID != "m3" {
+		t.Errorf("got %+v, %v; want m3 with the compaction behind it", tl, err)
+	}
 }
 
 // Only the end of a large log is read; a line cut by the start is skipped.
