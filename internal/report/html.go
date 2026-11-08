@@ -48,6 +48,8 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 	"join":     strings.Join,
 	"add":      func(a, b int) int { return a + b },
 	"kind":     func(k fixes.Kind) string { return string(k) },
+	"w":        func(x float64) string { return fmt.Sprintf("%.1f", max(0, x)) },
+	"p0":       func(x float64) string { return fmt.Sprintf("%.0f%%", x) },
 	"float":    func(n int) float64 { return float64(n) },
 	// args packs values for a sub-template, which reads them with index.
 	"args": func(v ...any) []any { return v },
@@ -77,6 +79,8 @@ type view struct {
 	// StandingGap is true when the system prompt and tools were recorded
 	// for noticeably fewer than all turns.
 	StandingGap bool
+
+	Summary summaryView // the two bars at the top of the page
 }
 
 // sessionRow joins one session's P19 and P09 figures.
@@ -142,6 +146,7 @@ func newView(r Results) view {
 	}
 	v.ThisWeek = detectors.WeekOf(r.Generated.Local())
 	v.StandingGap = r.Standing.Turns > 0 && float64(r.Standing.Covered) < 0.99*float64(r.Standing.Turns)
+	v.Summary = newSummary(r)
 	return v
 }
 

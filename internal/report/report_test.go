@@ -277,3 +277,48 @@ func TestContextName(t *testing.T) {
 		}
 	}
 }
+
+// The summary at the top shows spend against turns by conversation size, and
+// what filled the conversation.
+func TestHTMLSummary(t *testing.T) {
+	r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+	v := newSummary(r)
+	if len(v.Bands) != 4 || v.Bands[0].Label != "Under 50k" || v.Bands[3].Label != "Over 500k" {
+		t.Fatalf("bands: got %+v", v.Bands)
+	}
+	// sample(): 300k ($40), 600k ($60), 10k ($10) turns; total $110.
+	if !near(v.LargeSpendShare, 100*100.0/110) || !near(v.LargeTurnShare, 100*2.0/3) {
+		t.Errorf("large shares: got %v of spend, %v of turns", v.LargeSpendShare, v.LargeTurnShare)
+	}
+	if v.SmallCost != "$10" || v.LargeCost != "$40–$60" {
+		t.Errorf("cost ranges: got %q and %q", v.SmallCost, v.LargeCost)
+	}
+	sum := 0.0
+	for _, p := range v.Fill {
+		sum += p.Cost
+	}
+	if !near(sum, v.Input) {
+		t.Errorf("the parts should add up to what was sent: %v against %v", sum, v.Input)
+	}
+	var buf bytes.Buffer
+	if err := WriteHTML(&buf, r); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "ZgotmplZ") {
+		t.Error("the template blanked a value it considered unsafe")
+	}
+	for _, want := range []string{"91% of your spend came from turns over 200k tokens", "paid to send the conversation to Claude",
+		"Tool output", `class="size4"`, `class="kind2"`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("page has no %q", want)
+		}
+	}
+}
+
+func near(a, b float64) bool { return a-b < 1e-9 && b-a < 1e-9 }
+
+func TestCostRange(t *testing.T) {
+	if costRange(nil) != "" || costRange([]float64{0.061, 0.0612}) != "$0.06" || costRange([]float64{0.15, 0.28}) != "$0.15–$0.28" {
+		t.Error("costRange is wrong")
+	}
+}

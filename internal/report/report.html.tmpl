@@ -11,12 +11,16 @@
   --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #66665f; --line: #e4e3de;
   --accent: #2f6f5e; --accent-soft: #d9ebe4; --warn: #9c4a22; --warn-soft: #f6e3d8;
   --bar: #2f6f5e; --bar2: #9cc8b8; --bar3: #c98a5e; --bar4: #8d8c86; --code: #f1f0ec;
+  --size1: #0ca30c; --size2: #1baf7a; --size3: #eda100; --size4: #d03b3b;
+  --kind1: #2a78d6; --kind2: #eb6834; --kind3: #1baf7a; --kind4: #eda100;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #161715; --panel: #1f201e; --text: #ecebe6; --muted: #a9a8a1; --line: #34352f;
     --accent: #7cc4a9; --accent-soft: #24392f; --warn: #f0a07a; --warn-soft: #3d2a20;
     --bar: #7cc4a9; --bar2: #3f6b5b; --bar3: #c98a5e; --bar4: #77766f; --code: #2a2b27;
+    --size1: #0ca30c; --size2: #199e70; --size3: #c98500; --size4: #e66767;
+    --kind1: #3987e5; --kind2: #d95926; --kind3: #199e70; --kind4: #c98500;
   }
 }
 * { box-sizing: border-box; }
@@ -72,6 +76,20 @@ td.session { min-width: 16em; }
 dl.glossary { display: grid; grid-template-columns: 11em 1fr; gap: 6px 16px; margin: 0; }
 dl.glossary dt { font-weight: 600; }
 dl.glossary dd { margin: 0; color: var(--muted); }
+a { color: var(--accent); }
+.summary h2 { margin: 0 0 2px; font-size: 20px; }
+.summary .row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.summary .row b { width: 4.5em; font-size: 13px; font-weight: 600; color: var(--muted); }
+.strip { flex: 1; display: flex; gap: 2px; height: 22px; border-radius: 5px; overflow: hidden; }
+.strip span { display: block; height: 100%; min-width: 2px; }
+.summary .legend { margin: 8px 0 0; line-height: 1.9; }
+.summary .legend span { white-space: nowrap; margin-right: 14px; }
+.summary .legend i { margin-left: 0; }
+.summary + .summary { margin-top: 12px; }
+.size1 { background: var(--size1); } .size2 { background: var(--size2); }
+.size3 { background: var(--size3); } .size4 { background: var(--size4); }
+.kind1 { background: var(--kind1); } .kind2 { background: var(--kind2); }
+.kind3 { background: var(--kind3); } .kind4 { background: var(--kind4); }
 footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
 @media (max-width: 640px) { .barcell { display: none; } dl.glossary { grid-template-columns: 1fr; } }
 </style>
@@ -88,9 +106,24 @@ footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
 {{with .Reconciliation}}{{if and .Sessions (gt .Gap 0.0)}}<br><span class="muted small">Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more, for background requests its logs don't show — see <a href="#checks">Checking the totals</a>.</span>{{end}}{{end}}
 </p>
 
+{{with .Summary}}{{if .Bands}}
+<section class="panel summary" aria-label="Spend by conversation size">
+  <h2>{{p0 .LargeSpendShare}} of your spend came from turns over {{short .Threshold}} tokens</h2>
+  <p class="muted">Only {{p0 .LargeTurnShare}} of turns were that large{{if and .LargeCost .SmallCost}}, but each one cost {{.LargeCost}}, against {{.SmallCost}} for smaller turns{{end}}. Every turn sends the whole conversation again, so long sessions get dear.</p>
+  <div class="row"><b>Spend</b><div class="strip" role="img" aria-label="Share of spend by conversation size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .SpendShare}}%" title="{{.Label}} tokens: {{dollars .Cost}} ({{p0 .SpendShare}} of spend)"></span>{{end}}</div></div>
+  <div class="row"><b>Turns</b><div class="strip" role="img" aria-label="Share of turns by conversation size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .TurnShare}}%" title="{{.Label}} tokens: {{p0 .TurnShare}} of turns"></span>{{end}}</div></div>
+  <p class="legend">{{range .Bands}}<span><i class="{{.Class}}"></i>{{.Label}} tokens · {{dollars .Cost}} · {{p0 .SpendShare}} of spend, {{p0 .TurnShare}} of turns</span>{{end}}</p>
+</section>
+<section class="panel summary" aria-label="What filled the conversation">
+  <h2>{{dollars .Input}} paid to send the conversation to Claude</h2>
+  <p class="muted">Claude's replies cost another {{dollars .Output}}. This is what the conversation was made of.</p>
+  <div class="row"><div class="strip" role="img" aria-label="What filled the conversation, by cost">{{range .Fill}}<span class="{{.Class}}" style="width: {{w .Share}}%" title="{{.Label}}: {{dollars .Cost}}"></span>{{end}}</div></div>
+  <p class="legend">{{range .Fill}}<span><i class="{{.Class}}"></i>{{.Label}} · {{dollars .Cost}} ({{p0 .Share}})</span>{{end}}</p>
+</section>
+{{end}}{{end}}
+
 <div class="tiles">
   <div class="panel tile"><div class="num">{{dollars .Total}}</div><div class="lbl">spent{{if .Period.Days}} · about {{dollars .Period.PerWeek}} a week{{end}}</div></div>
-  {{with .Context}}<div class="panel tile"><div class="num">{{pct .Cost $.Total}}</div><div class="lbl">spent on turns that sent over {{short .Threshold}} tokens of conversation</div></div>{{end}}
   {{range .Growth.TopShares}}{{if eq .N 5}}<div class="panel tile"><div class="num">{{share .Share}}</div><div class="lbl">spent in the 5 costliest sessions</div></div>{{end}}{{end}}
   {{with .SubAgents}}{{if .Runs}}<div class="panel tile"><div class="num">{{pct .Cost $.Total}}</div><div class="lbl">spent by sub-agents ({{thousands .Runs}} runs)</div></div>{{end}}{{end}}
 </div>
