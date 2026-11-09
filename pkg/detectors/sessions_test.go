@@ -327,3 +327,16 @@ func TestFindGrowthMedianOfEvenCount(t *testing.T) {
 		t.Errorf("median conversation: got $%v, want $10", f.MedianCost)
 	}
 }
+
+// A band's mean cost is over its priced turns: a turn on a model with no
+// price costs 0 and would pull it down. Turn counts keep every turn.
+func TestFindGrowthBandMeanLeavesOutUnpriced(t *testing.T) {
+	turn := func(cost float64, priced bool) event.Turn {
+		return event.Turn{Usage: event.Usage{CacheRead: 300_000}, Cost: event.Cost{CacheRead: cost}, Priced: priced}
+	}
+	s := event.Session{ID: "s", Kind: "main", Turns: []event.Turn{turn(4, true), turn(4, true), turn(0, false)}}
+	b := FindGrowth([]event.Session{s}, 500_000, 1).Bands[2] // 200k to 500k
+	if b.Turns != 3 || b.Priced != 2 || !near(b.MeanCost(), 4) {
+		t.Errorf("got %+v, mean %v; want 3 turns, 2 priced, $4 each", b, b.MeanCost())
+	}
+}

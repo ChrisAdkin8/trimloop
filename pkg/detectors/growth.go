@@ -66,18 +66,20 @@ type ConversationStat struct {
 // Band is the turns whose context falls in (Min, Max] tokens: more than
 // Min, up to and including Max (Max 0: no upper end).
 type Band struct {
-	Min   int     `json:"min"`
-	Max   int     `json:"max"` // 0 means no upper bound
-	Turns int     `json:"turns"`
-	Cost  float64 `json:"cost"`
+	Min    int     `json:"min"`
+	Max    int     `json:"max"`    // 0 means no upper bound
+	Turns  int     `json:"turns"`  // all turns, priced or not
+	Priced int     `json:"priced"` // those with a price
+	Cost   float64 `json:"cost"`
 }
 
-// MeanCost is the average cost of a turn in the band.
+// MeanCost is the average cost of a priced turn in the band: a turn on a
+// model with no price costs 0 here, which would pull the mean down.
 func (b Band) MeanCost() float64 {
-	if b.Turns == 0 {
+	if b.Priced == 0 {
 		return 0
 	}
-	return b.Cost / float64(b.Turns)
+	return b.Cost / float64(b.Priced)
 }
 
 // bandEdges are the context sizes, in tokens, that split turns into bands.
@@ -123,6 +125,9 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 			b := &f.Bands[sort.SearchInts(bandEdges, ctx)] // exactly 200k is not over 200k
 			b.Turns++
 			b.Cost += t.Cost.Total()
+			if t.Priced {
+				b.Priced++
+			}
 			if t.CompactedBefore {
 				compacted = true
 				f.Compactions++

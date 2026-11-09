@@ -285,7 +285,7 @@ cache_write_1h`. The cache-hit ratio used by P01 and P02 is
 
 | API surface | `input_uncached` | `cache_read` | `cache_write_*` | `output` | `reasoning` |
 |---|---|---|---|---|---|
-| Anthropic Messages | `input_tokens` (already excludes cache) | `cache_read_input_tokens` | `cache_creation.ephemeral_5m_input_tokens`, `ephemeral_1h_input_tokens`; if absent, `cache_creation_input_tokens` counts as 5m | `output_tokens` | `output_tokens_details.thinking_tokens` |
+| Anthropic Messages | `input_tokens` (already excludes cache) | `cache_read_input_tokens` | `cache_creation.ephemeral_5m_input_tokens`, `ephemeral_1h_input_tokens`; writes `cache_creation_input_tokens` counts beyond that split (all of it, when the split is absent) count as 5m | `output_tokens` | `output_tokens_details.thinking_tokens` |
 | OpenAI Responses | `input_tokens − input_tokens_details.cached_tokens` | `input_tokens_details.cached_tokens` | 0 | `output_tokens` | `output_tokens_details.reasoning_tokens` |
 | OpenAI Chat Completions | `prompt_tokens − prompt_tokens_details.cached_tokens` | `prompt_tokens_details.cached_tokens` | 0 | `completion_tokens` | `completion_tokens_details.reasoning_tokens` |
 | Gemini | `promptTokenCount − cachedContentTokenCount` | `cachedContentTokenCount` | 0 (managed-cache storage is priced separately) | `candidatesTokenCount + thoughtsTokenCount` | `thoughtsTokenCount` |

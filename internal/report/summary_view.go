@@ -58,11 +58,13 @@ func newSummary(r Results) summaryView {
 		bs := bandShare{Label: label, Class: bandClasses[min(i, len(bandClasses)-1)], Cost: b.Cost,
 			SpendShare: pct(b.Cost, r.Total), TurnShare: pct(float64(b.Turns), float64(turns))}
 		s.Bands = append(s.Bands, bs)
-		if b.Turns == 0 {
-			continue
-		}
 		if b.Min >= s.Threshold {
 			s.LargeTurnShare += bs.TurnShare // all turns over the threshold, as the bars count them
+		}
+		if b.Priced == 0 {
+			continue // no mean cost to show
+		}
+		if b.Min >= s.Threshold {
 			large = append(large, b.MeanCost())
 		} else {
 			small = append(small, b.MeanCost())

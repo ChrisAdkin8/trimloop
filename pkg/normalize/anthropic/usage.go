@@ -37,7 +37,9 @@ func NormalizeUsage(u Usage) event.Usage {
 	}
 
 	// Prefer the split by lifetime: some records give the split with a zero
-	// total. Writes the split does not cover count as 5m, the cheaper rate.
+	// total. Writes the total counts beyond the split count as 5m, the
+	// cheaper rate, so none is dropped (docs/data-model.md; scripts/recount.py
+	// does the same, and the golden logs hold such a line).
 	if u.CacheCreation != nil {
 		out.CacheWrite5m = u.CacheCreation.Ephemeral5mInputTokens
 		out.CacheWrite1h = u.CacheCreation.Ephemeral1hInputTokens

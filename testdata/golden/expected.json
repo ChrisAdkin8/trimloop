@@ -6,7 +6,7 @@
  "cost": {
   "cache_read": 0.656885365,
   "cache_write_1h": 14.37512,
-  "cache_write_5m": 1.246725,
+  "cache_write_5m": 1.249225,
   "input_uncached": 0.0015346,
   "output": 0.72269
  },
@@ -44,7 +44,7 @@
    "turns": 10
   },
   "claude-sonnet-5-5": {
-   "cost": 0.3434765,
+   "cost": 0.3459765,
    "turns": 10
   }
  },
@@ -57,7 +57,7 @@
  "projects": {
   "beta": {
    "conversations": 2,
-   "cost": 0.8443635,
+   "cost": 0.8468635,
    "sub_agent_cost": 0.0393561,
    "turns": 14
   },
@@ -353,9 +353,9 @@
  "reconciliation": {
   "behind": 2,
   "behind_cost": 9.722921675,
-  "gap": 0.22245221,
+  "gap": 0.21995221,
   "harness": 5.2,
-  "ours": 4.97754779,
+  "ours": 4.98004779,
   "sessions": 4,
   "unpriced": 1,
   "unrecorded": 7,
@@ -379,7 +379,7 @@
    "turns": 4
   },
   "beta-1": {
-   "cost": 0.2968298,
+   "cost": 0.2993298,
    "turns": 8
   },
   "beta-1/agent-b1plan01": {
@@ -469,16 +469,16 @@
  "tokens": {
   "cache_read": 3411289,
   "cache_write_1h": 1074515,
-  "cache_write_5m": 983774,
+  "cache_write_5m": 984774,
   "input_uncached": 521,
   "output": 36550
  },
- "total": 17.002954965,
+ "total": 17.005454965,
  "zones": {
   "America/Los_Angeles": {
    "period": {
     "days": 25,
-    "per_week": 4.76082739
+    "per_week": 4.76152739
    },
    "weeks": {
     "2026-10-12": {
@@ -488,7 +488,7 @@
     },
     "2026-10-19": {
      "compactions": 2,
-     "spend": 1.51145019,
+     "spend": 1.51395019,
      "turns": 34
     },
     "2026-10-26": {
@@ -506,7 +506,7 @@
   "Asia/Kolkata": {
    "period": {
     "days": 25,
-    "per_week": 4.76082739
+    "per_week": 4.76152739
    },
    "weeks": {
     "2026-10-12": {
@@ -516,7 +516,7 @@
     },
     "2026-10-19": {
      "compactions": 1,
-     "spend": 0.88283169,
+     "spend": 0.88533169,
      "turns": 26
     },
     "2026-10-26": {
@@ -534,7 +534,7 @@
   "Pacific/Auckland": {
    "period": {
     "days": 25,
-    "per_week": 4.76082739
+    "per_week": 4.76152739
    },
    "weeks": {
     "2026-10-12": {
@@ -544,7 +544,7 @@
     },
     "2026-10-19": {
      "compactions": 1,
-     "spend": 0.76364049,
+     "spend": 0.76614049,
      "turns": 22
     },
     "2026-10-26": {
@@ -562,7 +562,7 @@
   "UTC": {
    "period": {
     "days": 25,
-    "per_week": 4.76082739
+    "per_week": 4.76152739
    },
    "weeks": {
     "2026-10-12": {
@@ -572,7 +572,7 @@
     },
     "2026-10-19": {
      "compactions": 2,
-     "spend": 1.31968269,
+     "spend": 1.32218269,
      "turns": 32
     },
     "2026-10-26": {

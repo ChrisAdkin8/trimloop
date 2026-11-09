@@ -114,10 +114,13 @@ def usage(
     speed=None,
     split=True,
     iterations=None,
+    unsplit=0,
 ):
+    # unsplit: cache writes the total counts but the lifetime split does not
+    # (they count as 5-minute writes, docs/data-model.md).
     u = {
         "input_tokens": unc,
-        "cache_creation_input_tokens": w5 + w1,
+        "cache_creation_input_tokens": w5 + w1 + unsplit,
         "cache_read_input_tokens": read,
     }
     if split:
@@ -643,7 +646,8 @@ def beta_1(root):
             cwd=cwd,
         )
     t += timedelta(minutes=50)  # waited for the sub-agents: the 5-minute cache expired
-    s.reply(t, "claude-sonnet-5-5", usage(w5=s.ctx + 2_000, unc=6, out=300))
+    # Its total counts 1,000 more writes than its split by lifetime.
+    s.reply(t, "claude-sonnet-5-5", usage(w5=s.ctx + 2_000, unc=6, out=300, unsplit=1_000))
     s.cost_state(
         t + timedelta(seconds=30),
         at("2026-10-21 09:59"),

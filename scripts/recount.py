@@ -165,13 +165,14 @@ def price(model, tok, fast, us):
 
 def norm_usage(u):
     """docs/data-model.md, Anthropic Messages row: (uncached, read, 5m, 1h,
-    output). The split by lifetime when given; else the write total is 5m."""
+    output). The split by lifetime when given; writes the total counts
+    beyond the split (all of them, with no split) are 5m."""
     cc = u.get("cache_creation")
+    w5, w1 = 0, 0
     if isinstance(cc, dict):
         w5 = cc.get("ephemeral_5m_input_tokens") or 0
         w1 = cc.get("ephemeral_1h_input_tokens") or 0
-    else:
-        w5, w1 = u.get("cache_creation_input_tokens") or 0, 0
+    w5 += max(0, (u.get("cache_creation_input_tokens") or 0) - w5 - w1)
     return [
         u.get("input_tokens") or 0,
         u.get("cache_read_input_tokens") or 0,
