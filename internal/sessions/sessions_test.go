@@ -216,13 +216,17 @@ func TestReadSessionMissingFile(t *testing.T) {
 }
 
 func TestSessionFor(t *testing.T) {
-	main := sessionFor("/p/proj/abc.jsonl")
+	main := sessionFor(source.Log{Path: "/p/proj/abc.jsonl", Session: "abc"})
 	if main.ID != "abc" || main.Kind != "main" {
 		t.Errorf("main: got %+v", main)
 	}
-	sub := sessionFor("/p/proj/abc/subagents/agent-x.jsonl")
+	sub := sessionFor(source.Log{Path: "/p/proj/abc/subagents/agent-x.jsonl", Session: "abc/agent-x", Parent: "abc"})
 	if sub.ID != "abc/agent-x" || sub.Kind != "subagent" || sub.ParentID != "abc" {
 		t.Errorf("subagent: got %+v", sub)
+	}
+	// A reader that gives no session id: the log is named after its file.
+	if got := sessionFor(source.Log{Path: "/p/proj/xyz.jsonl"}); got.ID != "xyz" || got.Kind != "main" {
+		t.Errorf("unnamed: got %+v", got)
 	}
 }
 
@@ -418,7 +422,7 @@ func TestBuildSessionCountsCopiedLinesOnce(t *testing.T) {
 		t.Fatalf("original: got %+v", first.Turns[0])
 	}
 	second := buildSession(logData{log: source.Log{Path: "/p/b.jsonl"}, msgs: []source.Message{skills, compact, {ID: "b"},
-		{ID: "c", Model: "<synthetic>"}}}, seen)
+		{ID: "c", Model: "<synthetic>", Synthetic: true}}}, seen)
 	if len(second.Turns) != 1 || len(second.Turns[0].Injected) != 0 || second.Turns[0].CompactedBefore {
 		t.Errorf("resumed: got %+v, want one turn with nothing copied counted again", second.Turns)
 	}
@@ -599,7 +603,7 @@ func TestBuildSessionFirstTurnAfterRefusals(t *testing.T) {
 	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
 		{Kind: source.KindLimitHit, ID: "l", Time: t0, Limit: "session"},
 		{Kind: source.KindFailure, ID: "f", Time: t0.Add(time.Minute), Failure: "network"},
-		{ID: "x", Model: claudecode.Synthetic, Time: t0.Add(2 * time.Minute)},
+		{ID: "x", Model: "<synthetic>", Synthetic: true, Time: t0.Add(2 * time.Minute)},
 		{ID: "a", Model: "claude-sonnet-4-5", Time: t0.Add(5 * time.Hour)},
 		{ID: "b", Model: "claude-sonnet-4-5", Time: t0.Add(6 * time.Hour)},
 	}}

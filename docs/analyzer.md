@@ -131,9 +131,12 @@ type Reader interface {
 }
 
 type Log struct {
-    Harness string // Name of the Reader that found it
-    Path    string
-    Offset  int64  // where reading starts; not yet saved between runs
+    Harness   string // Name of the Reader that found it
+    Path      string
+    Session   string // the session's id; "" means the file name
+    Parent    string // a sub-agent's main session; "" for a main session
+    AgentType string // a sub-agent's type recorded beside its log; "" if unknown
+    Offset    int64  // where reading starts; not yet saved between runs
 }
 
 // Message is one log line that matters (a turn with usage and its tool
@@ -148,6 +151,10 @@ type Log struct {
 //   collects tool calls from every line with that id.
 // - A line it cannot parse is yielded as an error wrapping ErrBadLine, and
 //   reading carries on.
+// - Harness-specific knowledge stays in the reader: Discover names each
+//   log's session (and a sub-agent's parent and type), and Read marks a
+//   reply the harness made up itself (Message.Synthetic). internal/sessions,
+//   which builds sessions from any reader's logs, never names a harness.
 
 // A Source produces raw events from a live stream: a socket, an HTTP body
 // (the gateway ingest API, the OTLP receiver, the local proxy).

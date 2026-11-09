@@ -3,6 +3,7 @@ package claudecode
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 )
@@ -47,8 +48,27 @@ func (r Reader) Discover() ([]source.Log, error) {
 			return nil, err // only happens if the pattern itself is malformed
 		}
 		for _, p := range paths {
-			logs = append(logs, source.Log{Harness: r.Name(), Path: p})
+			l := source.Log{Harness: r.Name(), Path: p}
+			l.Session, l.Parent = identify(p)
+			if l.Parent != "" {
+				l.AgentType = agentType(p)
+			}
+			logs = append(logs, l)
 		}
 	}
 	return logs, nil
+}
+
+// identify names the session a log holds. A main session's log is named
+// after its session id. A sub-agent's log (<session>/subagents/<agent>.jsonl)
+// is shown with its session id in front, so it can be traced back to the
+// session that started it, which is its parent.
+func identify(path string) (session, parent string) {
+	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	dir := filepath.Dir(path)
+	if filepath.Base(dir) == "subagents" {
+		parent = filepath.Base(filepath.Dir(dir))
+		return parent + "/" + name, parent
+	}
+	return name, ""
 }

@@ -116,7 +116,7 @@ func TestParseLineCleansText(t *testing.T) {
 
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "agent-a1.meta.json"), string(line(map[string]any{"agentType": tag("type")})))
-	got = append(got, AgentType(filepath.Join(dir, "agent-a1.jsonl")))
+	got = append(got, agentType(filepath.Join(dir, "agent-a1.jsonl")))
 
 	if len(got) != 17 {
 		t.Errorf("checked %d strings, want 17", len(got))

@@ -196,7 +196,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return source.Message{Kind: source.KindLimitHit, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
 			Limit: limitKind(blocks(rec.Message.Content))}, true, nil
 
-	case rec.Type == "assistant" && rec.IsAPIErrorMessage && (rec.Message.Model == Synthetic || limitError(rec.Error)):
+	case rec.Type == "assistant" && rec.IsAPIErrorMessage && (rec.Message.Model == synthetic || limitError(rec.Error)):
 		return source.Message{Kind: source.KindFailure, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
 			Failure: failureKind(errorText(rec.Error), blocks(rec.Message.Content))}, true, nil
 
@@ -209,6 +209,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			Time:      ts,
 			Project:   cleanFolder(projectOf(rec.Cwd)),
 			Model:     rec.Message.Model,
+			Synthetic: rec.Message.Model == synthetic,
 			Usage:     replyUsage(u.Usage, u.Iterations),
 			Fast:      u.Speed == "fast",
 			USOnly:    u.InferenceGeo == "us",

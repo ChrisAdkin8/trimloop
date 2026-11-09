@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
-	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
@@ -130,7 +129,7 @@ func oldestFirst(data []logData) {
 // earlier log (copied into a resumed session) are not: their output is
 // credited to the log it first appeared in.
 func buildSession(d logData, seen map[string]bool) event.Session {
-	s := sessionFor(d.log.Path)
+	s := sessionFor(d.log)
 	var last time.Time            // latest response time so far in this log
 	replied := false              // a real reply (not one the harness made up) came earlier in this log
 	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
@@ -223,7 +222,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			continue
 		}
 
-		if m.Model == claudecode.Synthetic {
+		if m.Synthetic {
 			// A reply the harness made up (after an API error): no usage,
 			// not a turn, but still activity.
 			active(m.Time)
@@ -296,7 +295,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 	}
 	s.Harness = sumRuns(runs)
 	if s.Kind == event.SubAgentSession && s.AgentType == "" {
-		s.AgentType = claudecode.AgentType(d.log.Path)
+		s.AgentType = d.log.AgentType // the type recorded beside the log, when no line named it
 	}
 	if u := pending.end(); u != nil {
 		s.Unreplied = append(s.Unreplied, *u)
@@ -480,15 +479,16 @@ func tail(path string, n int) string {
 	return strings.Join(parts[max(0, len(parts)-n):], "/")
 }
 
-// sessionFor names the session a log holds. A main session log is named after
-// its session ID. A subagent log is shown with its session ID in front, so it
-// can be traced back to the session that started it.
-func sessionFor(path string) event.Session {
-	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	dir := filepath.Dir(path)
-	if filepath.Base(dir) == "subagents" {
-		parent := filepath.Base(filepath.Dir(dir))
-		return event.Session{ID: parent + "/" + name, Kind: event.SubAgentSession, ParentID: parent}
+// sessionFor starts the session a log holds, named as its reader found it
+// (source.Log): a sub-agent's log names the main session that started it.
+// A log with no session id is named after its file.
+func sessionFor(l source.Log) event.Session {
+	id := l.Session
+	if id == "" {
+		id = strings.TrimSuffix(filepath.Base(l.Path), filepath.Ext(l.Path))
 	}
-	return event.Session{ID: name, Kind: event.MainSession}
+	if l.Parent != "" {
+		return event.Session{ID: id, Kind: event.SubAgentSession, ParentID: l.Parent}
+	}
+	return event.Session{ID: id, Kind: event.MainSession}
 }
