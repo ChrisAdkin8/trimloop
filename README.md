@@ -338,13 +338,7 @@ checks pass. The Homebrew cask does it for you.
 
 ## Licence and security
 
-Trimloop is source-available under the
-[Functional Source License 1.1, Apache-2.0 future licence](LICENSE.md)
-(FSL-1.1-ALv2). You may use, change and share it for any purpose, including
-at work, except to offer a competing commercial product or service. Each
-version becomes Apache-2.0 two years after its release. It is not "open
-source" by the Open Source Initiative's definition. Why:
-[ADR 0046](docs/adr/0046-licensing.md).
+Licence: [FSL-1.1-ALv2](LICENSE.md).
 
 Outside contributions are not accepted yet: they will need a contributor
 licence agreement. Please report security problems
