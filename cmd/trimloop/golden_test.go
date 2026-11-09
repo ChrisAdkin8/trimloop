@@ -14,8 +14,10 @@ import (
 	"time"
 	_ "time/tzdata" // the zones below, wherever the test runs
 
+	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
+	"github.com/ChrisAdkin8/trimloop/internal/sessions"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
@@ -123,27 +125,19 @@ type golden struct {
 	} `json:"projects"`
 }
 
-// goldenSessions reads the golden logs as analyse does: it finds and reads
-// them, then builds sessions with the same buildSessions, without the
-// history file or anything from the home folder.
+// goldenSessions reads the golden logs as analyse does, with the same
+// sessions.Load, without the history file or anything from the home folder.
 func goldenSessions(t *testing.T) ([]event.Session, report.Read) {
 	t.Helper()
 	claude := claudecode.Reader{ConfigDir: goldenDir}
-	logs, err := claude.Discover()
+	all, st, err := sessions.Load([]source.Reader{claude})
 	if err != nil {
 		t.Fatal(err)
 	}
-	read := report.Read{Logs: len(logs)}
-	data := make([]logData, 0, len(logs))
-	for _, l := range logs {
-		d := readLog(claude, l)
-		if d.err != nil {
-			t.Fatalf("%s: %v", l.Path, d.err)
-		}
-		read.BadLines += d.bad
-		data = append(data, d)
+	for _, p := range st.Problems {
+		t.Fatal(p)
 	}
-	return buildSessions(data), read
+	return all, report.Read{Logs: st.Logs, BadLines: st.BadLines}
 }
 
 // figures compares trimloop's figures with the recount's and names each one

@@ -18,8 +18,8 @@ each such entry says why it was left that way.
 
 | # | State machine | Where | Kind | Persisted |
 |---|---|---|---|---|
-| 1 | What the next turn inherits | `cmd/trimloop/between.go` | Explicit | No |
-| 2 | Building a session from a log | `cmd/trimloop/main.go` `buildSession` | Implicit, small | No |
+| 1 | What the next turn inherits | `internal/sessions/between.go` | Explicit | No |
+| 2 | Building a session from a log | `internal/sessions/sessions.go` `buildSession` | Implicit, small | No |
 | 3 | Trimloop's entries in Claude Code's settings | `internal/live/setup.go` `EntryState` | Explicit | Claude Code's settings file |
 | 4 | Size and pause nudges per session | `internal/live/state.go` `afterReply`, `beforeSend` | Explicit | `~/.trimloop/live/<session>.json` |
 | 5 | Usage-limit readings | `internal/history/limits.go`, `pkg/detectors/limits.go` | Explicit rule | `~/.trimloop/limits.jsonl` |
@@ -48,7 +48,8 @@ next turn inherits them. `between` holds them in two phases:
 | any other turn (`take`) | either phase → open: the turn takes everything, and the compaction |
 | end of log (`end`) | a compaction still pending was never replied to |
 
-Tests: `cmd/trimloop/between_test.go`, and the `TestBuildSession*` tests.
+Tests: `internal/sessions/between_test.go`, and the `TestBuildSession*` tests
+in `internal/sessions/sessions_test.go`.
 The rule is ADR 0045 rule 5.
 
 ## 2. Building a session from a log (implicit, small)
@@ -68,7 +69,8 @@ every later turn of a main session (`projectFor`: there, below or above it
 is the session's project); a sub-agent's turns keep the folder they ran in
 until `inheritProjects` matches them against the conversation's folder. Each is
 one variable with one rule, so they stay as they are. After all logs are
-read, two passes run across sessions (ADR 0053; `buildSessions`, which
+read, two passes run across sessions (ADR 0053; `buildSessions`, run by
+`sessions.Load`, which
 `TestGolden` runs too): `inheritProjects` credits each sub-agent's turns by
 its main session's folder (its own first folder when the main log was not
 read), then `nameProjects`
