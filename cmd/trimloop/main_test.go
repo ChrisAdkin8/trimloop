@@ -309,6 +309,27 @@ func TestInheritProjects(t *testing.T) {
 	}
 }
 
+// A subagent started in a subfolder of its conversation's project belongs
+// to that project, as the main session's turns there do; one that worked
+// in an unrelated folder keeps it.
+func TestInheritProjectsBySubfolder(t *testing.T) {
+	sessions := []event.Session{
+		{ID: "m", Kind: "main", Project: "/code/app", Turns: []event.Turn{{Project: "/code/app"}}},
+		{ID: "m/a", Kind: "subagent", ParentID: "m", Project: "/code/app/spec/harness",
+			Turns: []event.Turn{{Project: "/code/app/spec/harness"}, {Project: "/code/other"}}},
+		{ID: "m/b", Kind: "subagent", ParentID: "m", Project: "/code/other", Turns: []event.Turn{{Project: "/code/other"}}},
+	}
+	inheritProjects(sessions)
+	nameProjects(sessions)
+	a, b := sessions[1], sessions[2]
+	if a.Project != "app" || a.Turns[0].Project != "app" || a.Turns[1].Project != "other" {
+		t.Errorf("a: got %q, turns %q and %q; want app, app, other", a.Project, a.Turns[0].Project, a.Turns[1].Project)
+	}
+	if b.Project != "other" || b.Turns[0].Project != "other" {
+		t.Errorf("b: got %q, turn %q; want other", b.Project, b.Turns[0].Project)
+	}
+}
+
 // The full report runs on the fixture with every finding filled in.
 func TestFullReportOnFixture(t *testing.T) {
 	l := source.Log{Path: filepath.Join("..", "..", "testdata", "sessions", "tools.jsonl")}

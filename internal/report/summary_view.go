@@ -51,7 +51,7 @@ func newSummary(r Results) summaryView {
 		label := approx(b.Min) + "–" + approx(b.Max)
 		switch {
 		case b.Min == 0:
-			label = "Under " + approx(b.Max)
+			label = "Up to " + approx(b.Max) // a turn of exactly 50k is in it
 		case b.Max == 0:
 			label = "Over " + approx(b.Min)
 		}
@@ -62,16 +62,17 @@ func newSummary(r Results) summaryView {
 			continue
 		}
 		if b.Min >= s.Threshold {
+			s.LargeTurnShare += bs.TurnShare // all turns over the threshold, as the bars count them
 			large = append(large, b.MeanCost())
 		} else {
 			small = append(small, b.MeanCost())
 		}
 	}
 	s.SmallCost, s.LargeCost = costRange(small), costRange(large)
-	// The same figures as the text report's P19 section and the weekly
-	// table: the input cost of turns strictly over the threshold.
+	// The same spend as the text report's P19 section and the weekly table:
+	// the input cost of turns strictly over the threshold. The turn share
+	// is the bars' own, so the headline and the bars agree.
 	s.LargeSpendShare = pct(r.Context.Cost, r.Total)
-	s.LargeTurnShare = pct(float64(r.Context.Turns), float64(turns))
 
 	tools := r.Tools.Carried
 	inputs := r.ToolInputs.Carried

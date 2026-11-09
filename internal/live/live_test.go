@@ -442,8 +442,8 @@ func TestStatusLineKeepsLimitReadings(t *testing.T) {
 		var m map[string]any
 		_ = json.Unmarshal([]byte(session(t, 100_000, t0)), &m)
 		m["rate_limits"] = map[string]any{
-			"five_hour": map[string]any{"used_percentage": used, "resets_at": 1_800_000_000},
-			"seven_day": map[string]any{"used_percentage": 40, "resets_at": 1_800_500_000},
+			"five_hour": map[string]any{"used_percentage": used, "resets_at": t0.Add(3 * time.Hour).Unix()},
+			"seven_day": map[string]any{"used_percentage": 40, "resets_at": t0.Add(5 * 24 * time.Hour).Unix()},
 		}
 		b, _ := json.Marshal(m)
 		return string(b)
@@ -724,11 +724,14 @@ func TestInputIsLenient(t *testing.T) {
 		{name: "cost as a string", in: fmt.Sprintf(`{"session_id":"s1","transcript_path":%q,"cost":"4.10"}`, path), hooks: true, size: true},
 		{name: "resets_at as RFC 3339", in: five(`{"used_percentage":12,"resets_at":"2026-11-09T18:00:00Z"}`),
 			hooks: true, size: true, cost: true, resetsAt: time.Date(2026, 11, 9, 18, 0, 0, 0, time.UTC).Unix()},
-		{name: "resets_at as a number", in: five(`{"used_percentage":12,"resets_at":1800000000}`), hooks: true, size: true, cost: true, resetsAt: 1_800_000_000},
+		{name: "resets_at as a number", in: five(`{"used_percentage":12,"resets_at":1794150000}`), hooks: true, size: true, cost: true, resetsAt: 1_794_150_000},
+		{name: "resets_at in milliseconds", in: five(`{"used_percentage":12,"resets_at":1794150000000}`), hooks: true, size: true, cost: true, resetsAt: 1_794_150_000},
+		{name: "resets_at far in the future", in: five(`{"used_percentage":12,"resets_at":1e300}`), hooks: true, size: true, cost: true},
+		{name: "used_percentage null", in: five(`{"used_percentage":null,"resets_at":1794150000}`), hooks: true, size: true, cost: true},
 		{name: "resets_at not a time", in: five(`{"used_percentage":12,"resets_at":"soon"}`), hooks: true, size: true, cost: true},
 		{name: "resets_at missing", in: five(`{"used_percentage":12}`), hooks: true, size: true, cost: true},
 		{name: "resets_at zero", in: five(`{"used_percentage":12,"resets_at":0}`), hooks: true, size: true, cost: true},
-		{name: "used_percentage a string", in: five(`{"used_percentage":"12","resets_at":1800000000}`), hooks: true, size: true, cost: true},
+		{name: "used_percentage a string", in: five(`{"used_percentage":"12","resets_at":1794150000}`), hooks: true, size: true, cost: true},
 		{name: "rate_limits a list", in: `{` + base + `,"rate_limits":[1]}`, hooks: true, size: true, cost: true},
 		{name: "session_id a number", in: fmt.Sprintf(`{"session_id":1,"transcript_path":%q}`, path), size: true},
 		{name: "not JSON", in: `not json`},
@@ -764,6 +767,55 @@ func TestInputIsLenient(t *testing.T) {
 			Hook("stop", strings.NewReader(c.in), &out, e)
 			if got := strings.Contains(out.String(), "200k"); got != c.hooks {
 				t.Errorf("stop hook: got %q, want a nudge %v", out.String(), c.hooks)
+			}
+		})
+	}
+}
+
+// TestDecodeLimit checks which usage-limit readings are plausible enough to
+// keep: a reading that is not would sort after every genuine one in the
+// limits history, which would then drop them all.
+func TestDecodeLimit(t *testing.T) {
+	now := t0
+	in3h := now.Add(3 * time.Hour).Unix()
+	for _, c := range []struct {
+		name, in string
+		ok       bool
+		used     float64
+		resetsAt int64
+	}{
+		{name: "a normal reading", in: fmt.Sprintf(`{"used_percentage":12.5,"resets_at":%d}`, in3h), ok: true, used: 12.5, resetsAt: in3h},
+		{name: "RFC 3339", in: `{"used_percentage":12,"resets_at":"2026-11-08T12:00:00Z"}`, ok: true, used: 12, resetsAt: in3h},
+		{name: "milliseconds", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, in3h*1000), ok: true, used: 12, resetsAt: in3h},
+		{name: "a weekly reset", in: fmt.Sprintf(`{"used_percentage":40,"resets_at":%d}`, now.Add(7*24*time.Hour).Unix()), ok: true, used: 40,
+			resetsAt: now.Add(7 * 24 * time.Hour).Unix()},
+		{name: "reset a few hours ago", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, now.Add(-5*time.Hour).Unix()), ok: true, used: 12,
+			resetsAt: now.Add(-5 * time.Hour).Unix()},
+		{name: "over 100 is read as 100", in: fmt.Sprintf(`{"used_percentage":150,"resets_at":%d}`, in3h), ok: true, used: 100, resetsAt: in3h},
+		{name: "far future number", in: `{"used_percentage":12,"resets_at":1e300}`},
+		{name: "far future RFC 3339", in: `{"used_percentage":12,"resets_at":"9999-12-31T00:00:00Z"}`},
+		{name: "more than 8 days ahead", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, now.Add(9*24*time.Hour).Unix())},
+		{name: "more than a day ago", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, now.Add(-25*time.Hour).Unix())},
+		{name: "long past", in: `{"used_percentage":12,"resets_at":1000}`},
+		{name: "used_percentage null", in: fmt.Sprintf(`{"used_percentage":null,"resets_at":%d}`, in3h)},
+		{name: "used_percentage missing", in: fmt.Sprintf(`{"resets_at":%d}`, in3h)},
+		{name: "used_percentage negative", in: fmt.Sprintf(`{"used_percentage":-1,"resets_at":%d}`, in3h)},
+		{name: "resets_at null", in: `{"used_percentage":12,"resets_at":null}`},
+		{name: "missing", in: ``},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var b json.RawMessage
+			if c.in != "" {
+				b = json.RawMessage(c.in)
+			}
+			r := decodeLimit(b, now)
+			switch {
+			case !c.ok && r != nil:
+				t.Errorf("got %+v, want none", *r)
+			case c.ok && r == nil:
+				t.Error("got none, want a reading")
+			case c.ok && (r.UsedPercentage != c.used || int64(r.ResetsAt) != c.resetsAt):
+				t.Errorf("got %+v, want used %v, resets_at %d", *r, c.used, c.resetsAt)
 			}
 		})
 	}

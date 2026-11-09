@@ -51,9 +51,8 @@ func periodLine(w io.Writer, r Results) {
 // savingText is "likely about $X, up to $Y (Z%)", or "up to $Y (Z%)" when
 // there is no likelier estimate.
 func savingText(a fixes.Recommendation, total float64) string {
-	if a.Estimated && a.Likely <= 0 {
-		return fmt.Sprintf("likely nothing (replaying the logs, it costs about what it saves), up to %s (%.0f%%)",
-			money(a.Saving), pct(a.Saving, total))
+	if a.SavesNothing() {
+		return fmt.Sprintf("likely nothing (%s), up to %s (%.0f%%)", a.Nothing, money(a.Saving), pct(a.Saving, total))
 	}
 	if a.Likely > 0 && a.LikelyHigh > a.LikelyLow {
 		return fmt.Sprintf("likely about %s (%s–%s), up to %s (%.0f%%)", money(a.Likely), money(a.LikelyLow), money(a.LikelyHigh),

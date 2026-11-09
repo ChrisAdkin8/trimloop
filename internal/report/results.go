@@ -260,7 +260,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 		r.Actions = append(r.Actions, *r.SubAgentFix)
 	}
 	r.Actions = append(r.Actions, r.ToolFixes...)
-	sort.SliceStable(r.Actions, func(i, j int) bool { return r.Actions[i].Expected() > r.Actions[j].Expected() })
+	sortActions(&r)
 	r.Period = period(sessions, r.Total)
 	r.Labels = labels(sessions, r, s.Titles)
 	r.HideIDs = !s.Titles
@@ -370,4 +370,17 @@ func RetentionTip(r Retention) string {
 	}
 	return fmt.Sprintf("Claude Code deletes session logs once they have gone unused for %d days (%s), so older work "+
 		`drops out of reports. Set "cleanupPeriodDays": 365 in Claude Code's settings to keep a year.`, r.Days, how)
+}
+
+// sortActions ranks the actions: largest "up to" first, except that a card
+// whose replay found it saves nothing goes after every other, as its upper
+// bound is no reason to do it first.
+func sortActions(r *Results) {
+	sort.SliceStable(r.Actions, func(i, j int) bool {
+		a, b := r.Actions[i], r.Actions[j]
+		if a.SavesNothing() != b.SavesNothing() {
+			return b.SavesNothing()
+		}
+		return a.Expected() > b.Expected()
+	})
 }

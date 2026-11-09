@@ -61,7 +61,8 @@ type ConversationStat struct {
 	Cost    float64 `json:"cost"`
 }
 
-// Band is the turns whose context falls in [Min, Max) tokens.
+// Band is the turns whose context falls in (Min, Max] tokens: more than
+// Min, up to and including Max (Max 0: no upper end).
 type Band struct {
 	Min   int     `json:"min"`
 	Max   int     `json:"max"` // 0 means no upper bound

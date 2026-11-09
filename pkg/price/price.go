@@ -6,6 +6,7 @@
 package price
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -14,11 +15,12 @@ import (
 // Version identifies the catalogue. Every cost figure should record it.
 // Source: https://platform.claude.com/docs/en/about-claude/pricing, list
 // prices read on 2026-11-07 and checked again on 2026-11-08, when the
-// still-served 4.6-and-later models were added. Cache reads on Opus 5.5 and
+// still-served 4.6-and-later models were added, and on 2026-11-09, when
+// Opus 4.5 and Sonnet 4.5 were added. Cache reads on Opus 5.5 and
 // Sonnet 5.5 are 0.05x the input price and on Fable 5.1 0.025x (the page's
 // footnotes), not the usual 0.1x: Claude Code's own cost records price
 // Sonnet 5.5 reads at 0.1x, which shows up as reconciliation gap.
-const Version = "anthropic-list-2026-11-08"
+const Version = "anthropic-list-2026-11-09"
 
 // Rates are prices in US dollars per million tokens.
 type Rates struct {
@@ -65,9 +67,44 @@ var catalogue = map[string]Model{
 		Long:      Rates{0.50, 0.625, 1, 0.05, 2.50},
 		USOnly:    1.1,
 	},
-	"claude-haiku-4-5-20251001": {Rates: Rates{1, 1.25, 2, 0.10, 5}}, // before 4.6: no US-only surcharge
+	// Before 4.6: no US-only surcharge and no fast mode.
+	"claude-opus-4-5":           {Rates: Rates{5, 6.25, 10, 0.50, 25}},
+	"claude-sonnet-4-5":         {Rates: Rates{3, 3.75, 6, 0.30, 15}},
+	"claude-haiku-4-5-20251001": {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 	"claude-haiku-4-5":          {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 }
+
+// lookup finds a model's prices. An id the catalogue does not hold as written
+// is tried again without what cloud providers add around the model name:
+// "us.anthropic.claude-opus-5-5" and "anthropic.claude-opus-4-5-20251101-v1:0"
+// (Amazon Bedrock), "claude-opus-4-5@20251101" (Google Vertex AI), and a
+// date such as "claude-opus-4-5-20251101". A dated id the catalogue holds
+// (claude-haiku-4-5-20251001) is found before its date is removed. Nothing
+// else is guessed: an unknown model stays unpriced.
+func lookup(model string) (Model, bool) {
+	if m, ok := catalogue[model]; ok {
+		return m, true
+	}
+	id := model
+	for _, p := range []string{"us.", "eu.", "apac.", "global."} {
+		if rest, ok := strings.CutPrefix(id, p); ok {
+			id = rest
+			break
+		}
+	}
+	id = strings.TrimPrefix(id, "anthropic.")
+	id = bedrockVersion.ReplaceAllString(id, "")
+	if m, ok := catalogue[id]; ok {
+		return m, true
+	}
+	m, ok := catalogue[dateSuffix.ReplaceAllString(id, "")]
+	return m, ok
+}
+
+var (
+	bedrockVersion = regexp.MustCompile(`-v[0-9]+:[0-9]+$`) // "-v1:0"
+	dateSuffix     = regexp.MustCompile(`[-@][0-9]{8}$`)    // "-20251101" or Vertex's "@20251101"
+)
 
 // Options are the request settings that change the price.
 type Options struct {
@@ -82,7 +119,7 @@ func Cost(model string, u event.Usage, o Options) (c event.Cost, ok bool) {
 	if u.InputTotal() == 0 && u.Output == 0 {
 		return event.Cost{}, true
 	}
-	m, found := catalogue[model]
+	m, found := lookup(model)
 	if !found {
 		return event.Cost{}, false
 	}

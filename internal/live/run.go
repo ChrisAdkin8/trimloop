@@ -51,8 +51,8 @@ func (r *rateLimit) window() *detectors.LimitWindow {
 // decodeInput reads the input one field at a time, so a field sent with a
 // shape this version does not expect (Claude Code changes its input between
 // releases) loses only that field. Only input that is not a JSON object at
-// all is an error.
-func decodeInput(in io.Reader) (Input, error) {
+// all is an error. now is the clock usage-limit readings are checked against.
+func decodeInput(in io.Reader, now time.Time) (Input, error) {
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(in).Decode(&raw); err != nil {
 		return Input{}, err
@@ -65,7 +65,7 @@ func decodeInput(in io.Reader) (Input, error) {
 	field(raw, "effort", &inp.Effort)
 	var limits map[string]json.RawMessage
 	if field(raw, "rate_limits", &limits) {
-		five, seven := decodeLimit(limits["five_hour"]), decodeLimit(limits["seven_day"])
+		five, seven := decodeLimit(limits["five_hour"], now), decodeLimit(limits["seven_day"], now)
 		if five != nil || seven != nil {
 			inp.RateLimits = &struct {
 				FiveHour *rateLimit
@@ -91,22 +91,39 @@ func field[T any](raw map[string]json.RawMessage, key string, v *T) bool {
 	return true
 }
 
+// Bounds on a plausible reset time, around now: a window that reset up to a
+// day ago (a reading from an idle session), or one resetting within the
+// weekly window plus slack. A reset time outside them would sort after every
+// genuine reading, so the limits history would drop all later ones.
+const (
+	resetsAtPast   = 24 * time.Hour
+	resetsAtFuture = 8 * 24 * time.Hour
+	// msAbove is the largest value read as Unix seconds (the year 5138);
+	// above it a number is taken as Unix milliseconds.
+	msAbove = 1e11
+)
+
 // decodeLimit decodes one usage limit, or returns nil when it is missing,
-// does not fit, or is not plausible: a reading needs a use (not negative)
-// and a reset time. resets_at is Unix seconds (ADR 0048); an RFC 3339
-// time is accepted too.
-func decodeLimit(b json.RawMessage) *rateLimit {
+// does not fit, or is not plausible: a reading needs a use (a number, not
+// negative; above 100 is read as 100) and a reset time between a day before
+// now and eight days after. resets_at is Unix seconds (ADR 0048); Unix
+// milliseconds and an RFC 3339 time are accepted too.
+func decodeLimit(b json.RawMessage, now time.Time) *rateLimit {
 	var raw map[string]json.RawMessage
 	if b == nil || json.Unmarshal(b, &raw) != nil {
 		return nil
 	}
-	var r rateLimit
-	if !field(raw, "used_percentage", &r.UsedPercentage) || r.UsedPercentage < 0 {
+	var used *float64 // nil when sent as null, which would otherwise read as 0
+	if !field(raw, "used_percentage", &used) || used == nil || *used < 0 {
 		return nil
 	}
+	r := rateLimit{UsedPercentage: min(*used, 100)}
 	var at string
 	switch {
 	case field(raw, "resets_at", &r.ResetsAt):
+		if r.ResetsAt > msAbove {
+			r.ResetsAt /= 1000
+		}
 	case field(raw, "resets_at", &at):
 		t, err := time.Parse(time.RFC3339, at)
 		if err != nil {
@@ -114,7 +131,8 @@ func decodeLimit(b json.RawMessage) *rateLimit {
 		}
 		r.ResetsAt = float64(t.Unix())
 	}
-	if r.ResetsAt < 1 {
+	lo, hi := float64(now.Add(-resetsAtPast).Unix()), float64(now.Add(resetsAtFuture).Unix())
+	if r.ResetsAt < lo || r.ResetsAt > hi {
 		return nil
 	}
 	return &r
@@ -142,8 +160,8 @@ func DefaultEnv(home string) Env {
 }
 
 // readInput decodes the input and the session's latest reply.
-func readInput(in io.Reader) (Input, Reply, error) {
-	inp, err := decodeInput(in)
+func readInput(in io.Reader, now time.Time) (Input, Reply, error) {
+	inp, err := decodeInput(in, now)
 	if err != nil {
 		return inp, Reply{}, err
 	}
@@ -179,7 +197,7 @@ const (
 // and on its refresh timer, so it reads only the end of one log. On any
 // problem it prints what it can, and never fails.
 func StatusLine(in io.Reader, out io.Writer, env Env) {
-	inp, r, err := readInput(in)
+	inp, r, err := readInput(in, env.Now)
 	recordLimits(env, inp)
 	cost := -1.0
 	if inp.Cost != nil {
@@ -220,7 +238,7 @@ func StatusLine(in io.Reader, out io.Writer, env Env) {
 // holding a prompt); whether systemMessage also reaches the model is not
 // documented (ADR 0034).
 func Hook(event string, in io.Reader, out io.Writer, env Env) {
-	inp, r, err := readInput(in)
+	inp, r, err := readInput(in, env.Now)
 	if err != nil || inp.SessionID == "" {
 		return
 	}

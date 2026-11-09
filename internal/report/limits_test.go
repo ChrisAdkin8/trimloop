@@ -82,3 +82,18 @@ func TestAddLocalSetsEverythingFromOutsideTheLogs(t *testing.T) {
 		t.Errorf("got version %q, plan %+v, retention %+v", r.Version, r.Plan, r.Retention)
 	}
 }
+
+// A card whose replay found it saves nothing is ranked after every other,
+// whatever its upper bound, and says why in its own words.
+func TestSavesNothingRankedLast(t *testing.T) {
+	nothing := fixes.Recommendation{Title: "n", Saving: 500, Estimated: true, Nothing: "the reason"}
+	actions := []fixes.Recommendation{nothing, {Title: "small", Saving: 2}, {Title: "mid", Saving: 50, Likely: 10, Estimated: true}}
+	r := Results{Actions: actions}
+	sortActions(&r)
+	if got := []string{r.Actions[0].Title, r.Actions[1].Title, r.Actions[2].Title}; got[0] != "mid" || got[1] != "small" || got[2] != "n" {
+		t.Errorf("order: got %q, want mid, small, n", got)
+	}
+	if got := savingText(nothing, 1000); got != "likely nothing (the reason), up to $500 (50%)" {
+		t.Errorf("got %q", got)
+	}
+}

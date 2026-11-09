@@ -127,13 +127,18 @@ seconds; anything not ahead is dropped, so the file grows by at most one
 line per percentage point per window. Two reset times within a minute of
 each other are the same window (`SameWindow`), both when keeping readings
 and when measuring the rate (ADR 0048).
-A limit is read only when it has a use (not negative) and a reset time
-(Unix seconds, or an RFC 3339 time); one sent in another shape, or with no
-reset time, is left out, so a malformed input never writes a zero reading.
+A limit is read only when it has a use (a number, not null or negative;
+above 100 is read as 100) and a plausible reset time: Unix seconds (a
+number above 10^11 is taken as milliseconds), or an RFC 3339 time, between
+a day before the status line's clock and eight days after it. One sent in
+another shape, with no reset time, or with a reset time outside that range
+is left out, so a malformed input never writes a zero reading, and a reset
+time far in the future never makes every later reading look older and get
+dropped.
 
 Tests: `TestAppendAndLoadLimits`, `TestLoadLimitsSurvivesALongDamagedLine`,
 `TestFindLimits*`, `TestStatusLineKeepsLimitReadings`,
-`TestInputIsLenient`. Known edge: two status lines writing at the same
+`TestInputIsLenient`, `TestDecodeLimit`. Known edge: two status lines writing at the same
 instant can both append; the measure uses each window's first and last
 reading, so a duplicate changes nothing.
 

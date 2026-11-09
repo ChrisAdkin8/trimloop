@@ -661,8 +661,11 @@ func sumRuns(runs map[string]event.HarnessRecord) *event.HarnessRecord {
 	return total
 }
 
-// inheritProjects gives a subagent that logged no project, and its turns,
-// its main session's project.
+// inheritProjects credits a subagent, and its turns, by its conversation:
+// a subagent belongs to its main session's project, as the main session's
+// own turns do, when it ran there, in a subfolder or in a folder above
+// (projectFor). One started in a subfolder of the project is not a project
+// of its own; one that logged no folder takes the main session's.
 func inheritProjects(sessions []event.Session) {
 	project := map[string]string{}
 	for _, s := range sessions {
@@ -675,13 +678,9 @@ func inheritProjects(sessions []event.Session) {
 		if !ok || s.Kind != event.SubAgentSession {
 			continue
 		}
-		if s.Project == "" {
-			sessions[i].Project = p
-		}
+		sessions[i].Project = projectFor(s.Project, p)
 		for j := range s.Turns {
-			if s.Turns[j].Project == "" {
-				s.Turns[j].Project = p
-			}
+			s.Turns[j].Project = projectFor(s.Turns[j].Project, p)
 		}
 	}
 }

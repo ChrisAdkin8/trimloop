@@ -306,12 +306,28 @@ func TestLargeShareMatchesP19(t *testing.T) {
 	}
 }
 
+// The headline's share of large turns counts the same turns as the bars,
+// priced or not.
+func TestLargeTurnShareCountsAllTurns(t *testing.T) {
+	small := event.Turn{Model: "claude-opus-5-5", Time: t0, Usage: event.Usage{CacheRead: 10_000}, Cost: event.Cost{CacheRead: 0.01}, Priced: true}
+	large := event.Turn{Model: "mystery", Time: t0, Usage: event.Usage{CacheRead: 300_000}}
+	s := []event.Session{{ID: "m", Kind: "main", Turns: []event.Turn{small, small, large, large}}}
+	v := newSummary(Analyse(s, Read{}, DefaultSettings(), t0))
+	bars := 0.0
+	for _, b := range v.Bands[2:] {
+		bars += b.TurnShare
+	}
+	if !near(v.LargeTurnShare, 50) || !near(bars, 50) {
+		t.Errorf("headline %v%% of turns, bars %v%%; want 50%% both", v.LargeTurnShare, bars)
+	}
+}
+
 // The summary at the top shows spend against turns by conversation size, and
 // what filled the conversation.
 func TestHTMLSummary(t *testing.T) {
 	r := Analyse(sample(), Read{}, DefaultSettings(), t0)
 	v := newSummary(r)
-	if len(v.Bands) != 4 || v.Bands[0].Label != "Under 50k" || v.Bands[3].Label != "Over 500k" {
+	if len(v.Bands) != 4 || v.Bands[0].Label != "Up to 50k" || v.Bands[3].Label != "Over 500k" {
 		t.Fatalf("bands: got %+v", v.Bands)
 	}
 	// sample(): 300k ($40), 600k ($60), 10k ($10) turns; total $110.
@@ -362,7 +378,7 @@ func TestReconcileSectionGivesReasons(t *testing.T) {
 	var b strings.Builder
 	reconcileSection(&b, detectors.Reconciliation{Unpriced: 1, Behind: 2}, 10)
 	out := b.String()
-	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") || !strings.Contains(out, "2 sessions went on") {
+	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") || !strings.Contains(out, "2 sessions have a record that does not cover all of them") {
 		t.Errorf("got %q", out)
 	}
 }

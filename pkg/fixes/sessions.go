@@ -77,6 +77,7 @@ func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, afte
 		Saving:    upTo,
 		Likely:    likely,
 		Estimated: true,
+		Nothing:   nothingIf(likely, "replaying the logs, each compaction costs about what it saves"),
 		LikelyNote: fmt.Sprintf("Replays each main session as if compacted to %s tokens (what the first request "+
 			"after a compaction typically sends) whenever it passed %s, "+
 			"including the cost of each compaction, and assumes it then went on the same way. "+
@@ -126,6 +127,7 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, startCost, minS
 		Saving:     saving,
 		Likely:     likely,
 		Estimated:  true,
+		Nothing:    nothingIf(likely, "the sessions picked up after a break were no larger than a new one"),
 		LikelyNote: fmt.Sprintf("As if each of those turns had started a new session of about %s tokens.", thousandsInt(fresh)),
 		Overlap:    "Shares money with the compaction fix: do not add them",
 		Primary: Fix{Advise,
