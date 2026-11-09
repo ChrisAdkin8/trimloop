@@ -418,3 +418,24 @@ func TestOlderReason(t *testing.T) {
 		}
 	}
 }
+
+func TestTextShowsGapSections(t *testing.T) {
+	r := Analyse(sample(), Read{Logs: 1}, DefaultSettings(), t0)
+	r.Retention = Retention{Days: 30}
+	r.Failures = detectors.Failures{Sleep: 4, Resent: 2}
+	var out bytes.Buffer
+	if err := WriteText(&out, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"deletes logs after 30 days", "P12 REPLIES CUT OFF", "4 when the computer slept", "WHEN YOU WORK"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("text has no %q", want)
+		}
+	}
+	r.Retention = Retention{Days: 365, Set: true}
+	out.Reset()
+	_ = WriteText(&out, r)
+	if strings.Contains(out.String(), "deletes logs after") {
+		t.Error("a year's retention: no tip")
+	}
+}

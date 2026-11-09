@@ -19,7 +19,10 @@ worked out is in [measurements.md](measurements.md).
   It holds the figures behind every finding, the plan (`plan`) and usage
   limits (`usage_limits`: hits, readings, the measured rates) for
   subscribers, each action's `weekly_limit_share` where measured
-  ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)), the price
+  ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)); model switches
+  (`p01_model_switches`), failed requests (`p12_failures`), tool inputs
+  (`tool_inputs`), unused app servers, `start_cost`, `when` and `retention`
+  ([ADR 0050](adr/0050-second-gap-analysis-findings.md)); the price
   catalogue version used, the build that made it (`trimloop_version`) and, for a `--since`
   run, the date it starts from (`read.since`). Each recommendation carries `pattern`, `title`, `finding` (a
   sentence), `saving` (an upper bound, "up to"), `likely` (a likelier

@@ -24,7 +24,7 @@ neutral, so P01 and P02 describe each provider cache model.
 
 | ID | Pattern | Milestone | Built | Kind | Max fix level |
 |---|---|---|---|---|---|
-| P01 | Cache-prefix churn | M0 | No | Go | 3 |
+| P01 | Cache-prefix churn | M0 (model switches, reduced: [ADR 0050](adr/0050-second-gap-analysis-findings.md)) | Reduced | Go | 3 |
 | P02 | Cache TTL expiry | M0 ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md)) | Reduced | Go | 2 |
 | P03 | Repeated file reads | M0 | No (re-reads are shown under P04) | Go | 1 |
 | P04 | Oversized and noisy tool output | M0 | Yes | Go | 3 |
@@ -35,7 +35,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Yes | Go | 1 |
 | P10 | Compaction thrash | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0045](adr/0045-m0-measurement-method.md)); M3 full | Reduced | Go | 1 |
 | P11 | Post-failure burn | M3 | No | Go | 0 |
-| P12 | Retry storms | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md)); M3 full | No | Go | 1 |
+| P12 | Retry storms | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md); replies cut off: [ADR 0050](adr/0050-second-gap-analysis-findings.md)); M3 full | Reduced | Go | 1 |
 | P13 | Model over-provisioning | M0 sub-agents and main sessions, reduced ([ADR 0031](adr/0031-m0-order-from-measured-spend.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)); M4 full | Reduced | Go | 3 |
 | P14 | Thinking-budget overspend | M0 reduced ([ADR 0028](adr/0028-harness-recorded-signals.md), [ADR 0042](adr/0042-p02-p14-and-main-session-models.md)); M4 full | Reduced | Go | 3 |
 | P15 | Duplicated exploration across a team | M4 | No | SQL | 1 |

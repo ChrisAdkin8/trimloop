@@ -16,8 +16,9 @@ import (
 var htmlSource string
 
 var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
-	"dollars":  money,
-	"sinceDay": sinceDay,
+	"dollars":    money,
+	"sinceDay":   sinceDay,
+	"trimPrefix": strings.TrimPrefix,
 	"limitShare": func(a fixes.Recommendation) string {
 		return strings.TrimPrefix(limitText(a), "; ")
 	},
@@ -219,4 +220,28 @@ func approx(n int) string {
 		return fmt.Sprintf("%dk", (n+500)/1000)
 	}
 	return fmt.Sprint(n)
+}
+
+// dayRow is one day of the week's spend, for the "When you work" bars.
+type dayRow struct {
+	Name string
+	Cost float64
+}
+
+// Days is spend by day of the week, Monday first.
+func (v view) Days() []dayRow {
+	out := make([]dayRow, 7)
+	for i, c := range v.When.ByWeekday {
+		out[i] = dayRow{Name: weekdays[i], Cost: c}
+	}
+	return out
+}
+
+// MaxDay is the largest day's spend, for scaling the bars.
+func (v view) MaxDay() float64 {
+	m := 0.0
+	for _, c := range v.When.ByWeekday {
+		m = max(m, c)
+	}
+	return m
 }

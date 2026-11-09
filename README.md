@@ -67,7 +67,9 @@ How each figure is worked out is in [docs/measurements.md](docs/measurements.md)
 | Tool output (P04) | Large command output and file reads that stay in the conversation and are re-sent on every turn. |
 | What every request carries (P07) | The system prompt, tool definitions, skill lists and memory files sent with each request. |
 | Model choice (P13) | Sub-agents and sessions on a more expensive model than the work needs, or on an older, dearer version. |
-| Effort level (P14) | Turns at the highest effort levels that think far more than usual. |
+| Effort level (P14) | Turns at the highest effort levels that think far more than usual, and thinking's share of all output spend. |
+| Model switches (P01) | Changing model part-way through a session, which saves the whole conversation to the cache again. |
+| Replies cut off (P12) | Replies cut off when the computer slept (or the network failed), so the request was sent again. |
 
 It also checks its totals against Claude Code's own cost records. It shows
 spend by project, by skill and by MCP server (the add-on tools Claude Code

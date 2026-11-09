@@ -107,6 +107,19 @@ type Session struct {
 	// LimitHits are requests the harness refused because a usage limit was
 	// reached (subscription plans).
 	LimitHits []LimitHit
+
+	// Failures are requests that failed and were sent again: the harness
+	// wrote an error reply itself (ADR 0050).
+	Failures []Failure
+}
+
+// Failure is a request that failed. Context and Model are the session's
+// latest turn's, the request sent again; zero if no turn came before.
+type Failure struct {
+	At      time.Time
+	Kind    string // "sleep" (the computer slept mid-response), "network" or "other"
+	Context int
+	Model   string
 }
 
 // LimitHit is a request refused because a usage limit was reached.

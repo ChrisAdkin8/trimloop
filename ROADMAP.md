@@ -98,7 +98,11 @@ Done:
   savings as a share of the weekly limit from status-line readings
   ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md));
 - a Claude Code plugin whose skill runs trimloop and explains the report
-  ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
+  ([ADR 0049](docs/adr/0049-claude-code-plugin.md));
+- from a second gap analysis: P01 from model switches, P12 from replies cut
+  off, unused desktop-app tools, tool inputs in what fills a session, the
+  whole thinking share, the cost to start a session, when you work, and log
+  retention ([ADR 0050](docs/adr/0050-second-gap-analysis-findings.md)).
 
 To do:
 

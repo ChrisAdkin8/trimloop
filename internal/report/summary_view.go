@@ -72,18 +72,20 @@ func newSummary(r Results) summaryView {
 	s.SmallCost, s.LargeCost = costRange(small), costRange(large)
 
 	tools := r.Tools.Carried
+	inputs := r.ToolInputs.Carried
 	standing := r.Standing.SystemPrompt + r.Standing.ToolDefinitions
 	added := r.Standing.Injected
-	// The three are measured separately and can overlap, so together they
+	// The four are measured separately and can overlap, so together they
 	// may pass Input; scale them down then, so the bar adds up.
-	if sum := tools + standing + added; sum > s.Input && sum > 0 {
+	if sum := tools + inputs + standing + added; sum > s.Input && sum > 0 {
 		k := s.Input / sum
-		tools, standing, added = k*tools, k*standing, k*added
+		tools, inputs, standing, added = k*tools, k*inputs, k*standing, k*added
 	}
-	rest := max(0, s.Input-tools-standing-added)
+	rest := max(0, s.Input-tools-inputs-standing-added)
 	for _, p := range []fillPart{
 		{"Your messages and Claude's replies, sent again each turn", "kind1", rest, 0},
 		{"Tool output", "kind2", tools, 0},
+		{"Commands and files Claude wrote", "kind5", inputs, 0},
 		{"System prompt and tool definitions", "kind3", standing, 0},
 		{"Text Claude Code added", "kind4", added, 0},
 	} {

@@ -38,6 +38,12 @@ type Effort struct {
 	// TopModels are the models of the xhigh and max turns, most turns
 	// first: effort can be set per model, so the advice names them.
 	TopModels []string `json:"top_models"`
+
+	// ThinkingCost and OutputCost are the output cost of thinking and of all
+	// output, over every turn (ADR 0050): the whole thinking share, where the
+	// figures above count only what xhigh and max add.
+	ThinkingCost float64 `json:"thinking_cost"`
+	OutputCost   float64 `json:"output_cost"`
 }
 
 // EffortLevel is one effort level's turns and spend.

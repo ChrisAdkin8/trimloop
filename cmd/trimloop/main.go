@@ -233,6 +233,8 @@ func analyse() {
 		log.Printf("usage-limit readings not used: %v", err)
 	}
 	plan := claude.Plan()
+	days, set := claude.Retention()
+	r.Retention = report.Retention{Days: days, Set: set}
 	report.AddLimits(&r, sessions, report.Plan{Name: plan.Name, Subscription: plan.Subscription}, readings)
 	if !*noHistory {
 		path := *historyPath
@@ -467,6 +469,20 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 		case source.KindLimitHit:
 			if !copiedLine(m, seen) {
 				s.LimitHits = append(s.LimitHits, event.LimitHit{At: m.Time, Limit: m.Limit})
+			}
+			continue
+		case source.KindFailure:
+			// Not a turn, but activity: the idle time before the next turn
+			// is measured from it, as for any reply the harness made up.
+			if m.Time.After(last) {
+				last = m.Time
+			}
+			if !copiedLine(m, seen) {
+				f := event.Failure{At: m.Time, Kind: m.Failure}
+				if n := len(s.Turns); n > 0 {
+					f.Context, f.Model = s.Turns[n-1].Context(), s.Turns[n-1].Model
+				}
+				s.Failures = append(s.Failures, f)
 			}
 			continue
 		case source.KindTitle:

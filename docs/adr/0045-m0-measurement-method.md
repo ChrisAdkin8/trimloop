@@ -1,6 +1,6 @@
 # ADR 0045: The M0 measurement method
 
-- Status: Accepted — built in the M0 prototype; rule 10: analysis version 7: [ADR 0048](0048-usage-limits-for-subscribers.md)
+- Status: Accepted — built in the M0 prototype; rule 10: analysis version 7: [ADR 0048](0048-usage-limits-for-subscribers.md); new figures: [ADR 0050](0050-second-gap-analysis-findings.md)
 - Date: 2026-11-08
 - Supersedes: [ADR 0035](0035-measurement-corrections.md), [ADR 0036](0036-prices-reconciliation-status.md), [ADR 0037](0037-partial-weeks-prompts-compaction-nudges.md), [ADR 0038](0038-real-size-after-compaction.md), [ADR 0039](0039-rebuilt-cache-and-likely-ranges.md), [ADR 0040](0040-position-pricing-and-one-method-page.md), [ADR 0041](0041-compaction-edges-and-quartile-rule.md), [ADR 0044](0044-effort-thinking-and-cache-figures.md) (kept as history)
 - Amends: [ADR 0026](0026-usage-dedup-across-logs.md), [ADR 0027](0027-measured-m0-findings.md), [ADR 0028](0028-harness-recorded-signals.md), [ADR 0030](0030-how-fixes-are-chosen.md), [ADR 0031](0031-m0-order-from-measured-spend.md), [ADR 0032](0032-readable-reports.md), [ADR 0033](0033-reconciliation-history-standing-context.md), [ADR 0034](0034-live-nudges.md), [ADR 0042](0042-p02-p14-and-main-session-models.md), [ADR 0043](0043-weekly-trend-for-new-findings.md)

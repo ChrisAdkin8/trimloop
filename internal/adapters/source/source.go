@@ -105,6 +105,10 @@ type Message struct {
 	// limit), "weekly", or "other".
 	Limit string
 
+	// KindFailure: why the request failed: "sleep" (the computer slept
+	// mid-response), "network", or "other".
+	Failure string
+
 	// KindCostRecord: the record so far for one run of the harness. Runs
 	// are told apart by RunID; within a run, later records include earlier
 	// ones.
@@ -126,6 +130,7 @@ const (
 	KindCostRecord              // the harness's running record of the session's cost
 	KindPrompt                  // the user sent a message (only the fact is kept, not the text)
 	KindLimitHit                // the harness refused a request: a usage limit was reached
+	KindFailure                 // a request failed: the harness wrote an error reply itself
 )
 
 // Result is one tool result, linked to its call by CallID.

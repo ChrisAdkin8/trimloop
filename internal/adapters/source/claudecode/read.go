@@ -188,6 +188,10 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return source.Message{Kind: source.KindLimitHit, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
 			Limit: limitKind(blocks(rec.Message.Content))}, true, nil
 
+	case rec.Type == "assistant" && rec.IsAPIErrorMessage && rec.Message.Model == Synthetic:
+		return source.Message{Kind: source.KindFailure, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
+			Failure: failureKind(blocks(rec.Message.Content))}, true, nil
+
 	case rec.Type == "assistant" && rec.Message.Usage != nil:
 		u := rec.Message.Usage
 		return source.Message{
@@ -293,7 +297,7 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 		}
 		var in input
 		_ = json.Unmarshal(b.Input, &in) // lenient: other argument types leave in empty
-		c := event.ToolCall{ID: b.ID, Tool: b.Name}
+		c := event.ToolCall{ID: b.ID, Tool: b.Name, InputBytes: len(b.Input)}
 		switch {
 		case b.Name == "Bash":
 			s := cmdshape.Parse(in.Command)
@@ -544,6 +548,23 @@ func limitKind(bs []block) string {
 			return "weekly"
 		case strings.Contains(t, "session limit"):
 			return "session"
+		}
+	}
+	return "other"
+}
+
+// failureKind sorts an error reply the harness wrote by its text: "API
+// Error: Your computer went to sleep mid-response", a network error such as
+// "Can't reach the API server" or "Connection lost", or anything else.
+func failureKind(bs []block) string {
+	for _, b := range bs {
+		t := strings.ToLower(b.Text)
+		switch {
+		case strings.Contains(t, "went to sleep"):
+			return "sleep"
+		case strings.Contains(t, "reach the api server"), strings.Contains(t, "connection"),
+			strings.Contains(t, "network"), strings.Contains(t, "enotfound"), strings.Contains(t, "timed out"):
+			return "network"
 		}
 	}
 	return "other"

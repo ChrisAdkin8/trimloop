@@ -308,3 +308,65 @@ func largest(m map[string]float64, n int) []string {
 	}
 	return names
 }
+
+// ToolInputs is what the text of Claude's own tool calls costs to keep in
+// the session: the commands, scripts and file contents it wrote, re-sent on
+// every later turn until a compaction, like tool output (ADR 0050).
+type ToolInputs struct {
+	Calls   int     `json:"calls"`
+	Tokens  int     `json:"tokens"`  // their estimated tokens, each counted once
+	Carried float64 `json:"carried"` // carried cost of all of them
+	ByTool  []Group `json:"by_tool"` // by tool, MCP tools by server; largest carried cost first
+}
+
+// FindToolInputs prices tool-call inputs as carried, the way carry prices
+// tool output: from the turn after the call (at the arrival price) until a
+// compaction (at each turn's history price).
+func FindToolInputs(sessions []event.Session, topN int) ToolInputs {
+	var f ToolInputs
+	groups := map[string]*Group{}
+	for _, s := range sessions {
+		type live struct {
+			tool   string
+			tokens int
+		}
+		var inContext []live
+		for i, t := range s.Turns {
+			if t.CompactedBefore {
+				inContext = nil
+			}
+			history := historyRate(t)
+			for _, x := range inContext {
+				c := float64(x.tokens) * history
+				f.Carried += c
+				groups[x.tool].Carried += c
+			}
+			if i == 0 || t.CompactedBefore {
+				continue // the previous turn's calls went into the compaction
+			}
+			arrival := arrivalRate(t)
+			for _, c := range s.Turns[i-1].ToolCalls {
+				tok := c.InputTokens()
+				if tok == 0 {
+					continue
+				}
+				name := toolGroup(c.Tool)
+				g := groups[name]
+				if g == nil {
+					g = &Group{Name: name}
+					groups[name] = g
+				}
+				g.Calls++
+				g.Tokens += tok
+				f.Calls++
+				f.Tokens += tok
+				cost := float64(tok) * arrival
+				f.Carried += cost
+				g.Carried += cost
+				inContext = append(inContext, live{name, tok})
+			}
+		}
+	}
+	f.ByTool = ranked(groups, topN, func(g Group) float64 { return g.Carried })
+	return f
+}

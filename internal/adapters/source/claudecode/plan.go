@@ -72,3 +72,28 @@ func planName(orgType, tier string) string {
 	}
 	return name
 }
+
+// DefaultRetentionDays is how long Claude Code keeps session logs when
+// cleanupPeriodDays is not set.
+const DefaultRetentionDays = 30
+
+// Retention reads how many days Claude Code keeps session logs: the
+// cleanupPeriodDays key of its settings file, and only that key (ADR 0050).
+// set is false when the key is missing, and days is then the default.
+func (r Reader) Retention() (days int, set bool) {
+	dir := r.ConfigDir
+	if dir == "" {
+		dir = filepath.Join(r.Home, ".claude")
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		return DefaultRetentionDays, false
+	}
+	var s struct {
+		CleanupPeriodDays *int `json:"cleanupPeriodDays"`
+	}
+	if json.Unmarshal(b, &s) != nil || s.CleanupPeriodDays == nil {
+		return DefaultRetentionDays, false
+	}
+	return *s.CleanupPeriodDays, true
+}

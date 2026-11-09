@@ -92,6 +92,21 @@ Decided in ADR 0035 (decision 2), 0039 (decision 1) and 0040.
 | Reconciliation | Claude Code's own cost record for each main session it covers, against the logged cost of that session and its sub-agents. The difference is reported as spend the logs do not record; ADR 0028's test (within 2 %) is not passed in M0. Web searches are priced at $0.01 each here; they are not in total spend, which comes from the logs | `FindReconciliation` | ADR 0033, 0035, 0036 |
 | Weekly figures | By calendar week, local time; kept in a history file; the oldest weeks keep a fuller stored copy when turns were counted the same way. Each week also keeps the P02 short-wait cost, the output cost of xhigh and max turns, and main-session spend with a cheaper choice, so the cards can be checked week by week; and, from analysis version 7, how often a usage limit was reached | `FindWeekly`, `history.Merge` | ADR 0033, 0035, 0037, 0038, 0039, 0043, 0044, 0048 |
 
+## 3b. From the second gap analysis
+
+Added by [ADR 0050](adr/0050-second-gap-analysis-findings.md).
+
+| Figure | How it is worked out | Code | Decided in |
+|---|---|---|---|
+| Model switches (P01) | A turn on a different model from the session's previous turn, not after a compaction, while the previous writes' cache was alive (the wait no longer than its lifetime), at a previous context over 20,000 tokens. Saving: the turn's cost less the same turn reading the earlier context and writing only its new part, at its own model's prices | `FindModelSwitches`, `ForModelSwitches` | ADR 0050 |
+| Replies cut off (P12) | Claude Code's own error replies (`isApiErrorMessage`, model `<synthetic>`), sorted by text: "went to sleep" is the computer sleeping; connection and server errors are network. Counted once by line id; still activity for idle times. Saving: each sleep's context (the latest turn's) re-read at its model's cache-read price; the card shows at three sleeps or more | `FindFailures`, `ForFailures` | ADR 0050 |
+| Desktop-app tools never used (P07) | Tool-definition parts of MCP servers the desktop app adds (`ccd_`, `Claude_`, and the listed app servers) none of whose tools any turn called; "up to" is their whole carried cost | `UnusedAppServers`, `ForAppServers` | ADR 0050 |
+| Tool inputs | Each tool call's input size (bytes ÷ 4 as tokens), priced as carried from the next turn on, like tool output (arrival, then history price), until a compaction | `FindToolInputs` | ADR 0050 |
+| Thinking share (P14) | Each turn's output cost times its thinking tokens over its output tokens, over all turns, against all output cost | `ThinkingCost` | ADR 0050 |
+| Cost to start a session | Median cost of a main session's first turn (the median's rule); quoted on the long-break card | `StartCost` | ADR 0050 |
+| When you work | Priced turns' cost by local hour and day of the week; weekend share; the most main sessions whose first and last turns overlap | `FindWhen` | ADR 0050 |
+| Log retention | `cleanupPeriodDays` from Claude Code's settings file (that key only), else 30; a tip under 90 days | `Reader.Retention` | ADR 0050 |
+
 ## 3a. Usage limits (subscribers)
 
 For users on a flat-fee plan (Pro or Max), whose usage limits matter more

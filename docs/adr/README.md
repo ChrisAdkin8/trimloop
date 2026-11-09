@@ -17,7 +17,7 @@ Which record governs what in the M0 prototype:
 
 | Topic | Governing ADRs |
 |---|---|
-| What the prototype measures, and how | [0045](0045-m0-measurement-method.md) |
+| What the prototype measures, and how | [0045](0045-m0-measurement-method.md), [0050](0050-second-gap-analysis-findings.md) |
 | Which findings are in M0, and in what order | [0027](0027-measured-m0-findings.md), [0031](0031-m0-order-from-measured-spend.md), [0042](0042-p02-p14-and-main-session-models.md) |
 | How fixes are chosen and worded | [0030](0030-how-fixes-are-chosen.md) |
 | What reports show | [0032](0032-readable-reports.md), [0048](0048-usage-limits-for-subscribers.md) (subscribers) |
@@ -69,7 +69,7 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0030](0030-how-fixes-are-chosen.md) | How fixes are chosen — the fix ladder, failure-preserving cuts, measure after | Fixes | Partly | Amended by 0032, 0045 |
 | [0031](0031-m0-order-from-measured-spend.md) | Re-rank M0 from measured spend; sub-agent model fit in M0 | Build order (M0) | Mostly: items 1–4, 6, 9, 10; 5, 7, 8 partly; 11 not built | Amended by 0042, 0045 |
 | [0032](0032-readable-reports.md) | Readable reports — session titles, likely savings, plain language | Reports (M0) | Yes | Amended by 0045, 0048 |
-| [0033](0033-reconciliation-history-standing-context.md) | Reconciliation, weekly history, and pricing standing context | Findings (M0) | Yes | Amended by 0043, 0045, 0048 |
+| [0033](0033-reconciliation-history-standing-context.md) | Reconciliation, weekly history, and pricing standing context | Findings (M0) | Yes | Amended by 0043, 0045, 0048, 0050 |
 | [0034](0034-live-nudges.md) | Live nudges in Claude Code | Live nudges (M0) | Yes | Amended by 0045, 0048 |
 | [0035](0035-measurement-corrections.md) | Measurement corrections and how actions are ranked | Measurements (M0) | Yes | Superseded by 0045 |
 | [0036](0036-prices-reconciliation-status.md) | Prices checked against the pricing page, and what "reconciliation done" means in M0 | Measurements (M0) | Yes | Superseded by 0045 |
@@ -78,14 +78,15 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0039](0039-rebuilt-cache-and-likely-ranges.md) | Removed history on a rebuilt cache, and likely savings as a range | Measurements (M0) | Yes | Superseded by 0045 |
 | [0040](0040-position-pricing-and-one-method-page.md) | Removed history priced by position, and one page for the current method | Measurements (M0) | Yes | Superseded by 0045 |
 | [0041](0041-compaction-edges-and-quartile-rule.md) | Compaction edge cases and the quartile rule | Measurements (M0) | Yes | Superseded by 0045 |
-| [0042](0042-p02-p14-and-main-session-models.md) | P02, P14 and main-session models in M0 | Findings (M0) | Yes | Amended by 0043, 0045 |
+| [0042](0042-p02-p14-and-main-session-models.md) | P02, P14 and main-session models in M0 | Findings (M0) | Yes | Amended by 0043, 0045, 0050 |
 | [0043](0043-weekly-trend-for-new-findings.md) | Weekly figures for P02, P14 and main-session models | Reports (M0) | Yes | Amended by 0045 |
 | [0044](0044-effort-thinking-and-cache-figures.md) | Effort by thinking tokens, and fairer cache figures | Measurements (M0) | Yes | Superseded by 0045 |
-| [0045](0045-m0-measurement-method.md) | The M0 measurement method | Measurements (M0) | Yes | Amended by 0048 |
+| [0045](0045-m0-measurement-method.md) | The M0 measurement method | Measurements (M0) | Yes | Amended by 0048, 0050 |
 | [0046](0046-licensing.md) | Licensing — FSL core, Apache-2.0 connectors, commercial team features | Licensing | Partly: LICENSE.md | Yes |
 | [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Amended by 0049 |
 | [0048](0048-usage-limits-for-subscribers.md) | Usage limits for subscribers | Reports (M0) | Yes | Yes |
 | [0049](0049-claude-code-plugin.md) | A Claude Code plugin with a trimloop skill | Packaging | Yes: not yet tried by users | Yes |
+| [0050](0050-second-gap-analysis-findings.md) | Findings from the second gap analysis | Findings (M0) | Yes | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

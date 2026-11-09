@@ -28,6 +28,11 @@ type ToolCall struct {
 
 	Result    ToolResult
 	HasResult bool // false if the log has no result for the call
+
+	// InputBytes is the size of the call's arguments as logged: the command,
+	// script or file content Claude wrote. It stays in the conversation like
+	// any reply (ADR 0050).
+	InputBytes int
 }
 
 // FileOp says what a call did to File.
@@ -54,6 +59,9 @@ type ToolResult struct {
 
 // Tokens is the result's estimated size in tokens, rounded up.
 func (r ToolResult) Tokens() int { return (r.Bytes + BytesPerToken - 1) / BytesPerToken }
+
+// InputTokens is the call's input size in estimated tokens.
+func (c ToolCall) InputTokens() int { return (c.InputBytes + BytesPerToken - 1) / BytesPerToken }
 
 // NoiseKind sorts tool output by where it comes from, which decides the fix
 // (docs/patterns.md, P04 "Kinds of noise").

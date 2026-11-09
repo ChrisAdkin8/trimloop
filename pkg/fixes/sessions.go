@@ -96,7 +96,9 @@ func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, afte
 // ForPauses recommends starting fresh after long breaks (P09), or returns
 // false if the cost is under minSaving. likely is the replayed estimate
 // (detectors.LikelyPauseSaving) and fresh the new-session size it assumed.
-func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float64) (Recommendation, bool) {
+// startCost, if above 0, is the median cost of a new session's first turn,
+// which the finding quotes (ADR 0050).
+func ForPauses(p detectors.LongPause, likely float64, fresh int, startCost, minSaving float64) (Recommendation, bool) {
 	// Only breaks the user took: after the others, no message from the user
 	// started the next turn, so there was no moment to start fresh.
 	saving := p.Saving
@@ -106,6 +108,9 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, minSaving float
 	gap := spanText(p.MinGap)
 	finding := fmt.Sprintf("%d times, you carried on after more than %s away. The saved copy of the "+
 		"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses-p.Unprompted, gap)
+	if startCost > 0 {
+		finding += fmt.Sprintf(" Starting a new session instead costs about %s for its first turn.", cents(startCost))
+	}
 	switch {
 	case p.Unprompted == 1:
 		finding += " Another long wait was on a tool, a sub-agent, a timer or another agent, not on you; it is left out of this saving."
@@ -174,4 +179,13 @@ func spanText(d time.Duration) string {
 		return fmt.Sprintf("%d hours", int(d.Hours()))
 	}
 	return fmt.Sprintf("%d minutes", int(d.Minutes()))
+}
+
+// cents writes a small amount with its cents: "$0.06", "$1.25"; amounts of
+// $10 or more as whole dollars.
+func cents(v float64) string {
+	if v >= 10 {
+		return dollars(v)
+	}
+	return fmt.Sprintf("$%.2f", v)
 }

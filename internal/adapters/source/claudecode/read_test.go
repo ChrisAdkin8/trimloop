@@ -172,14 +172,18 @@ func TestParseLineToolCalls(t *testing.T) {
 	mainGo := fileKey("/repo/main.go", "")
 	want := []event.ToolCall{
 		// The shell's cd is not followed, so sed's file resolves against the session's cwd.
-		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: mainGo, FileOp: event.FileView},
-		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView},
-		{ID: "t3", Tool: "Edit", File: mainGo, FileOp: event.FileEdit},
-		{ID: "t4", Tool: "mcp__github__get_issue", Noise: event.NoiseMCP},
-		{ID: "t5", Tool: "Grep", Noise: event.NoiseSearch},
+		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: mainGo, FileOp: event.FileView, InputBytes: 52},
+		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView, InputBytes: 40},
+		{ID: "t3", Tool: "Edit", File: mainGo, FileOp: event.FileEdit, InputBytes: 23},
+		{ID: "t4", Tool: "mcp__github__get_issue", Noise: event.NoiseMCP, InputBytes: 32},
+		{ID: "t5", Tool: "Grep", Noise: event.NoiseSearch, InputBytes: 15},
 	}
 	if !reflect.DeepEqual(m.ToolCalls, want) {
 		t.Errorf("got  %+v\nwant %+v", m.ToolCalls, want)
+	}
+	// InputBytes is the raw input's length, as logged.
+	if got := len(`{"command":"cd sub && sed -n '1,9p' main.go | head"}`); got != 52 {
+		t.Errorf("t1 input is %d bytes", got)
 	}
 }
 
@@ -468,8 +472,16 @@ func TestParseLineLimitHit(t *testing.T) {
 			t.Errorf("%q: got %+v, %v, %v; want a %s limit hit", c.text, m, ok, err, c.want)
 		}
 	}
-	// Another API error stays an empty reply, as before.
-	if m, ok, _ := parseLine([]byte(line(`"unknown"`, "API Error: Connection lost"))); !ok || m.Kind != source.KindTurn {
-		t.Errorf("other error: got %+v, %v", m, ok)
+	// Other error replies are failures, sorted by their text (ADR 0050).
+	for text, want := range map[string]string{
+		"API Error: Your computer went to sleep mid-response. The response above may be incomplete.": "sleep",
+		"API Error: Connection lost mid-response.":                                                   "network",
+		"API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)":             "network",
+		"API Error: Something else":                                                                  "other",
+	} {
+		m, ok, _ := parseLine([]byte(line(`"unknown"`, text)))
+		if !ok || m.Kind != source.KindFailure || m.Failure != want || m.LineID != "u9" {
+			t.Errorf("%q: got %+v, %v; want a %s failure", text, m, ok, want)
+		}
 	}
 }

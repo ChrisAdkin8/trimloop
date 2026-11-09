@@ -99,12 +99,12 @@ func TestForCompaction(t *testing.T) {
 }
 
 func TestForPauses(t *testing.T) {
-	r, ok := ForPauses(detectors.LongPause{Pauses: 4, Cost: 20, Saving: 15, Unprompted: 1, UnpromptedCost: 5}, 15, 30_000, 1)
+	r, ok := ForPauses(detectors.LongPause{Pauses: 4, Cost: 20, Saving: 15, Unprompted: 1, UnpromptedCost: 5}, 15, 30_000, 0.06, 1)
 	if !ok || r.Pattern != "P09" || r.Saving != 15 || r.Likely != 15 || !strings.Contains(r.LikelyNote, "30,000") ||
 		!strings.Contains(r.Finding, "3 times") || !strings.Contains(r.Finding, "Another long wait was") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
-	if _, ok := ForPauses(detectors.LongPause{Saving: 0.5}, 0, 0, 1); ok {
+	if _, ok := ForPauses(detectors.LongPause{Saving: 0.5}, 0, 0, 0, 1); ok {
 		t.Error("a saving under the minimum should give no recommendation")
 	}
 	if dollars(1234.5) != "$1,235" {
@@ -205,9 +205,37 @@ func TestForSubAgentsNamesTheModel(t *testing.T) {
 func TestForPausesNamesTheGap(t *testing.T) {
 	for gap, want := range map[time.Duration]string{time.Hour: "more than an hour away", 2 * time.Hour: "more than 2 hours away",
 		90 * time.Minute: "more than 90 minutes away", 0: "more than an hour away"} {
-		r, ok := ForPauses(detectors.LongPause{MinGap: gap, Pauses: 3, Saving: 50}, 0, 30_000, 1)
+		r, ok := ForPauses(detectors.LongPause{MinGap: gap, Pauses: 3, Saving: 50}, 0, 30_000, 0, 1)
 		if !ok || !strings.Contains(r.Finding, want) {
 			t.Errorf("gap %v: got %q, want %q", gap, r.Finding, want)
 		}
+	}
+}
+
+func TestGapCards(t *testing.T) {
+	if r, ok := ForModelSwitches(detectors.ModelSwitches{Switches: 3, Sessions: 2, Saving: 10}, 1); !ok || r.Pattern != "P01" ||
+		!strings.Contains(r.Finding, "3 times, in 2 sessions") || !strings.Contains(r.Primary.How, "/compact first") {
+		t.Errorf("model switches: got %+v", r)
+	}
+	if _, ok := ForModelSwitches(detectors.ModelSwitches{Saving: 0.5}, 1); ok {
+		t.Error("model switches under the minimum: want no card")
+	}
+	f := detectors.Failures{Sleep: 2, SleepResent: 5, MedianContext: 259_000}
+	if _, ok := ForFailures(f, 1); ok {
+		t.Error("two sleeps: want no card")
+	}
+	f.Sleep = 57
+	if r, ok := ForFailures(f, 1); !ok || r.Pattern != "P12" || !strings.Contains(r.Finding, "57 times") ||
+		!strings.Contains(r.Finding, "259,000") || !strings.Contains(r.Primary.How, "caffeinate") {
+		t.Errorf("sleep: got %+v", r)
+	}
+	parts := []detectors.ContextPart{{Name: "mcp__claude-artifacts", Cost: 10}, {Name: "mcp__ccd_session", Cost: 2}}
+	if r, ok := ForAppServers(parts, 1); !ok || r.Pattern != "P07" || r.Saving != 12 ||
+		!strings.Contains(r.Finding, "claude-artifacts, ccd_session") || !strings.Contains(r.Primary.What, "terminal") {
+		t.Errorf("app servers: got %+v", r)
+	}
+	r, _ := ForPauses(detectors.LongPause{Pauses: 3, Saving: 50}, 0, 30_000, 0.06, 1)
+	if !strings.Contains(r.Finding, "about $0.06 for its first turn") {
+		t.Errorf("start cost: got %q", r.Finding)
 	}
 }

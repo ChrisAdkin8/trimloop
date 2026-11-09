@@ -29,6 +29,7 @@ func WriteText(out io.Writer, r Results) error {
 		fmt.Fprintf(w, " %d turns have no price and are left out.", r.Read.Unpriced)
 	}
 	fmt.Fprintln(w)
+	retentionLine(w, r)
 	limitLines(w, r)
 
 	fmt.Fprintln(w, "\nCOST BY TOKEN CLASS")
@@ -94,9 +95,11 @@ func WriteText(out io.Writer, r Results) error {
 
 	cacheLifeSection(w, r.CacheLife, r.CacheLifeFix, all)
 	toolOutputSection(w, r.Tools, r.ToolFixes, all)
+	toolInputLine(w, r)
 	subAgentSection(w, r.SubAgents, r.SubAgentFix, all)
 	mainModelSection(w, r.MainModels, r.ModelFixes, all)
 	effortSection(w, r.Effort, r.EffortFix, all)
+	thinkingLine(w, r)
 	standingSection(w, r.Standing, all)
 	if len(r.StandingFixes) > 0 {
 		fmt.Fprintln(w, "\n  Recommended fixes:")
@@ -105,6 +108,7 @@ func WriteText(out io.Writer, r Results) error {
 			printFixes(w, f)
 		}
 	}
+	gapSections(w, r)
 
 	fmt.Fprintln(w, "\n\"Up to\" figures are upper bounds: some context is needed, and a compacted or")
 	fmt.Fprintln(w, "new session still pays for what it keeps. \"Likely\" figures replay the logs with")

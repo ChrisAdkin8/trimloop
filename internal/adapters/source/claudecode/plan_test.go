@@ -39,3 +39,24 @@ func TestPlanReadsOnlyThePlan(t *testing.T) {
 		}
 	}
 }
+
+func TestRetention(t *testing.T) {
+	dir := t.TempDir()
+	r := Reader{Home: t.TempDir(), ConfigDir: dir}
+	if d, set := r.Retention(); d != DefaultRetentionDays || set {
+		t.Errorf("no settings: got %d, %v", d, set)
+	}
+	write := func(s string) {
+		if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"model":"opus","hooks":{}}`)
+	if d, set := r.Retention(); d != DefaultRetentionDays || set {
+		t.Errorf("key missing: got %d, %v", d, set)
+	}
+	write(`{"cleanupPeriodDays": 365}`)
+	if d, set := r.Retention(); d != 365 || !set {
+		t.Errorf("set: got %d, %v", d, set)
+	}
+}

@@ -592,3 +592,21 @@ func TestBuildSessionKeepsLimitHits(t *testing.T) {
 		t.Errorf("copied limit hit counted again: %+v", s.LimitHits)
 	}
 }
+
+func TestBuildSessionRecordsFailures(t *testing.T) {
+	reply := `{"type":"assistant","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","model":"claude-opus-5-5","usage":{"cache_read_input_tokens":250000}}}` + "\n"
+	sleep := `{"type":"assistant","uuid":"f1","timestamp":"2026-11-01T10:00:00Z","isApiErrorMessage":true,"error":"unknown",` +
+		`"message":{"model":"<synthetic>","content":[{"type":"text","text":"API Error: Your computer went to sleep mid-response."}],"usage":{"output_tokens":0}}}` + "\n"
+	again := `{"type":"assistant","timestamp":"2026-11-01T10:05:00Z","message":{"id":"m2","model":"claude-opus-5-5","usage":{"cache_read_input_tokens":250000}}}` + "\n"
+	s, _, err := readSession(cc, writeLog(t, "s.jsonl", reply+sleep+again), map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Failures) != 1 || s.Failures[0].Kind != "sleep" || s.Failures[0].Context != 250_000 || s.Failures[0].Model != "claude-opus-5-5" {
+		t.Errorf("failures: got %+v", s.Failures)
+	}
+	// The failure is activity: the next turn's idle time runs from it.
+	if len(s.Turns) != 2 || s.Turns[1].IdleBefore != 5*time.Minute {
+		t.Errorf("idle before the retry: got %+v", s.Turns)
+	}
+}

@@ -55,6 +55,18 @@ type Results struct {
 	Plan   Plan             `json:"plan"`
 	Limits detectors.Limits `json:"usage_limits"`
 
+	// From the second gap analysis (ADR 0050).
+	Switches     detectors.ModelSwitches `json:"p01_model_switches"`
+	SwitchFix    *fixes.Recommendation   `json:"p01_fix,omitempty"`
+	Failures     detectors.Failures      `json:"p12_failures"`
+	FailureFix   *fixes.Recommendation   `json:"p12_fix,omitempty"`
+	ToolInputs   detectors.ToolInputs    `json:"tool_inputs"`
+	AppServers   []detectors.ContextPart `json:"p07_unused_app_servers"`
+	AppServerFix *fixes.Recommendation   `json:"p07_app_server_fix,omitempty"`
+	StartCost    float64                 `json:"start_cost"` // median cost of a new main session's first turn
+	When         detectors.When          `json:"when"`
+	Retention    Retention               `json:"retention"`
+
 	Reconciliation detectors.Reconciliation  `json:"reconciliation"`
 	Standing       detectors.StandingContext `json:"p07_standing_context"`
 	StandingFixes  []fixes.Recommendation    `json:"p07_fixes"`
@@ -184,7 +196,8 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 		r.CompactFix = &f
 	}
 	fresh := detectors.TypicalStart(sessions)
-	if f, ok := fixes.ForPauses(r.Pause, detectors.LikelyPauseSaving(sessions, s.PauseGap, fresh), fresh, s.MinFixSaving); ok {
+	r.StartCost = detectors.StartCost(sessions)
+	if f, ok := fixes.ForPauses(r.Pause, detectors.LikelyPauseSaving(sessions, s.PauseGap, fresh), fresh, r.StartCost, s.MinFixSaving); ok {
 		r.PauseFix = &f
 	}
 
@@ -196,6 +209,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	r.ModelFixes = fixes.ForMainModels(r.MainModels, s.MinFixSaving)
 	r.Actions = append(r.Actions, r.ModelFixes...)
 	r.Effort = detectors.FindEffort(sessions)
+	r.Effort.ThinkingCost, r.Effort.OutputCost = detectors.ThinkingCost(sessions)
 	if f, ok := fixes.ForEffort(r.Effort, s.MinFixSaving); ok {
 		r.EffortFix = &f
 	}
@@ -210,7 +224,23 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	}
 	r.Weeks = detectors.FindWeekly(sessions, s.ContextThreshold, s.PauseGap, loc)
 
-	for _, f := range []*fixes.Recommendation{r.CompactFix, r.PauseFix, r.CacheLifeFix, r.EffortFix} {
+	r.Switches = detectors.FindModelSwitches(sessions, s.TopSessions)
+	if f, ok := fixes.ForModelSwitches(r.Switches, s.MinFixSaving); ok {
+		r.SwitchFix = &f
+	}
+	r.Failures = detectors.FindFailures(sessions)
+	if f, ok := fixes.ForFailures(r.Failures, s.MinFixSaving); ok {
+		r.FailureFix = &f
+	}
+	r.ToolInputs = detectors.FindToolInputs(sessions, s.TopGroups)
+	r.AppServers = detectors.UnusedAppServers(r.Standing, sessions)
+	if f, ok := fixes.ForAppServers(r.AppServers, s.MinFixSaving); ok {
+		r.AppServerFix = &f
+	}
+	r.When = detectors.FindWhen(sessions, loc)
+
+	for _, f := range []*fixes.Recommendation{r.CompactFix, r.PauseFix, r.CacheLifeFix, r.EffortFix,
+		r.SwitchFix, r.FailureFix, r.AppServerFix} {
 		if f != nil {
 			r.Actions = append(r.Actions, *f)
 		}
@@ -296,3 +326,14 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 	}
 	return out
 }
+
+// Retention is how long Claude Code keeps session logs (ADR 0050): its
+// cleanupPeriodDays setting, or the default when it is not set.
+type Retention struct {
+	Days int  `json:"days"`
+	Set  bool `json:"set"`
+}
+
+// ShortRetention reports whether logs are kept for under 90 days, which
+// limits what a report can see.
+func (r Results) ShortRetention() bool { return r.Retention.Days > 0 && r.Retention.Days < 90 }

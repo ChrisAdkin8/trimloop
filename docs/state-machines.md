@@ -178,6 +178,8 @@ replaced or rotated file is noticed.
 | Weekly figures (`weekly.go`) | the week of each turn | |
 | Reconciliation (`reconcile.go`) | per main session: recorded, unpriced, behind, or compared | Decided by the order of its checks |
 | Usage limits (`limits.go`) | per limit window: its first and last reading | See §5 |
+| Model switches (`switches.go`) | the lifetime of the session's latest cache write, as P02 does | A switch counts only while that cache was alive |
+| Tool inputs (`tool_output.go` `FindToolInputs`) | the tool-call inputs still in the session, cleared by a compaction | Priced like carried tool output |
 
 Sums over maps are taken in a fixed order (sorted keys), so a report is
 the same on every run.

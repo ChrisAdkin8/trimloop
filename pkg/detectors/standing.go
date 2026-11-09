@@ -221,3 +221,33 @@ func sameStanding(a, b *event.Standing) bool {
 	}
 	return true
 }
+
+// UnusedAppServers returns the tool-definition parts of MCP servers the
+// desktop app adds that were sent but never called in these sessions, most
+// costly first (ADR 0050). They cannot be removed like other servers, so
+// P07's "remove" card leaves them out.
+func UnusedAppServers(f StandingContext, sessions []event.Session) []ContextPart {
+	called := map[string]bool{}
+	for _, s := range sessions {
+		for _, t := range s.Turns {
+			for _, c := range t.ToolCalls {
+				called[toolGroup(c.Tool)] = true
+			}
+		}
+	}
+	var out []ContextPart
+	for _, p := range f.Parts {
+		server, ok := strings.CutPrefix(p.Name, "mcp__")
+		if !ok || called[p.Name] || p.Cost <= 0 || !appServer(server) {
+			continue
+		}
+		out = append(out, p)
+	}
+	sortBy(out, func(p ContextPart) (float64, string) { return p.Cost, p.Name })
+	return out
+}
+
+// appServer reports whether the desktop app adds an MCP server itself.
+func appServer(server string) bool {
+	return strings.HasPrefix(server, "ccd_") || strings.HasPrefix(server, "Claude_") || appServers[server]
+}
