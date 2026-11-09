@@ -66,3 +66,11 @@ func TestLimitsOnlyForSubscribers(t *testing.T) {
 		t.Errorf("no readings: got %q", r.LimitRateText())
 	}
 }
+
+func TestAddLocalSetsEverythingFromOutsideTheLogs(t *testing.T) {
+	var r Results
+	AddLocal(&r, sample(), Local{Version: "v1.2.3", Plan: Plan{Name: "Pro", Subscription: true}, Retention: Retention{Days: 365, Set: true}})
+	if r.Version != "v1.2.3" || r.Plan.Name != "Pro" || !r.Subscriber() || r.Retention.Days != 365 || r.ShortRetention() {
+		t.Errorf("got version %q, plan %+v, retention %+v", r.Version, r.Plan, r.Retention)
+	}
+}

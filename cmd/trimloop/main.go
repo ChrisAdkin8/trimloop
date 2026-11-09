@@ -226,16 +226,21 @@ func analyse() {
 	settings := report.DefaultSettings()
 	settings.Titles = !*noTitles
 	r := report.Analyse(sessions, read, settings, time.Now())
-	r.Version = version()
-	// Usage limits (ADR 0048): the plan, and readings the status line kept.
+	// What the report needs from outside the logs: this build, the plan,
+	// the status line's usage-limit readings (ADR 0048) and how long Claude
+	// Code keeps logs (ADR 0050).
 	readings, err := history.LoadLimits(history.LimitsPath(home, os.Getenv("CLAUDE_CONFIG_DIR")))
 	if err != nil {
 		log.Printf("usage-limit readings not used: %v", err)
 	}
 	plan := claude.Plan()
 	days, set := claude.Retention()
-	r.Retention = report.Retention{Days: days, Set: set}
-	report.AddLimits(&r, sessions, report.Plan{Name: plan.Name, Subscription: plan.Subscription}, readings)
+	report.AddLocal(&r, sessions, report.Local{
+		Version:   version(),
+		Plan:      report.Plan{Name: plan.Name, Subscription: plan.Subscription},
+		Readings:  readings,
+		Retention: report.Retention{Days: days, Set: set},
+	})
 	if !*noHistory {
 		path := *historyPath
 		if path == "" {
@@ -405,9 +410,16 @@ func oldestFirst(data []logData) {
 // credited to the log it first appeared in.
 func buildSession(d logData, seen map[string]bool) event.Session {
 	s := sessionFor(d.log.Path)
-	var last time.Time                       // latest response time so far in this log
-	turnOf := map[string]int{}               // message id -> index in s.Turns, for ids counted here
-	callAt := map[string][2]int{}            // tool-use id -> turn index, call index
+	var last time.Time            // latest response time so far in this log
+	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
+	callAt := map[string][2]int{} // tool-use id -> turn index, call index
+	// active marks activity at time t: idle time before a turn runs from the
+	// latest activity, which includes replies the harness made up itself.
+	active := func(t time.Time) {
+		if t.After(last) {
+			last = t
+		}
+	}
 	var pending between                      // what the next new turn inherits (between.go)
 	customTitle := false                     // the user named the session: generated titles no longer replace it
 	var standing *event.Standing             // the latest system prompt and tool list
@@ -472,11 +484,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			continue
 		case source.KindFailure:
-			// Not a turn, but activity: the idle time before the next turn
-			// is measured from it, as for any reply the harness made up.
-			if m.Time.After(last) {
-				last = m.Time
-			}
+			active(m.Time) // not a turn, but activity, like any reply the harness made up
 			if !copiedLine(m, seen) {
 				f := event.Failure{At: m.Time, Kind: m.Failure}
 				if n := len(s.Turns); n > 0 {
@@ -495,9 +503,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 		if m.Model == claudecode.Synthetic {
 			// A reply the harness made up (after an API error): no usage,
 			// not a turn, but still activity.
-			if m.Time.After(last) {
-				last = m.Time
-			}
+			active(m.Time)
 			continue
 		}
 		i, here := turnOf[m.ID]
@@ -562,9 +568,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				s.Turns[i].ToolCalls = append(s.Turns[i].ToolCalls, c)
 			}
 		}
-		if m.Time.After(last) {
-			last = m.Time
-		}
+		active(m.Time)
 	}
 	s.Harness = sumRuns(runs)
 	if s.Kind == event.SubAgentSession && s.AgentType == "" {

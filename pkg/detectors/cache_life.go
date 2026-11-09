@@ -13,6 +13,25 @@ const (
 	longLife  = event.LongCacheLife
 )
 
+// cacheClock follows a session's cache from turn to turn: the lifetime its
+// latest write asked for (Usage.WriteLife), zero until it first writes. P02
+// and P01's model switches both read it (docs/state-machines.md §9).
+type cacheClock struct{ life time.Duration }
+
+// short reports whether the session's latest write was for five minutes.
+func (c cacheClock) short() bool { return c.life == shortLife }
+
+// alive reports whether the latest write's cache would still be there
+// after idle.
+func (c cacheClock) alive(idle time.Duration) bool { return c.life > 0 && idle <= c.life }
+
+// after moves the clock past turn t: its writes, if any, set the lifetime.
+func (c *cacheClock) after(t event.Turn) {
+	if l := t.Usage.WriteLife(); l != 0 {
+		c.life = l
+	}
+}
+
 // CacheLife is P02, cache TTL expiry, in reduced fidelity (ADR 0042). A
 // session whose cache lasts 5 minutes (sub-agents and SDK runs, in the
 // founder's logs) that waits
@@ -79,12 +98,12 @@ type shortWait struct {
 // part written at the session's 5-minute price).
 func shortWaits(s event.Session) []shortWait {
 	var out []shortWait
-	life := time.Duration(0) // the lifetime of the session's latest cache write so far
-	prev := 0                // the previous turn's context
+	var clock cacheClock // the lifetime of the session's latest cache write so far
+	prev := 0            // the previous turn's context
 	for i, t := range s.Turns {
 		u := t.Usage
 		ctx := t.Context()
-		if i > 0 && t.Priced && !t.CompactedBefore && life == shortLife &&
+		if i > 0 && t.Priced && !t.CompactedBefore && clock.short() &&
 			t.IdleBefore > shortLife && t.IdleBefore <= longLife &&
 			t.Model == s.Turns[i-1].Model && u.CacheRead < ctx/5 {
 			opts := price.Options{Fast: t.Fast, USOnly: t.USOnly}
@@ -98,9 +117,7 @@ func shortWaits(s event.Session) []shortWait {
 				out = append(out, shortWait{turn: i, saving: t.Cost.Total() - alt.Total(), hour: t.Cost.Total() - alt1h.Total()})
 			}
 		}
-		if l := u.WriteLife(); l != 0 {
-			life = l
-		}
+		clock.after(t)
 		prev = ctx
 	}
 	return out

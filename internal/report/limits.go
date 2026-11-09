@@ -22,6 +22,25 @@ const (
 	minLimitRise  = 5.0
 )
 
+// Local is what a report needs from outside the logs: the build that made
+// it, the user's plan, the status line's usage-limit readings, and how long
+// Claude Code keeps logs. Analyse works from the logs alone; AddLocal adds
+// these, so every field that does not come from the logs is set in one
+// place.
+type Local struct {
+	Version   string
+	Plan      Plan
+	Readings  []detectors.LimitReading
+	Retention Retention
+}
+
+// AddLocal completes r with what comes from outside the logs.
+func AddLocal(r *Results, sessions []event.Session, l Local) {
+	r.Version = l.Version
+	r.Retention = l.Retention
+	AddLimits(r, sessions, l.Plan, l.Readings)
+}
+
 // AddLimits adds the plan and the status-line readings of usage limits to
 // r, and gives each action its saving as a share of a week's limit when
 // that can be measured (ADR 0048).

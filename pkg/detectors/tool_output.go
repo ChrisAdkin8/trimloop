@@ -149,26 +149,11 @@ func addTo(g *Group, cc callCost, saving float64) {
 // never sent, cost nothing.
 func carry(s event.Session) []callCost {
 	var out []callCost
-	var inContext []int         // indexes into out
 	viewed := map[string]bool{} // files viewed, unchanged, since the last compaction
-	for i, t := range s.Turns {
-		if t.CompactedBefore {
-			inContext = nil
-			viewed = map[string]bool{}
-		}
-		history := historyRate(t)
-		for _, k := range inContext {
-			out[k].carried += float64(out[k].call.Result.Tokens()) * history
-		}
-		if i == 0 || t.CompactedBefore {
-			continue // the previous turn's results went into the compaction
-		}
-		arrival := arrivalRate(t)
-		for _, c := range s.Turns[i-1].ToolCalls {
-			if !c.HasResult {
-				continue
-			}
-			cc := callCost{call: c, carried: float64(c.Result.Tokens()) * arrival, at: t.Time}
+	walkCarried(s, func() { viewed = map[string]bool{} },
+		func(c event.ToolCall) (int, bool) { return c.Result.Tokens(), c.HasResult },
+		func(t event.Turn, c event.ToolCall, cost float64) func(float64) {
+			cc := callCost{call: c, carried: cost, at: t.Time}
 			switch {
 			case c.File == "":
 			case c.FileOp == event.FileView:
@@ -178,10 +163,52 @@ func carry(s event.Session) []callCost {
 				delete(viewed, c.File)
 			}
 			out = append(out, cc)
-			inContext = append(inContext, len(out)-1)
+			k := len(out) - 1
+			return func(history float64) { out[k].carried += float64(out[k].call.Result.Tokens()) * history }
+		})
+	return out
+}
+
+// walkCarried walks a session the way the text of its tool calls stays in
+// the conversation (docs/state-machines.md §9): what turn i-1's calls
+// leave arrives with turn i, at that turn's arrival price, then is re-read
+// on every later turn at that turn's history price, until a compaction
+// drops it all. compacted, if not nil, is told of each compaction, before
+// anything else on that turn. size gives a call's tokens and whether it
+// leaves anything; arrive is told each call that does, with its turn and
+// arrival cost, and returns a function given each later turn's history
+// price per token, which adds that turn's cost (callers multiply by their
+// own tokens, so the sums round as they always have). Tool output and tool
+// inputs are both priced this way.
+func walkCarried(s event.Session, compacted func(), size func(event.ToolCall) (int, bool),
+	arrive func(t event.Turn, c event.ToolCall, cost float64) func(float64)) {
+	type live struct {
+		add func(history float64)
+	}
+	var inContext []live
+	for i, t := range s.Turns {
+		if t.CompactedBefore {
+			inContext = nil
+			if compacted != nil {
+				compacted()
+			}
+		}
+		history := historyRate(t)
+		for _, x := range inContext {
+			x.add(history)
+		}
+		if i == 0 || t.CompactedBefore {
+			continue // the previous turn's calls went into the compaction
+		}
+		arrival := arrivalRate(t)
+		for _, c := range s.Turns[i-1].ToolCalls {
+			n, ok := size(c)
+			if !ok {
+				continue
+			}
+			inContext = append(inContext, live{arrive(t, c, float64(n)*arrival)})
 		}
 	}
-	return out
 }
 
 // arrivalRate is a turn's price per token for input new to it: a cache
@@ -326,30 +353,8 @@ func FindToolInputs(sessions []event.Session, topN int) ToolInputs {
 	var f ToolInputs
 	groups := map[string]*Group{}
 	for _, s := range sessions {
-		type live struct {
-			tool   string
-			tokens int
-		}
-		var inContext []live
-		for i, t := range s.Turns {
-			if t.CompactedBefore {
-				inContext = nil
-			}
-			history := historyRate(t)
-			for _, x := range inContext {
-				c := float64(x.tokens) * history
-				f.Carried += c
-				groups[x.tool].Carried += c
-			}
-			if i == 0 || t.CompactedBefore {
-				continue // the previous turn's calls went into the compaction
-			}
-			arrival := arrivalRate(t)
-			for _, c := range s.Turns[i-1].ToolCalls {
-				tok := c.InputTokens()
-				if tok == 0 {
-					continue
-				}
+		walkCarried(s, nil, func(c event.ToolCall) (int, bool) { n := c.InputTokens(); return n, n > 0 },
+			func(_ event.Turn, c event.ToolCall, cost float64) func(float64) {
 				name := toolGroup(c.Tool)
 				g := groups[name]
 				if g == nil {
@@ -357,15 +362,18 @@ func FindToolInputs(sessions []event.Session, topN int) ToolInputs {
 					groups[name] = g
 				}
 				g.Calls++
-				g.Tokens += tok
+				g.Tokens += c.InputTokens()
 				f.Calls++
-				f.Tokens += tok
-				cost := float64(tok) * arrival
+				f.Tokens += c.InputTokens()
 				f.Carried += cost
 				g.Carried += cost
-				inContext = append(inContext, live{name, tok})
-			}
-		}
+				tok := c.InputTokens()
+				return func(history float64) {
+					c := float64(tok) * history
+					f.Carried += c
+					g.Carried += c
+				}
+			})
 	}
 	f.ByTool = ranked(groups, topN, func(g Group) float64 { return g.Carried })
 	return f

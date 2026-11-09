@@ -129,3 +129,47 @@ func TestFindToolInputs(t *testing.T) {
 		t.Errorf("got %+v; want 2 calls, 3,000 tokens carried twice, Write first", f)
 	}
 }
+
+func TestCacheClock(t *testing.T) {
+	var c cacheClock
+	if c.alive(time.Second) || c.short() {
+		t.Error("before any write: not alive, not short")
+	}
+	c.after(event.Turn{Usage: event.Usage{CacheWrite5m: 10}})
+	if !c.short() || !c.alive(5*time.Minute) || c.alive(6*time.Minute) {
+		t.Errorf("after a 5-minute write: got %+v", c)
+	}
+	c.after(event.Turn{Usage: event.Usage{CacheRead: 10}}) // wrote nothing: unchanged
+	c.after(event.Turn{Usage: event.Usage{CacheWrite1h: 10, CacheWrite5m: 10}})
+	if c.short() || !c.alive(time.Hour) || c.alive(61*time.Minute) {
+		t.Errorf("after an hour write: got %+v", c)
+	}
+}
+
+// The shared walk tells its users of every compaction, even one on a turn
+// that brings in nothing: carry forgets which files were viewed then.
+func TestWalkCarriedReportsCompactions(t *testing.T) {
+	view := event.ToolCall{Tool: "Read", File: "f", FileOp: event.FileView, HasResult: true, Result: event.ToolResult{Bytes: 400}}
+	turn := func(compacted bool, calls ...event.ToolCall) event.Turn {
+		return event.Turn{Priced: true, CompactedBefore: compacted, ToolCalls: calls,
+			Usage: event.Usage{CacheRead: 1000}, Cost: event.Cost{CacheRead: 0.0002}}
+	}
+	s := event.Session{Turns: []event.Turn{
+		turn(false, view), turn(false, view), // results arrive with the next turn: the second is a re-read
+		turn(false),
+		turn(true),                     // compacted: the views are forgotten
+		turn(false, view), turn(false), // a first view again, not a re-read
+	}}
+	var rereads []bool
+	for _, cc := range carry(s) {
+		rereads = append(rereads, cc.reread)
+	}
+	if len(rereads) != 3 || rereads[0] || !rereads[1] || rereads[2] {
+		t.Errorf("re-reads: got %v, want [false true false]", rereads)
+	}
+	compactions := 0
+	walkCarried(s, func() { compactions++ }, func(event.ToolCall) (int, bool) { return 0, false }, nil)
+	if compactions != 1 {
+		t.Errorf("compactions reported: got %d, want 1", compactions)
+	}
+}

@@ -1,8 +1,6 @@
 package detectors
 
 import (
-	"time"
-
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
@@ -30,13 +28,13 @@ func FindModelSwitches(sessions []event.Session, topN int) ModelSwitches {
 	var f ModelSwitches
 	stats := map[string]*SessionStat{}
 	for _, s := range sessions {
-		life := time.Duration(0) // the lifetime of the session's latest cache write
+		var clock cacheClock // the lifetime of the session's latest cache write
 		for i, t := range s.Turns {
 			if i > 0 {
 				p := s.Turns[i-1]
 				prev := p.Context()
 				if t.Model != p.Model && t.Priced && !t.CompactedBefore && prev > minSwitchContext &&
-					life > 0 && t.IdleBefore <= life {
+					clock.alive(t.IdleBefore) {
 					saving := t.Cost.Total() - readInstead(t, prev)
 					if saving > 0 {
 						f.Switches++
@@ -50,9 +48,7 @@ func FindModelSwitches(sessions []event.Session, topN int) ModelSwitches {
 					}
 				}
 			}
-			if l := t.Usage.WriteLife(); l != 0 {
-				life = l
-			}
+			clock.after(t)
 		}
 	}
 	f.Sessions = len(stats)

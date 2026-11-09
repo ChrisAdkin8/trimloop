@@ -54,7 +54,8 @@ The rule is ADR 0045 rule 5.
 ## 2. Building a session from a log (implicit, small)
 
 `buildSession` also remembers, across a log's lines: the latest activity
-time (for idle time before a turn); message ids counted here (`turnOf`) and
+time (for idle time before a turn), moved only by `active`, so a reply the
+harness made up (an API error) counts as activity like any other; message ids counted here (`turnOf`) and
 tool calls waiting for results (`callAt`); whether the user named the
 session (a generated title then never replaces it); the latest system
 prompt and tool list; and the harness's latest cost record per run (records
@@ -171,18 +172,29 @@ replaced or rotated file is noticed.
 
 | Detector | What it remembers across turns | Note |
 |---|---|---|
-| P02 short waits (`cache_life.go`) | the session's cache lifetime from its latest write; whether it ever wrote for 5 minutes or an hour; from its first hour write on (for the hour-against-5-minutes range) | Three questions on purpose, all from one rule, `Usage.WriteLife` (the hour if any write was for the hour, else 5 minutes, else none), which the status line's countdown also uses. "Wholly on the 5-minute cache" means it never wrote for an hour, by design (ADR 0045 rule 7) |
+| Cache clock (`cache_life.go` `cacheClock`) | the lifetime of the session's latest cache write | Shared by P02 and P01's model switches: `short`, `alive(idle)`, `after(turn)` |
+| P02 short waits (`cache_life.go`) | the session's cache lifetime from its latest write (the cache clock); whether it ever wrote for 5 minutes or an hour; from its first hour write on (for the hour-against-5-minutes range) | Three questions on purpose, all from one rule, `Usage.WriteLife` (the hour if any write was for the hour, else 5 minutes, else none), which the status line's countdown also uses. "Wholly on the 5-minute cache" means it never wrote for an hour, by design (ADR 0045 rule 7) |
 | P09 long breaks, weekly `userBreak` (`long_pause.go`) | nothing but the turn's idle time and who ended it | P02 counts waits of 5 minutes to an hour; P09 waits longer than its gap setting, an hour by default, and the card names the gap it used |
 | Compaction replay (`likely.go`) | how much a simulated compaction has removed so far | Reset by a real compaction, and by a fall of more than half with no marker (`TestLikelyCompactionResetsOnAnUnmarkedDrop`) |
-| Carried tool output (`tool_output.go` `carry`) and carried text (`standing.go`) | what is still in the session, cleared by a compaction; files viewed since their last change | Two implementations of one idea (ADR 0045 rule 4). On a compaction turn, tool output from before is dropped, while text arriving on that turn is new and priced as such. Merging them is possible, but each is covered by its own tests and the merge would be all risk for no change in figures |
+| Carried tool calls (`tool_output.go` `walkCarried`) | what each turn's tool calls left in the session, cleared by a compaction | One walk for tool output (`carry`, which also remembers files viewed since their last change and forgets them at a compaction) and tool inputs (`FindToolInputs`). It tells its users of each compaction, so per-user state resets with it (`TestWalkCarriedReportsCompactions`) |
+| Carried text (`standing.go`) | the text Claude Code added, still in the session | Priced like tool calls (ADR 0045 rule 4), but text arriving on a compaction turn is new and priced as such, so it keeps its own walk |
 | Weekly figures (`weekly.go`) | the week of each turn | |
 | Reconciliation (`reconcile.go`) | per main session: recorded, unpriced, behind, or compared | Decided by the order of its checks |
 | Usage limits (`limits.go`) | per limit window: its first and last reading | See §5 |
-| Model switches (`switches.go`) | the lifetime of the session's latest cache write, as P02 does | A switch counts only while that cache was alive |
-| Tool inputs (`tool_output.go` `FindToolInputs`) | the tool-call inputs still in the session, cleared by a compaction | Priced like carried tool output |
+| Model switches (`switches.go`) | the cache clock | A switch counts only while that cache was alive |
 
 Sums over maps are taken in a fixed order (sorted keys), so a report is
-the same on every run.
+the same on every run. When refactoring a sum, keep `total += n * rate` as
+one expression where it was one: Go may fuse the multiply and add (one
+rounding instead of two) on some processors, so splitting it across a
+function call changes the last digits.
+
+## The results' lifecycle
+
+`report.Analyse` works from the logs alone. `report.AddLocal` then adds
+what comes from outside them: the build's version, the plan, the status
+line's usage-limit readings and the log retention. Every field not from the
+logs is set there, in one call from `main`.
 
 ## 10. Which card text applies (decision tables)
 
