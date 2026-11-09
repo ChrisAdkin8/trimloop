@@ -427,7 +427,7 @@ func TestTextShowsGapSections(t *testing.T) {
 	if err := WriteText(&out, r); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"deletes logs after 30 days", "P12 REPLIES CUT OFF", "4 when the computer slept", "WHEN YOU WORK"} {
+	for _, want := range []string{"gone unused for 30 days", "P12 REPLIES CUT OFF", "4 when the computer slept", "WHEN YOU WORK"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("text has no %q", want)
 		}
@@ -435,7 +435,46 @@ func TestTextShowsGapSections(t *testing.T) {
 	r.Retention = Retention{Days: 365, Set: true}
 	out.Reset()
 	_ = WriteText(&out, r)
-	if strings.Contains(out.String(), "deletes logs after") {
+	if strings.Contains(out.String(), "gone unused for") {
 		t.Error("a year's retention: no tip")
+	}
+}
+
+func TestRetentionTip(t *testing.T) {
+	for _, c := range []struct {
+		r    Retention
+		want string
+	}{
+		{Retention{Days: 30}, "gone unused for 30 days (by default)"},
+		{Retention{Days: 45, Set: true}, "as cleanupPeriodDays is set"},
+		{Retention{Days: 0, Set: true}, "cleanupPeriodDays is 0"},
+		{Retention{Days: 90, Set: true}, ""},
+		{Retention{}, ""}, // not read: no tip
+	} {
+		got := RetentionTip(c.r)
+		if (c.want == "") != (got == "") || !strings.Contains(got, c.want) {
+			t.Errorf("RetentionTip(%+v) = %q, want %q", c.r, got, c.want)
+		}
+	}
+}
+
+// The page renders whole, with and without --no-titles, when MCP servers
+// (here a connector known only by an id) are in the spend tables; under
+// --no-titles it shows no session or connector ids.
+func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
+	for _, titles := range []bool{true, false} {
+		s := DefaultSettings()
+		s.Titles = titles
+		r := Analyse(sample(), Read{Logs: 1}, s, t0)
+		r.Attribution.ByMCPServer = []detectors.Spend{{Name: "1a59c906-04da-521d-bda7-7f71b9f9e01c", Cost: 3, Turns: 1}}
+		var out bytes.Buffer
+		if err := WriteHTML(&out, r); err != nil {
+			t.Fatalf("titles %v: %v", titles, err)
+		}
+		page := out.String()
+		hasID := strings.Contains(page, "1a59c906") || strings.Contains(page, `title="Session m1"`)
+		if hasID == !titles || !strings.Contains(page, "unnamed connector") || !strings.Contains(page, "</html>") {
+			t.Errorf("titles %v: ids shown %v; page ends %q", titles, hasID, page[len(page)-40:])
+		}
 	}
 }

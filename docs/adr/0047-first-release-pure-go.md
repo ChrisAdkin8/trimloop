@@ -1,6 +1,6 @@
 # ADR 0047: First releases built in one job while trimloop is pure Go
 
-- Status: Accepted — built: `.goreleaser.yaml` and `.github/workflows/release.yml`, proved by a local snapshot release (2026-11-08); no release has been published; releases bump the plugin version: [ADR 0049](0049-claude-code-plugin.md)
+- Status: Accepted — built: `.goreleaser.yaml` and `.github/workflows/release.yml`, proved by a local snapshot release (2026-11-08); no release has been published; releases bump the plugin version: [ADR 0049](0049-claude-code-plugin.md); signing, provenance and the tap while private, the order of going public, and hardening: [ADR 0051](0051-private-releases-and-going-public.md)
 - Date: 2026-11-08
 - Amends: [ADR 0014](0014-release-builds-per-os.md) (applies once trimloop needs cgo), [packaging.md](../packaging.md) §4 and §10 (until then)
 

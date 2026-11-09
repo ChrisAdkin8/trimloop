@@ -16,9 +16,11 @@ import (
 var htmlSource string
 
 var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
-	"dollars":    money,
-	"sinceDay":   sinceDay,
-	"trimPrefix": strings.TrimPrefix,
+	"dollars":      money,
+	"sinceDay":     sinceDay,
+	"trimPrefix":   strings.TrimPrefix,
+	"retentionTip": RetentionTip,
+	"serverLabel":  serverLabel,
 	"limitShare": func(a fixes.Recommendation) string {
 		return strings.TrimPrefix(limitText(a), "; ")
 	},
@@ -245,3 +247,14 @@ func (v view) MaxDay() float64 {
 	}
 	return m
 }
+
+// SessID is a session's id for the page, or "" under --no-titles.
+func (v view) SessID(id string) string {
+	if v.HideIDs {
+		return ""
+	}
+	return id
+}
+
+// Server names an MCP server for the page (serverLabel).
+func (v view) Server(n string) string { return serverLabel(n, v.HideIDs) }

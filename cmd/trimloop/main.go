@@ -87,8 +87,8 @@ func setup(args []string, home string) int {
 		return checkSetup(os.Stdout, *settingsFile, exe, home, cfgDir)
 	}
 	if *write == "" {
-		fmt.Println("Add this to ~/.claude/settings.json (or a project's .claude/settings.json), or run")
-		fmt.Println("'trimloop setup --write <file>' to add it for you:")
+		fmt.Printf("Add this to %s (or a project's .claude/settings.json), or run\n", defaultSettings)
+		fmt.Printf("'trimloop setup --write %s' to add it for you:\n", defaultSettings)
 		fmt.Println()
 		fmt.Println(live.SetupSnippet(exe))
 		return 0
@@ -479,6 +479,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 			continue
 		case source.KindLimitHit:
+			active(m.Time) // a refused request is activity, like any reply the harness made up
 			if !copiedLine(m, seen) {
 				s.LimitHits = append(s.LimitHits, event.LimitHit{At: m.Time, Limit: m.Limit})
 			}

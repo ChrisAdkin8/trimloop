@@ -104,7 +104,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <h1>Where your Claude Code tokens went</h1>
 <p class="lead">
 {{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.PerWeek}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{thousands .Read.Sessions}} sessions · list prices as of {{.Prices}}
-{{if .ShortRetention}}<br><span class="muted small">Claude Code deletes logs after {{.Retention.Days}} days, so this sees only that far back. Add <span class="mono">"cleanupPeriodDays": 365</span> to ~/.claude/settings.json to keep a year.</span>{{end}}
+{{if .ShortRetention}}<br><span class="muted small">{{retentionTip .Retention}}</span>{{end}}
 {{if .Read.Since}}<br><span class="note">Only sessions started on or after {{sinceDay .Read.Since}}, with their sub-agents.</span>{{end}}
 {{if .Read.Failed}}<br><span class="note">{{.Read.Failed}} log files could not be read to the end.</span>{{end}}
 {{if .Read.BadLines}}<br><span class="note">{{.Read.BadLines}} lines could not be read; Claude Code's log format may have changed.</span>{{end}}
@@ -184,9 +184,9 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   {{if or .Attribution.BySkill .Attribution.ByPlugin .Attribution.ByMCPServer}}
   <h3>By skill, plugin and MCP server</h3>
   <p class="muted small">Claude Code names a skill, plugin or MCP server (a connected tool provider) on some turns. The cost is those turns' cost, which can include work that followed the tool.</p>
-  {{template "spend" (args "Skill" .Attribution.BySkill $.Total false)}}
-  {{template "spend" (args "Plugin" .Attribution.ByPlugin $.Total false)}}
-  {{template "spend" (args "MCP server" .Attribution.ByMCPServer $.Total true)}}
+  {{template "spend" (args "Skill" .Attribution.BySkill $.Total false $.HideIDs)}}
+  {{template "spend" (args "Plugin" .Attribution.ByPlugin $.Total false $.HideIDs)}}
+  {{template "spend" (args "MCP server" .Attribution.ByMCPServer $.Total true $.HideIDs)}}
   {{end}}
 </div>
 </details>
@@ -227,7 +227,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
     <thead><tr><th data-sort>Session</th><th data-sort>Project</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Largest size (tokens)</th></tr></thead>
     <tbody>
     {{range .Top}}{{$l := $.Name .ID}}<tr>
-      <td class="name session">{{template "session" (args $l .ID)}}</td><td class="name">{{.Project}}</td>
+      <td class="name session">{{template "session" (args $l ($.SessID .ID))}}</td><td class="name">{{.Project}}</td>
       <td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Cost}}">{{pct1 .Cost $.Total}}</td>
       <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td></tr>{{end}}
     </tbody>
@@ -249,7 +249,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   <div class="scroll"><table class="sortable">
     <thead><tr><th data-sort>Session</th><th class="n" data-sort>Waits</th><th class="n" data-sort>Largest context</th><th class="n" data-sort>Cost of the expiry</th></tr></thead>
     <tbody>
-    {{range .Top}}{{$l := $.Name .SessionID}}<tr><td class="name session">{{template "session" (args $l .SessionID)}}</td><td class="n" data-v="{{.Turns}}">{{.Turns}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td><td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td></tr>{{end}}
+    {{range .Top}}{{$l := $.Name .SessionID}}<tr><td class="name session">{{template "session" (args $l ($.SessID .SessionID))}}</td><td class="n" data-v="{{.Turns}}">{{.Turns}}</td><td class="n" data-v="{{.Peak}}">{{short .Peak}}</td><td class="n" data-v="{{.Saving}}">{{dollars .Saving}}</td></tr>{{end}}
     </tbody>
   </table></div>{{else}}<p>No session on the 5-minute cache waited long enough to lose it.</p>{{end}}
   {{if gt .HourAsShortLow .HourActual}}<p class="muted small">Keeping the cache for an hour cost {{dollars (sub .HourAsShortLow .HourActual)}} to {{dollars (sub .HourAsShort .HourActual)}} less than the 5-minute cache would have, in the sessions that used it: the hour pays for itself here. The first figure is if only waits over 10 minutes lost a 5-minute cache, the second if every wait over 5 minutes did. Neither is exact: the logged wait includes the next reply's own time, and requests the logs do not record can keep a cache alive, even past 10 minutes.</p>{{end}}
@@ -366,7 +366,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 </details>
 </section>
 
-{{if or .Switches.Switches (or .Failures.Sleep .Failures.Network) .AppServers}}
+{{if or .Switches.Switches (or .Failures.Sleep .Failures.Network .Failures.Other) .AppServers}}
 <section class="area">
 <h2 id="interruptions">Interruptions and switches</h2>
 <ul>
@@ -434,7 +434,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 </main>
 
-{{define "session"}}{{$l := index . 0}}{{$id := index . 1}}{{if $l.Title}}{{$l.Title}}{{else}}<span class="muted">Untitled session</span>{{end}}{{if $l.SubAgent}} <span class="muted small">(a sub-agent)</span>{{end}}{{if not $l.Start.IsZero}}<span class="id" title="Session {{$id}}">{{day $l.Start}}</span>{{end}}{{end}}
+{{define "session"}}{{$l := index . 0}}{{$id := index . 1}}{{if $l.Title}}{{$l.Title}}{{else}}<span class="muted">Untitled session</span>{{end}}{{if $l.SubAgent}} <span class="muted small">(a sub-agent)</span>{{end}}{{if not $l.Start.IsZero}}<span class="id"{{if $id}} title="Session {{$id}}"{{end}}>{{day $l.Start}}</span>{{end}}{{end}}
 
 {{define "action"}}{{$a := index . 0}}{{$total := index . 1}}
 <div class="panel card">
@@ -460,12 +460,12 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 </div>
 {{end}}
 
-{{define "spend"}}{{$rows := index . 1}}{{$total := index . 2}}{{$servers := index . 3}}{{if $rows}}
+{{define "spend"}}{{$rows := index . 1}}{{$total := index . 2}}{{$servers := index . 3}}{{$hide := index . 4}}{{if $rows}}
 <h3>{{index . 0}}</h3>
 <div class="scroll"><table class="sortable">
   <thead><tr><th data-sort>Name</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Sessions</th></tr></thead>
   <tbody>
-  {{range $rows}}<tr><td class="name">{{if $servers}}{{server .Name}}{{else}}{{.Name}}{{end}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Cost}}">{{pct1 .Cost $total}}</td>
+  {{range $rows}}<tr><td class="name">{{if $servers}}{{serverLabel .Name $hide}}{{else}}{{.Name}}{{end}}</td><td class="n" data-v="{{.Cost}}">{{dollars .Cost}}</td><td class="n" data-v="{{.Cost}}">{{pct1 .Cost $total}}</td>
     <td class="n" data-v="{{.Turns}}">{{thousands .Turns}}</td><td class="n" data-v="{{.Conversations}}">{{.Conversations}}</td></tr>{{end}}
   </tbody>
 </table></div>

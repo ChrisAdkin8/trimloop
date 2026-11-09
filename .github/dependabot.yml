@@ -1,0 +1,16 @@
+# Keeps the pinned GitHub Actions and Go modules up to date, taking only
+# releases at least two weeks old (ADR 0051).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14

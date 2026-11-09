@@ -184,13 +184,15 @@ func parseLine(line []byte) (source.Message, bool, error) {
 	}
 
 	switch {
-	case rec.Type == "assistant" && rec.IsAPIErrorMessage && limitError(rec.Error):
+	case rec.Type == "assistant" && rec.IsAPIErrorMessage && limitError(rec.Error) && limitKind(blocks(rec.Message.Content)) != "":
+		// A subscription usage limit, in Claude Code's own words. Other rate
+		// limits (an API key's per-minute limit) are failures, below.
 		return source.Message{Kind: source.KindLimitHit, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
 			Limit: limitKind(blocks(rec.Message.Content))}, true, nil
 
-	case rec.Type == "assistant" && rec.IsAPIErrorMessage && rec.Message.Model == Synthetic:
+	case rec.Type == "assistant" && rec.IsAPIErrorMessage && (rec.Message.Model == Synthetic || limitError(rec.Error)):
 		return source.Message{Kind: source.KindFailure, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
-			Failure: failureKind(blocks(rec.Message.Content))}, true, nil
+			Failure: failureKind(errorText(rec.Error), blocks(rec.Message.Content))}, true, nil
 
 	case rec.Type == "assistant" && rec.Message.Usage != nil:
 		u := rec.Message.Usage
@@ -538,32 +540,62 @@ func limitError(raw json.RawMessage) bool {
 	return json.Unmarshal(raw, &s) == nil && s == "rate_limit"
 }
 
-// limitKind tells which limit a harness limit message names, from its text
-// ("You've hit your session limit · resets 11:30pm", "... weekly limit ...").
+// limitKind tells which subscription limit a harness limit message names,
+// from its text ("You've hit your session limit · resets 11:30pm", "...
+// weekly limit ...", "... Opus limit ..."): "session", "weekly", "other",
+// or "" when the text names no usage limit (an API key's rate limit).
 func limitKind(bs []block) string {
 	for _, b := range bs {
 		t := strings.ToLower(b.Text)
+		if !strings.Contains(t, "hit your") || !strings.Contains(t, "limit") {
+			continue
+		}
 		switch {
 		case strings.Contains(t, "weekly limit"):
 			return "weekly"
 		case strings.Contains(t, "session limit"):
 			return "session"
 		}
+		return "other"
 	}
-	return "other"
+	return ""
 }
 
-// failureKind sorts an error reply the harness wrote by its text: "API
-// Error: Your computer went to sleep mid-response", a network error such as
-// "Can't reach the API server" or "Connection lost", or anything else.
-func failureKind(bs []block) string {
+// errorText is an error line's error field when it is a string.
+func errorText(raw json.RawMessage) string {
+	var s string
+	_ = json.Unmarshal(raw, &s)
+	return s
+}
+
+// failureKind sorts an error reply the harness wrote, by its error field
+// and text: "sleep" ("API Error: Your computer went to sleep
+// mid-response"); "network" for connection and server errors ("Can't reach
+// the API server", "Connection lost", overloaded, a rate limit); "not-sent"
+// when the request was refused before it was sent and nothing was sent again
+// (an expired login, a bad request); or "other".
+func failureKind(errField string, bs []block) string {
+	// The text comes first: Claude Code marks a reply cut off by sleep with
+	// a server error.
+	for _, b := range bs {
+		if strings.Contains(strings.ToLower(b.Text), "went to sleep") {
+			return "sleep"
+		}
+	}
+	switch errField {
+	case "authentication_failed", "invalid_request", "billing_error":
+		return "not-sent"
+	case "rate_limit", "server_error", "overloaded":
+		return "network"
+	}
 	for _, b := range bs {
 		t := strings.ToLower(b.Text)
 		switch {
-		case strings.Contains(t, "went to sleep"):
-			return "sleep"
+		case strings.Contains(t, "/login"), strings.Contains(t, "login expired"):
+			return "not-sent"
 		case strings.Contains(t, "reach the api server"), strings.Contains(t, "connection"),
-			strings.Contains(t, "network"), strings.Contains(t, "enotfound"), strings.Contains(t, "timed out"):
+			strings.Contains(t, "network"), strings.Contains(t, "enotfound"), strings.Contains(t, "timed out"),
+			strings.Contains(t, "overloaded"), strings.Contains(t, "server error"), strings.Contains(t, "rate limit"):
 			return "network"
 		}
 	}

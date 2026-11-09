@@ -48,6 +48,12 @@ neutral, so P01 and P02 describe each provider cache model.
 
 ## P01 — Cache-prefix churn
 
+**In M0 (reduced fidelity, built):** one cause the logs show without the
+request bodies: a session moving to another model part-way through, whose
+first turn on the new model saves the whole conversation again while the
+old model's cache was still alive ([ADR 0050](adr/0050-second-gap-analysis-findings.md)). Other churn, measured
+from usage alone, was too small to report on the founder's logs.
+
 **What happens:** Something early in the request changes between turns, so the
 provider cannot reuse its cached copy of the prefix. It charges full price —
 or, on providers that bill cache writes, a write premium — for content it saw
@@ -396,8 +402,13 @@ retries, each re-sending the full request.
 seconds; or, where the harness records retries (`harness.retries`), retry
 attempts, delays and causes per turn, and time spent retrying.
 
-**Detection:** From harness retry records (M0, reduced fidelity; not built
-yet), else from repeated request fingerprints (M3).
+**In M0 (reduced fidelity, built):** requests Claude Code's own error
+replies show were cut off and sent again — the computer sleeping
+mid-response, network and server errors — with the context re-read as a
+lower bound; the card is about keeping the computer awake ([ADR 0050](adr/0050-second-gap-analysis-findings.md)).
+
+**Detection:** From harness retry records (M0, not built yet), else from
+repeated request fingerprints (M3).
 
 **Fix:** L1 — recommend backoff or concurrency settings; alert on rate-limit
 headroom.
@@ -440,7 +451,8 @@ call set a model, so every sub-agent ran on the main model. Measured figures: [l
 
 **In M0 (reduced fidelity, built):** spend by effort level, and how much
 more xhigh and max turns think per turn, on average, than the same model's
-high-effort turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0045](adr/0045-m0-measurement-method.md)).
+high-effort turns ([ADR 0042](adr/0042-p02-p14-and-main-session-models.md), [ADR 0045](adr/0045-m0-measurement-method.md)),
+and thinking's share of all output spend ([ADR 0050](adr/0050-second-gap-analysis-findings.md)).
 
 **What happens:** Extended reasoning tokens are spent on trivial turns.
 

@@ -2,6 +2,7 @@ package fixes
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
@@ -33,8 +34,13 @@ func ForStandingContext(f detectors.StandingContext, minSaving float64) []Recomm
 		r.Finding = fmt.Sprintf(r.Finding, dollars(cost[src]))
 		if src == detectors.SourceMCP {
 			r.Examples = nil
+			seen := map[string]bool{}
 			for _, n := range names[src] {
-				r.Examples = append(r.Examples, strings.TrimPrefix(n, "mcp__"))
+				n = connectorName(strings.TrimSuffix(strings.TrimPrefix(n, "mcp__"), " (instructions)"))
+				if !seen[n] {
+					seen[n] = true
+					r.Examples = append(r.Examples, n)
+				}
 			}
 		}
 		out = append(out, r)
@@ -84,4 +90,17 @@ var contextFixes = map[string]Recommendation{
 			"Trim CLAUDE.md to what every session needs. Put task-specific instructions in a skill " +
 				"(.claude/skills/<name>/SKILL.md), which loads only when it is used."},
 	},
+}
+
+// uuidLike matches a server name that is only an identifier, as claude.ai
+// connectors can be.
+var uuidLike = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// connectorName is a server's name for a card: an identifier means nothing
+// to people, so it is "an unnamed connector".
+func connectorName(n string) string {
+	if uuidLike.MatchString(n) {
+		return "an unnamed connector"
+	}
+	return n
 }

@@ -30,8 +30,9 @@ Each item is tagged **Done**, **Partly** or **Not built** for the prototype.
   [ADR 0028](docs/adr/0028-harness-recorded-signals.md),
   [ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md),
   [ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)). Done: P04,
-  P07, P09 and P19; in reduced fidelity, P02, P10, P13 (sub-agents and main
-  sessions) and P14. Not built: P01, P03, P05, P06 and P12.
+  P07, P09 and P19; in reduced fidelity, P01 (model switches), P02, P10,
+  P12 (replies cut off), P13 (sub-agents and main sessions) and P14. Not
+  built: P03, P05 and P06.
 - **Partly.** Reader also takes the harness's own cost and compaction
   records: reconciliation reports the gap with them (about 13 %). ADR 0028's
   acceptance test, within 2 % with auxiliary turns added, is not yet passed:
@@ -109,9 +110,12 @@ To do:
 1. Saved offsets, so a re-run reads only new lines.
 2. Command-line options: `--repo` (`analyse`, `--format`, `--out`,
    `--open`, `--since` and `--version` are done).
-3. P03, P06 (with the DuckDB store, numbers only until item 5), P01; then
-   P05, and P12 in reduced fidelity from harness records (its full fidelity, and P10's, stays in M3).
-4. Distribution: installable release, minimal conformance runner, profiles.
+3. P03, P06 (with the DuckDB store, numbers only until item 5), P01's other
+   causes (beyond model switches); then P05, and P12 from harness retry
+   records (its full fidelity, and P10's, stays in M3).
+4. Distribution: publish the first release after going public
+   ([ADR 0051](docs/adr/0051-private-releases-and-going-public.md)), minimal
+   conformance runner, profiles.
 5. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 
 **Done when:** on a sample of real sessions, findings are reproducible and a

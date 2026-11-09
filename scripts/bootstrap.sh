@@ -29,6 +29,23 @@ NODE_MIN="22"
 # macOS Homebrew installs its current release and a mismatch is reported but
 # does not fail --check.
 DUCKDB_VERSION="v2.0.0"
+
+# On Linux, Go, uv and Node.js are pinned to releases at least two weeks old,
+# each with the SHA-256 of its download recorded here, so a download is
+# checked against this file rather than against a checksum from the same
+# place (ADR 0051). Update the version and both checksums together.
+GO_PIN="1.27.3"
+GO_SHA256_amd64="65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"
+GO_SHA256_arm64="a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49"
+UV_PIN="0.13.5"
+UV_SHA256_amd64="f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
+UV_SHA256_arm64="4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403"
+NODE_PIN="v24.22.1"
+NODE_SHA256_amd64="6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6"
+NODE_SHA256_arm64="dbabf7a1cbf947e6059ffad2c27b80041db97dea1e553b62afdee7f13fca336e"
+
+# pinned_sha prints the pinned checksum for a tool on this machine's architecture.
+pinned_sha() { local v="${1}_SHA256_${GOARCH}"; echo "${!v}"; }
 BUF_VERSION="v1.75.0"
 PROTOC_GEN_GO_VERSION="v1.36.12"
 PROTOC_GEN_GO_GRPC_VERSION="v1.6.2"
@@ -205,18 +222,12 @@ else
   if [[ $PLATFORM == macos ]]; then
     run brew install go
   else
-    # Latest stable release from go.dev, verified against its published SHA-256.
+    # The pinned release from go.dev, verified against the SHA-256 recorded above.
     if ((CHECK_ONLY)); then
-      echo "    would download the latest stable Go for linux-$GOARCH from go.dev and install to /usr/local/go"
+      echo "    would download Go $GO_PIN for linux-$GOARCH from go.dev and install to /usr/local/go"
     else
-      go_meta="$(curl -fsSL 'https://go.dev/dl/?mode=json' | python3 -c '
-import json, sys
-arch = sys.argv[1]
-rel = next(r for r in json.load(sys.stdin) if r["stable"])
-f = next(f for f in rel["files"] if f["os"] == "linux" and f["arch"] == arch and f["kind"] == "archive")
-print(f["filename"], f["sha256"])' "$GOARCH")" || die "Could not look up the latest Go release on go.dev."
-      read -r go_file go_sha <<<"$go_meta"
-      [[ -n ${go_file:-} && -n ${go_sha:-} ]] || die "Unexpected response from go.dev; install Go >= $GO_MIN manually."
+      go_file="go${GO_PIN}.linux-${GOARCH}.tar.gz"
+      go_sha="$(pinned_sha GO)"
       curl -fsSL -o "$TMP/$go_file" "https://go.dev/dl/$go_file"
       echo "$go_sha  $TMP/$go_file" | sha256sum -c - >/dev/null || die "Go download failed checksum verification."
       $SUDO rm -rf /usr/local/go
@@ -277,15 +288,15 @@ if ((!SKIP_PYTHON)); then
     if [[ $PLATFORM == macos ]]; then
       run brew install uv
     elif ((CHECK_ONLY)); then
-      echo "    would download the latest uv release from GitHub, verify its SHA-256 and install to ~/.local/bin"
+      echo "    would download uv $UV_PIN from GitHub, verify its SHA-256 and install to ~/.local/bin"
     else
-      # Release archive plus its published .sha256; no installer script, no shell rc edits.
+      # The pinned release archive, checked against the SHA-256 recorded
+      # above; no installer script, no shell rc edits.
       uv_triple=$([[ $GOARCH == amd64 ]] && echo x86_64-unknown-linux-gnu || echo aarch64-unknown-linux-gnu)
       uv_file="uv-${uv_triple}.tar.gz"
-      uv_url="https://github.com/astral-sh/uv/releases/latest/download/${uv_file}"
+      uv_url="https://github.com/astral-sh/uv/releases/download/${UV_PIN}/${uv_file}"
       curl -fsSL -o "$TMP/$uv_file" "$uv_url" || die "Could not download $uv_file."
-      curl -fsSL -o "$TMP/$uv_file.sha256" "$uv_url.sha256" || die "Could not download the checksum for $uv_file."
-      [[ "$(awk '{print $1}' "$TMP/$uv_file.sha256")" == "$(sha256sum "$TMP/$uv_file" | awk '{print $1}')" ]] \
+      [[ "$(pinned_sha UV)" == "$(sha256sum "$TMP/$uv_file" | awk '{print $1}')" ]] \
         || die "uv download failed checksum verification."
       tar -C "$TMP" -xzf "$TMP/$uv_file"
       mkdir -p "$HOME/.local/bin"
@@ -315,17 +326,14 @@ if ((!SKIP_NODE)); then
     if [[ $PLATFORM == macos ]]; then
       run brew install node
     elif ((CHECK_ONLY)); then
-      echo "    would download the latest Node.js LTS for linux-$GOARCH from nodejs.org into /usr/local/lib/nodejs"
+      echo "    would download Node.js $NODE_PIN for linux-$GOARCH from nodejs.org into /usr/local/lib/nodejs"
     else
-      # Latest LTS from nodejs.org, verified against SHASUMS256.txt.
-      node_ver="$(curl -fsSL https://nodejs.org/dist/index.json | python3 -c '
-import json, sys
-print(next(r["version"] for r in json.load(sys.stdin) if r["lts"]))')" || die "Could not look up the latest Node.js LTS."
+      # The pinned LTS release, verified against the SHA-256 recorded above.
+      node_ver="$NODE_PIN"
       node_arch=$([[ $GOARCH == amd64 ]] && echo x64 || echo arm64)
       node_file="node-${node_ver}-linux-${node_arch}.tar.xz"
       curl -fsSL -o "$TMP/$node_file" "https://nodejs.org/dist/${node_ver}/${node_file}"
-      curl -fsSL -o "$TMP/SHASUMS256.txt" "https://nodejs.org/dist/${node_ver}/SHASUMS256.txt"
-      (cd "$TMP" && grep " ${node_file}\$" SHASUMS256.txt | sha256sum -c - >/dev/null) \
+      echo "$(pinned_sha NODE)  $TMP/$node_file" | sha256sum -c - >/dev/null \
         || die "Node.js download failed checksum verification."
       # Unpack into its own directory and link the commands, rather than
       # scattering the tarball's files across /usr/local.

@@ -8,6 +8,7 @@ import (
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/internal/history"
 	"github.com/ChrisAdkin8/trimloop/internal/live"
+	"github.com/ChrisAdkin8/trimloop/internal/report"
 )
 
 // checkSetup prints where each part of the live nudges stands, and what to
@@ -46,14 +47,9 @@ func checkSetup(w io.Writer, settings, exe, home, cfgDir string) int {
 	default:
 		fmt.Fprintln(w, "Usage-limit readings: none (only Pro and Max plans have usage limits).")
 	}
-	reader := claudecode.Reader{Home: home, ConfigDir: cfgDir}
-	if days, set := reader.Retention(); days < 90 {
-		how := "the default"
-		if set {
-			how = "cleanupPeriodDays"
-		}
-		fmt.Fprintf(w, "Log retention: Claude Code deletes session logs after %d days (%s), so reports see\n", days, how)
-		fmt.Fprintln(w, `  only that far back. Add "cleanupPeriodDays": 365 to Claude Code's settings to keep a year.`)
+	days, set := claudecode.Reader{Home: home, ConfigDir: cfgDir}.Retention()
+	if tip := report.RetentionTip(report.Retention{Days: days, Set: set}); tip != "" {
+		fmt.Fprintln(w, "Log retention: "+tip)
 	}
 	if !c.OK() {
 		return 1

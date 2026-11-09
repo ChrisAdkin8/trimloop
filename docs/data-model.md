@@ -38,6 +38,12 @@ worked out is in [measurements.md](measurements.md).
   subscriber's usage limits, as the status line saw them: `time`, and for
   `five_hour` and `seven_day` the percentage `used` and `resets_at` (Unix
   seconds). Numbers only.
+- **File names**: per-session nudge state is named by Claude Code's session
+  id (`~/.trimloop/live/<session>.json`), and history and limit files for
+  another `CLAUDE_CONFIG_DIR` by the first 8 hex digits of a SHA-256 of the
+  folder's path. These names never leave the machine; the keyed-hash rule
+  ([ADR 0004](adr/0004-local-first-hashes-only.md),
+  [ADR 0011](adr/0011-keyed-fingerprints.md)) is for what does.
 - **Turn fields read from the logs**: a yes/no form of `origin`, and
   `effort` (see [Turn](#turn)); the session `title`, shown in local reports
   only.

@@ -82,8 +82,9 @@ func readInstead(t event.Turn, prev int) float64 {
 // (ADR 0050).
 type Failures struct {
 	Sleep    int `json:"sleep"`   // the computer slept mid-response
-	Network  int `json:"network"` // the connection failed
+	Network  int `json:"network"` // a connection or server error
 	Other    int `json:"other"`
+	NotSent  int `json:"not_sent"` // refused before sending (an expired login): nothing was sent again
 	Sessions int `json:"sessions"`
 	// Resent is what sending the context again cost, at least: each
 	// failure's context re-read from the cache. The cut-off output is not
@@ -104,6 +105,10 @@ func FindFailures(sessions []event.Session) Failures {
 			f.Sessions++
 		}
 		for _, x := range s.Failures {
+			if x.Kind == "not-sent" {
+				f.NotSent++
+				continue
+			}
 			resent := 0.0
 			if c, ok := price.Cost(x.Model, event.Usage{CacheRead: x.Context}, price.Options{}); ok && x.Context > 0 {
 				resent = c.Total()

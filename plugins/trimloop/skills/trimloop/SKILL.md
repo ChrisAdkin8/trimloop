@@ -29,7 +29,11 @@ user how to install it; do not install it yourself without their yes:
 - macOS or Linux with Homebrew: `brew install --cask chrisadkin8/tap/trimloop`
 - otherwise: download the archive for their system from
   https://github.com/ChrisAdkin8/trimloop/releases and put `trimloop` on
-  their PATH.
+  their PATH;
+- or, with Go 1.27.3 or later, from a clone of
+  https://github.com/ChrisAdkin8/trimloop:
+  `go build -o ~/.local/bin/trimloop ./cmd/trimloop` (the only way until a
+  release is published).
 
 ## 2. Run the analysis
 
@@ -86,15 +90,19 @@ Always say, in plain words:
   measure of how much of their usage limits work takes, not money back.
   Lead with `usage_limits.hits` and `weekly_limit_share` where present.
 
-Offer the full web page with `trimloop --open` (it writes
-`trimloop-report.html` in the current folder and opens it).
+Offer the full web page with
+`trimloop --open --out ~/trimloop-report.html`: it writes the page to the
+home folder and opens it. Do not write it into the current folder, which is
+usually a project that may be shared through git: the page names sessions
+and projects.
 
 ## 4. Privacy
 
 Reports show session titles, which summarise what the user asked, and
 project names. Do not paste a report into anything shared without the
 user's yes; `--no-titles` leaves the titles out. Delete the temporary
-folder when you are done (`rm -r /tmp/tmp.Ab12Cd`, with its real path).
+folder as soon as you have read the report, and also if any step failed or
+the user stopped early (`rm -r /tmp/tmp.Ab12Cd`, with its real path).
 
 ## 5. Live nudges (optional)
 
@@ -106,10 +114,12 @@ and nudge when a session gets large. Check with:
 trimloop setup --check
 ```
 
-If anything is "missing" or "out of date", show the user what
-`trimloop setup` prints, and run `trimloop setup --write
-~/.claude/settings.json` only if they say yes: it edits Claude Code's
-settings (after making a backup). If their status line is "another
+`setup --check` names the settings file it read (the first line). If
+anything is "missing" or "out of date", show the user what `trimloop setup`
+prints, and run `trimloop setup --write <that settings file>` only if they
+say yes: it edits Claude Code's settings (after making a backup). Use the
+file `setup --check` named: with `CLAUDE_CONFIG_DIR` set it is not
+`~/.claude/settings.json`. If their status line is "another
 program's", tell them that `--replace-statusline` would replace it; never
 add that flag on your own. Changes take effect in new Claude Code sessions.
 
@@ -119,7 +129,7 @@ add that flag on your own. Changes take effect in new Claude Code sessions.
 |---|---|
 | `trimloop` | short summary |
 | `trimloop --format json --out FILE` | every figure, for reading |
-| `trimloop --open` | the web page, opened in the browser |
+| `trimloop --open --out ~/trimloop-report.html` | the web page, saved in the home folder and opened |
 | `trimloop --since 7d` | only sessions started in the last 7 days |
 | `trimloop setup --check` | is the status line and nudge setup working? |
 | `trimloop --version` | which build is installed |

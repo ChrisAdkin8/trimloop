@@ -5,7 +5,7 @@
 | Status | Draft |
 | Last updated | 2026-11-08 |
 | Decision | [ADR 0008](adr/0008-packaging-and-distribution.md) |
-| Built | Little yet: the prototype binary has the `analyse`, `setup`, `statusline` and `hook` commands, is pure Go, and is built from source. The other commands, the DuckDB store, release builds and CI checks below are planned |
+| Built | The prototype binary has the `analyse`, `setup`, `statusline` and `hook` commands, is pure Go, and builds with one GoReleaser job (archives, `.deb`/`.rpm`, a Homebrew cask; [ADR 0047](adr/0047-first-release-pure-go.md), [ADR 0051](adr/0051-private-releases-and-going-public.md)); CI runs the checks, a release dry run and the plugin check. The other commands, the DuckDB store, the container image, the Helm chart and the per-OS pipeline below are planned |
 | Related | [analyzer.md](analyzer.md) (shapes, `trimloop serve` in [§5.2](analyzer.md#52-gateway-sidecar-trimloop-serve), repo layout in [§12](analyzer.md#12-repository-layout)), [design.md §9](design.md#9-deployment-modes) (deployment modes) |
 
 ## 1. Principles
@@ -287,10 +287,12 @@ which sidecar API versions.
 ## 10. Release pipeline
 
 **Today:** one GoReleaser job (`.goreleaser.yaml`,
-`.github/workflows/release.yml`) builds a draft release with signed
-checksums, SBOMs, provenance, packages and a Homebrew cask; macOS binaries
-are not yet notarised ([ADR 0047](adr/0047-first-release-pure-go.md)). The
-pipeline below is the target once cgo arrives.
+`.github/workflows/release.yml`) builds a draft release with checksums,
+SBOMs, packages and a Homebrew cask, after the tests pass in a read-only
+job. Checksums are signed and provenance attached only once the repository
+is public; until then releases stay drafts ([ADR 0051](adr/0051-private-releases-and-going-public.md)). macOS
+binaries are not yet notarised ([ADR 0047](adr/0047-first-release-pure-go.md)).
+The pipeline below is the target once cgo arrives.
 
 Run by CI on a version tag. The web UI is built first, so every job embeds
 it. Then:

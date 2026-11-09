@@ -18,12 +18,14 @@ cover most avoidable spend. Smaller things were missing:
   made-up reply, "API Error: Your computer went to sleep mid-response", and
   the request is sent again (P12). The context re-read is at least $4; the
   cut-off output is not logged.
-- **App-provided MCP servers never called** ($10, `claude-artifacts`): P07
+- **App-provided MCP servers never called** ($10 for `claude-artifacts`;
+  $15 with the three others the detector finds): P07
   leaves servers the desktop app adds out of its "remove" card, rightly,
   since `claude mcp remove` cannot remove them, so an unused one goes
   unmentioned.
 - **What Claude writes stays in the session too**: commands, scripts and
-  file contents in tool calls cost about $128 to carry and are not in the
+  file contents in tool calls cost about $128 to carry by a first scan
+  ($230 as priced below; see log-signals §8) and are not in the
   report's view of what fills a session, which counts tool output only.
 - **Thinking is 41 % of output spend** ($174 of $423); P14 shows only the
   part above the usual level.
@@ -49,7 +51,8 @@ were also measured and are too small to report.
 2. **P12, replies cut off** (reduced fidelity): Claude Code's made-up error
    replies, sorted by their text into "computer slept", "network" and
    "other"; each counted once by line id. The saving is the context of the
-   turn before, re-read at that turn's history price. The card (when the
+   turn before, re-read at its model's cache-read price (a lower bound:
+   after a long sleep the cache has often expired too, which P09 counts). The card (when the
    computer slept at least three times): keep it awake while Claude works.
 3. **P07, unused app servers**: an MCP server the desktop app adds, whose
    tool definitions were sent but none of whose tools was called in the

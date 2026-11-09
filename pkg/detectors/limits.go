@@ -39,7 +39,7 @@ type Limits struct {
 	Hits    int       `json:"hits"`    // requests refused because a limit was reached
 	Session int       `json:"session"` // of which the 5-hour limit
 	Weekly  int       `json:"weekly"`  // of which the weekly limit
-	Last    time.Time `json:"last,omitempty"`
+	Last    time.Time `json:"last,omitzero"`
 
 	Readings int       `json:"readings"` // status-line readings in the period
 	FiveHour LimitRate `json:"five_hour"`

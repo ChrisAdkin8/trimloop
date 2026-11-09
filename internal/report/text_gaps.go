@@ -93,10 +93,5 @@ func retentionLine(w io.Writer, r Results) {
 	if !r.ShortRetention() {
 		return
 	}
-	how := "by default"
-	if r.Retention.Set {
-		how = "as cleanupPeriodDays is set"
-	}
-	fmt.Fprintf(w, "Claude Code deletes logs after %d days %s, so this sees only that far back: add\n", r.Retention.Days, how)
-	fmt.Fprintln(w, `"cleanupPeriodDays": 365 to ~/.claude/settings.json to keep a year.`)
+	fmt.Fprintln(w, RetentionTip(r.Retention))
 }

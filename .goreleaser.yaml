@@ -26,9 +26,15 @@ archives:
   - id: trimloop
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    # File times come from the commit, so the same commit builds the same
+    # archives (reproducible builds, ADR 0047).
     files:
-      - LICENSE.md
-      - README.md
+      - src: LICENSE.md
+        info:
+          mtime: "{{ .CommitDate }}"
+      - src: README.md
+        info:
+          mtime: "{{ .CommitDate }}"
 
 checksum:
   name_template: checksums.txt
@@ -59,11 +65,16 @@ nfpms:
     license: FSL-1.1-ALv2
     formats: [deb, rpm]
     bindir: /usr/bin
+    mtime: "{{ .CommitDate }}"
     contents:
       - src: LICENSE.md
         dst: /usr/share/doc/trimloop/LICENSE.md
+        file_info:
+          mtime: "{{ .CommitDate }}"
       - src: README.md
         dst: /usr/share/doc/trimloop/README.md
+        file_info:
+          mtime: "{{ .CommitDate }}"
 
 # Homebrew: brew install --cask chrisadkin8/tap/trimloop. Needs the
 # ChrisAdkin8/homebrew-tap repository and a HOMEBREW_TAP_TOKEN secret; the
@@ -92,8 +103,8 @@ homebrew_casks:
           end
     caveats: |
       trimloop's macOS binary is not yet notarised by Apple, so this cask
-      removed macOS's quarantine flag from it. Its checksums are signed:
-      see the README to verify a download.
+      removed macOS's quarantine flag from it. See "Checking a download" in
+      the README to verify a release.
 
 release:
   github:

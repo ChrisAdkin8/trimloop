@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -27,7 +28,10 @@ func version() string {
 	if !ok {
 		return "dev"
 	}
-	if v := info.Main.Version; v != "" && v != "(devel)" {
+	// A local build gets a version Go makes up from the commit
+	// (v0.1.1-0.20261109101144-c0daee340df5): not a release, so show it as
+	// a dev build of that commit instead.
+	if v := info.Main.Version; v != "" && v != "(devel)" && !pseudoVersion.MatchString(v) {
 		return v
 	}
 	v, modified := "dev", false
@@ -44,6 +48,11 @@ func version() string {
 	}
 	return v
 }
+
+// pseudoVersion matches the versions Go makes up for unreleased commits:
+// a 14-digit time and a 12-letter commit hash, with "+dirty" if the
+// working tree had changes.
+var pseudoVersion = regexp.MustCompile(`-(?:\d+\.)?\d{14}-[0-9a-f]{12}(\+dirty)?$`)
 
 // parseSince reads --since: a date (2026-11-01, local time) or a span back
 // from now in days or weeks (7d, 2w), which starts at the beginning of that
@@ -74,7 +83,7 @@ func startedSince(sessions []event.Session, since time.Time) []event.Session {
 	for _, s := range sessions {
 		if s.Kind != event.SubAgentSession {
 			mains[s.ID] = true
-			kept[s.ID] = !s.Start().Before(since)
+			kept[s.ID] = !began(s).Before(since)
 		}
 	}
 	var out []event.Session
@@ -84,7 +93,7 @@ func startedSince(sessions []event.Session, since time.Time) []event.Session {
 			if mains[s.ParentID] {
 				keep = kept[s.ParentID]
 			} else {
-				keep = !s.Start().Before(since)
+				keep = !began(s).Before(since)
 			}
 		}
 		if keep {
@@ -92,6 +101,26 @@ func startedSince(sessions []event.Session, since time.Time) []event.Session {
 		}
 	}
 	return out
+}
+
+// began is when a session started: its first turn, or, for one with no
+// turns (refused at its first message), its first limit hit or failure.
+func began(s event.Session) time.Time {
+	t := s.Start()
+	if !t.IsZero() {
+		return t
+	}
+	for _, h := range s.LimitHits {
+		if !h.At.IsZero() && (t.IsZero() || h.At.Before(t)) {
+			t = h.At
+		}
+	}
+	for _, f := range s.Failures {
+		if !f.At.IsZero() && (t.IsZero() || f.At.Before(t)) {
+			t = f.At
+		}
+	}
+	return t
 }
 
 // openInBrowser opens a file with the system's default program for it.

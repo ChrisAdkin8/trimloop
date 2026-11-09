@@ -24,7 +24,7 @@ Which record governs what in the M0 prototype:
 | Reconciliation and weekly history | [0033](0033-reconciliation-history-standing-context.md), [0043](0043-weekly-trend-for-new-findings.md) |
 | Live nudges | [0034](0034-live-nudges.md) |
 | Licensing | [0046](0046-licensing.md) |
-| Releases | [0047](0047-first-release-pure-go.md), then [0014](0014-release-builds-per-os.md) once cgo arrives; [0049](0049-claude-code-plugin.md) (the plugin) |
+| Releases | [0047](0047-first-release-pure-go.md), then [0014](0014-release-builds-per-os.md) once cgo arrives; [0049](0049-claude-code-plugin.md) (the plugin); [0051](0051-private-releases-and-going-public.md) (private releases, going public) |
 | Privacy | [0004](0004-local-first-hashes-only.md), [0011](0011-keyed-fingerprints.md), [0032](0032-readable-reports.md) (the local-report exception) |
 
 ## All records
@@ -83,10 +83,11 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0044](0044-effort-thinking-and-cache-figures.md) | Effort by thinking tokens, and fairer cache figures | Measurements (M0) | Yes | Superseded by 0045 |
 | [0045](0045-m0-measurement-method.md) | The M0 measurement method | Measurements (M0) | Yes | Amended by 0048, 0050 |
 | [0046](0046-licensing.md) | Licensing — FSL core, Apache-2.0 connectors, commercial team features | Licensing | Partly: LICENSE.md | Yes |
-| [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Amended by 0049 |
+| [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Amended by 0049, 0051 |
 | [0048](0048-usage-limits-for-subscribers.md) | Usage limits for subscribers | Reports (M0) | Yes | Yes |
 | [0049](0049-claude-code-plugin.md) | A Claude Code plugin with a trimloop skill | Packaging | Yes: not yet tried by users | Yes |
 | [0050](0050-second-gap-analysis-findings.md) | Findings from the second gap analysis | Findings (M0) | Yes | Yes |
+| [0051](0051-private-releases-and-going-public.md) | Releases while private, the order of going public, and release hardening | Packaging | Yes | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

@@ -81,6 +81,10 @@ type Results struct {
 	// Titles summarise conversations, so they are left out when
 	// Settings.Titles is false.
 	Labels map[string]Label `json:"labels"`
+
+	// HideIDs is true under --no-titles: the web page then shows no session
+	// or connector identifiers either. Not in the JSON, which is for scripts.
+	HideIDs bool `json:"-"`
 }
 
 // Period is the time the logs cover.
@@ -252,6 +256,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	sort.SliceStable(r.Actions, func(i, j int) bool { return r.Actions[i].Expected() > r.Actions[j].Expected() })
 	r.Period = period(sessions, r.Total)
 	r.Labels = labels(sessions, r, s.Titles)
+	r.HideIDs = !s.Titles
 	return r
 }
 
@@ -336,4 +341,26 @@ type Retention struct {
 
 // ShortRetention reports whether logs are kept for under 90 days, which
 // limits what a report can see.
-func (r Results) ShortRetention() bool { return r.Retention.Days > 0 && r.Retention.Days < 90 }
+func (r Results) ShortRetention() bool { return RetentionTip(r.Retention) != "" }
+
+// RetentionTip is the tip to show when Claude Code keeps logs for under 90
+// days, or "" (the report and setup --check both use it). Claude Code
+// deletes a log once it has gone unused that long, so long-running sessions
+// stay in reports longer than that.
+func RetentionTip(r Retention) string {
+	switch {
+	case r.Days >= 90:
+		return ""
+	case r.Set && r.Days <= 0:
+		return "cleanupPeriodDays is 0, so Claude Code may keep no session logs at all. " +
+			`Set "cleanupPeriodDays": 365 in Claude Code's settings to keep a year.`
+	case r.Days <= 0:
+		return ""
+	}
+	how := "by default"
+	if r.Set {
+		how = "as cleanupPeriodDays is set"
+	}
+	return fmt.Sprintf("Claude Code deletes session logs once they have gone unused for %d days (%s), so older work "+
+		`drops out of reports. Set "cleanupPeriodDays": 365 in Claude Code's settings to keep a year.`, r.Days, how)
+}

@@ -1,6 +1,6 @@
 # State machines in the prototype
 
-- Status: current for the M0 prototype (2026-11-08)
+- Status: current for the M0 prototype (2026-11-09)
 - Read with: [measurements.md](measurements.md) (what each figure means),
   [ADR 0045](adr/0045-m0-measurement-method.md) (the method in force)
 

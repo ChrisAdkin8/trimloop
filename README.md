@@ -15,15 +15,15 @@ A run on one developer's 45 days of logs, shortened (the full output also
 covers their usage limits and Claude Code's own cost records):
 
 ```text
-Read 571 logs: 570 sessions, 17,816 turns.
-Spent $2,264 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $352 a week.
+Read 574 logs: 573 sessions, 18,210 turns.
+Spent $2,306 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $359 a week.
 
 What to do first (these savings overlap, so do not add them):
-  1. Compact long sessions earlier: likely about $565 ($541–$675), up to $870 (38%)
+  1. Compact long sessions earlier: likely about $579 ($555–$692), up to $891 (39%)
      Compact when a session passes about 200,000 tokens, or between tasks.
-  2. Start fresh after a long break: likely about $304, up to $315 (14%)
+  2. Start fresh after a long break: likely about $301, up to $311 (14%)
      After a break of over an hour, start a new session with a short note instead of carrying on.
-  3. Run sub-agents on a cheaper model: up to $301 (13%)
+  3. Run sub-agents on a cheaper model: up to $305 (13%)
      Run sub-agents that search, read and summarise on Sonnet 5.5.
 ```
 
@@ -179,10 +179,13 @@ The messages come from *hooks*: commands Claude Code runs after each reply
 and before each message. With trimloop [installed](#install):
 
 ```bash
-trimloop setup                                      # print the settings to add
+trimloop setup                                      # print the settings to add, and the file
 trimloop setup --write ~/.claude/settings.json      # or add them for you
 trimloop setup --check                              # is everything set up and working?
 ```
+
+With `CLAUDE_CONFIG_DIR` set, Claude Code's settings file is
+`settings.json` in that folder: `trimloop setup` names the right one.
 
 `setup --write` saves a backup of your settings first, and leaves another
 status line alone unless you add `--replace-statusline`. `setup --check`
@@ -290,7 +293,10 @@ macOS and Linux (Apple silicon, Intel and arm64), `.deb` and `.rpm`
 packages, signed checksums, a software bill of materials and build
 provenance. Check the draft, then publish it. While the repository is private,
 releases skip the signature and provenance (both would need it public or a
-paid plan). With a `HOMEBREW_TAP_TOKEN`
+paid plan) and stay drafts. **Going public**, in this order: make this
+repository public, re-run the release workflow for the tag (it signs the
+files this time), publish the draft, then make the tap public
+([ADR 0051](docs/adr/0051-private-releases-and-going-public.md)). With a `HOMEBREW_TAP_TOKEN`
 secret the release also updates the `ChrisAdkin8/homebrew-tap` cask, for
 `brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
 release dry run ([ci.yml](.github/workflows/ci.yml)), on
@@ -300,8 +306,11 @@ every push to `main` and every pull request.
 #### Checking a download
 
 Download `checksums.txt`, `checksums.txt.sigstore.json` and your archive
-into one folder. First check that the release workflow signed the
-checksums (put the release's tag in place of `v0.1.0`):
+into one folder. Releases built while the repository was private have no
+`.sigstore.json` file and are not published
+([ADR 0051](docs/adr/0051-private-releases-and-going-public.md)). First check
+that the release workflow signed the checksums (put the release's tag in
+place of `v0.1.0`):
 
 ```bash
 cosign verify-blob \

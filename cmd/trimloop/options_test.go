@@ -72,3 +72,31 @@ func TestNoLogsMessageNamesTheFolder(t *testing.T) {
 		t.Errorf("message: %q", msg)
 	}
 }
+
+func TestStartedSinceKeepsHitOnlySessions(t *testing.T) {
+	since := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	hit := func(d int) []event.LimitHit {
+		return []event.LimitHit{{At: time.Date(2026, 11, d, 9, 0, 0, 0, time.UTC)}}
+	}
+	sessions := []event.Session{
+		{ID: "old", Kind: event.MainSession, LimitHits: hit(0)},
+		{ID: "new", Kind: event.MainSession, LimitHits: hit(3)},
+	}
+	got := startedSince(sessions, since)
+	if len(got) != 1 || got[0].ID != "new" {
+		t.Errorf("got %+v; want the hit-only session from 3 November", got)
+	}
+}
+
+func TestPseudoVersion(t *testing.T) {
+	for v, want := range map[string]bool{
+		"v0.1.1-0.20261109101144-c0daee340df5":     true,
+		"v0.0.0-20261108192342-6a1a90719b1d+dirty": true,
+		"v0.1.0":      false,
+		"v1.2.3-rc.1": false,
+	} {
+		if got := pseudoVersion.MatchString(v); got != want {
+			t.Errorf("pseudoVersion(%q) = %v, want %v", v, got, want)
+		}
+	}
+}

@@ -40,7 +40,9 @@ func ForFailures(f detectors.Failures, minSaving float64) (Recommendation, bool)
 		Title:   "Keep the computer awake while Claude works",
 		Finding: fmt.Sprintf("%d times the computer went to sleep while Claude was replying, in sessions of about "+
 			"%s tokens. Each reply was cut off and the request sent again; the cut-off part is not in the logs, so "+
-			"the saving counts only the conversation sent again.", f.Sleep, thousandsInt(f.MedianContext)),
+			"the saving counts only the conversation read again. After a long sleep the cache has often expired "+
+			"too, and the next turn saves the whole conversation again; the long-break card counts that, so it "+
+			"is not added here.", f.Sleep, thousandsInt(f.MedianContext)),
 		Saving: f.SleepResent,
 		Primary: Fix{Advise,
 			"Keep the computer awake during long tasks.",

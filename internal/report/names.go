@@ -19,8 +19,14 @@ var appTools = map[string]string{
 }
 
 // serverName is an MCP server's name as people would recognise it.
-func serverName(n string) string {
+func serverName(n string) string { return serverLabel(n, false) }
+
+// serverLabel names a server; with hideIDs (--no-titles) a connector known
+// only by an identifier gets no part of it.
+func serverLabel(n string, hideIDs bool) string {
 	switch {
+	case uuidLike.MatchString(n) && hideIDs:
+		return "unnamed connector"
 	case uuidLike.MatchString(n):
 		return "unnamed connector (" + n[:8] + "…)"
 	case strings.HasPrefix(n, "ccd_"):

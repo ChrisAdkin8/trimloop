@@ -610,3 +610,18 @@ func TestBuildSessionRecordsFailures(t *testing.T) {
 		t.Errorf("idle before the retry: got %+v", s.Turns)
 	}
 }
+
+func TestLimitHitIsActivity(t *testing.T) {
+	reply := func(id, at string) string {
+		return `{"type":"assistant","timestamp":"` + at + `","message":{"id":"` + id + `","model":"claude-opus-5-5","usage":{"cache_read_input_tokens":1000}}}` + "\n"
+	}
+	hit := `{"type":"assistant","uuid":"h1","timestamp":"2026-11-01T10:40:00Z","isApiErrorMessage":true,"error":"rate_limit",` +
+		`"message":{"model":"<synthetic>","content":[{"type":"text","text":"You've hit your session limit"}],"usage":{"output_tokens":0}}}` + "\n"
+	s, _, err := readSession(cc, writeLog(t, "s.jsonl", reply("m1", "2026-11-01T10:05:00Z")+hit+reply("m2", "2026-11-01T11:10:00Z")), map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Turns) != 2 || s.Turns[1].IdleBefore != 30*time.Minute || len(s.LimitHits) != 1 {
+		t.Errorf("idle after a limit hit: got %+v", s.Turns)
+	}
+}

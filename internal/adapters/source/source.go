@@ -106,7 +106,8 @@ type Message struct {
 	Limit string
 
 	// KindFailure: why the request failed: "sleep" (the computer slept
-	// mid-response), "network", or "other".
+	// mid-response), "network" (connection or server), "not-sent" (refused
+	// before sending, such as an expired login), or "other".
 	Failure string
 
 	// KindCostRecord: the record so far for one run of the harness. Runs

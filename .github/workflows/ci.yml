@@ -53,3 +53,15 @@ jobs:
           # Build and package everything; publish, sign and SBOMs need the
           # release job's permissions and tools.
           args: release --snapshot --clean --skip=sign,sbom
+
+  plugin:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The Claude Code plugin and marketplace (ADR 0049). Claude Code is
+      # pinned to a release at least two weeks old; validating needs no login.
+      - name: Validate the plugin
+        run: npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate . --strict

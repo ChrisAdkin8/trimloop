@@ -485,3 +485,29 @@ func TestParseLineLimitHit(t *testing.T) {
 		}
 	}
 }
+
+func TestParseLineRateLimitIsNotAUsageLimit(t *testing.T) {
+	line := func(errField, text string) string {
+		return `{"type":"assistant","uuid":"u1","timestamp":"2026-11-01T09:00:00Z","isApiErrorMessage":true,"error":"` + errField +
+			`","message":{"model":"<synthetic>","content":[{"type":"text","text":"` + text + `"}],"usage":{"output_tokens":0}}}`
+	}
+	for _, c := range []struct {
+		errField, text string
+		kind           source.Kind
+		detail         string
+	}{
+		{"rate_limit", "You've hit your weekly limit · resets 8am", source.KindLimitHit, "weekly"},
+		{"rate_limit", "You've hit your Opus limit", source.KindLimitHit, "other"},
+		{"rate_limit", "API Error: 429 rate_limit_error: requests per minute", source.KindFailure, "network"},
+		{"authentication_failed", "Login expired · Please run /login", source.KindFailure, "not-sent"},
+		{"unknown", "API Error: 529 Overloaded", source.KindFailure, "network"},
+		{"server_error", "API Error: 500", source.KindFailure, "network"},
+		{"server_error", "API Error: Your computer went to sleep mid-response.", source.KindFailure, "sleep"},
+	} {
+		m, ok, err := parseLine([]byte(line(c.errField, c.text)))
+		got := m.Limit + m.Failure
+		if err != nil || !ok || m.Kind != c.kind || got != c.detail {
+			t.Errorf("%s %q: got kind %v %q, want %v %q", c.errField, c.text, m.Kind, got, c.kind, c.detail)
+		}
+	}
+}

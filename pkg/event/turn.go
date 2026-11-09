@@ -117,7 +117,7 @@ type Session struct {
 // latest turn's, the request sent again; zero if no turn came before.
 type Failure struct {
 	At      time.Time
-	Kind    string // "sleep" (the computer slept mid-response), "network" or "other"
+	Kind    string // "sleep" (the computer slept mid-response), "network", "not-sent" or "other"
 	Context int
 	Model   string
 }

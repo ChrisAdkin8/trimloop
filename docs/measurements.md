@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Current: describes the M0 prototype as built |
-| Last updated | 2026-11-08 |
+| Last updated | 2026-11-09 |
 | Related | [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance) (the figures, with their history), [patterns.md](patterns.md) (what each pattern is), [data-model.md](data-model.md) (fields) |
 
 This page says how the prototype works out each figure it reports **today**,
@@ -92,22 +92,7 @@ Decided in ADR 0035 (decision 2), 0039 (decision 1) and 0040.
 | Reconciliation | Claude Code's own cost record for each main session it covers, against the logged cost of that session and its sub-agents. The difference is reported as spend the logs do not record; ADR 0028's test (within 2 %) is not passed in M0. Web searches are priced at $0.01 each here; they are not in total spend, which comes from the logs | `FindReconciliation` | ADR 0033, 0035, 0036 |
 | Weekly figures | By calendar week, local time; kept in a history file; the oldest weeks keep a fuller stored copy when turns were counted the same way. Each week also keeps the P02 short-wait cost, the output cost of xhigh and max turns, and main-session spend with a cheaper choice, so the cards can be checked week by week; and, from analysis version 7, how often a usage limit was reached | `FindWeekly`, `history.Merge` | ADR 0033, 0035, 0037, 0038, 0039, 0043, 0044, 0048 |
 
-## 3b. From the second gap analysis
-
-Added by [ADR 0050](adr/0050-second-gap-analysis-findings.md).
-
-| Figure | How it is worked out | Code | Decided in |
-|---|---|---|---|
-| Model switches (P01) | A turn on a different model from the session's previous turn, not after a compaction, while the previous writes' cache was alive (the wait no longer than its lifetime), at a previous context over 20,000 tokens. Saving: the turn's cost less the same turn reading the earlier context and writing only its new part, at its own model's prices | `FindModelSwitches`, `ForModelSwitches` | ADR 0050 |
-| Replies cut off (P12) | Claude Code's own error replies (`isApiErrorMessage`, model `<synthetic>`), sorted by text: "went to sleep" is the computer sleeping; connection and server errors are network. Counted once by line id; still activity for idle times. Saving: each sleep's context (the latest turn's) re-read at its model's cache-read price; the card shows at three sleeps or more | `FindFailures`, `ForFailures` | ADR 0050 |
-| Desktop-app tools never used (P07) | Tool-definition parts of MCP servers the desktop app adds (`ccd_`, `Claude_`, and the listed app servers) none of whose tools any turn called; "up to" is their whole carried cost | `UnusedAppServers`, `ForAppServers` | ADR 0050 |
-| Tool inputs | Each tool call's input size (bytes ÷ 4 as tokens), priced as carried from the next turn on, like tool output (arrival, then history price), until a compaction | `FindToolInputs` | ADR 0050 |
-| Thinking share (P14) | Each turn's output cost times its thinking tokens over its output tokens, over all turns, against all output cost | `ThinkingCost` | ADR 0050 |
-| Cost to start a session | Median cost of a main session's first turn (the median's rule); quoted on the long-break card | `StartCost` | ADR 0050 |
-| When you work | Priced turns' cost by local hour and day of the week; weekend share; the most main sessions whose first and last turns overlap | `FindWhen` | ADR 0050 |
-| Log retention | `cleanupPeriodDays` from Claude Code's settings file (that key only), else 30; a tip under 90 days | `Reader.Retention` | ADR 0050 |
-
-## 3a. Usage limits (subscribers)
+## 4. Usage limits (subscribers)
 
 For users on a flat-fee plan (Pro or Max), whose usage limits matter more
 than dollars ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)).
@@ -115,12 +100,27 @@ than dollars ([ADR 0048](adr/0048-usage-limits-for-subscribers.md)).
 | Figure | How it is worked out | Code | Decided in |
 |---|---|---|---|
 | Plan | `organizationType`, `billingType` and the rate-limit tier from Claude Code's account file (`.claude.json` in `CLAUDE_CONFIG_DIR`, else the home folder); nothing else is read from it, and it is not stored. A subscriber is one billed by subscription, or one with limit hits or readings | `claudecode.Reader.Plan`, `Results.Subscriber` | ADR 0048 |
-| Limit hits | Assistant lines Claude Code wrote itself with `error: "rate_limit"` and `isApiErrorMessage`; "session limit" in the text is the 5-hour limit, "weekly limit" the weekly one, anything else "other". Counted once by line id; a session with only a hit is kept | `parseLine`, `FindLimits` | ADR 0048 |
+| Limit hits | Assistant lines Claude Code wrote itself with `error: "rate_limit"`, `isApiErrorMessage`, and text naming a usage limit ("You've hit your … limit"); "session limit" is the 5-hour limit, "weekly limit" the weekly one, any other ("Opus limit") "other". Another rate limit (an API key's per-minute limit) is a failed request instead. Counted once by line id; activity for idle times; a session with only a hit is kept, and `--since` places it by its first hit | `parseLine`, `FindLimits` | ADR 0048 |
 | Limit readings | The status line's `rate_limits.five_hour` and `.seven_day` (used percentage, reset time), appended to `~/.trimloop/limits.jsonl` when either changes | `recordLimits`, `history.AppendLimits` | ADR 0048 |
 | Weekly limit per dollar | In each weekly window (readings with the same reset time, to the minute), the rise from the first reading to the last, against the list-price spend logged between them; summed over windows. Shown once the windows cover $20 and 5 points. Overstated when Claude chat or another machine also used the limit. With `--since`, sessions started earlier are left out, so their spend is too | `FindLimits` | ADR 0048 |
 | Share of the weekly limit, per action | The likely saving (else the upper bound) per week of the period, times the weekly limit per dollar, capped at 100 % | `AddLimits` | ADR 0048 |
 
-## 4. Live nudges
+## 5. From the second gap analysis
+
+Added by [ADR 0050](adr/0050-second-gap-analysis-findings.md).
+
+| Figure | How it is worked out | Code | Decided in |
+|---|---|---|---|
+| Model switches (P01) | A turn on a different model from the session's previous turn, not after a compaction, while the previous writes' cache was alive (the wait no longer than its lifetime), at a previous context over 20,000 tokens. Saving: the turn's cost less the same turn reading the earlier context and writing only its new part, at its own model's prices | `FindModelSwitches`, `ForModelSwitches` | ADR 0050 |
+| Replies cut off (P12) | Claude Code's own error replies (`isApiErrorMessage`, model `<synthetic>`), sorted by text first, then by error field: "went to sleep" is the computer sleeping; connection and server errors, overloads and rate limits are network; an expired login or a bad request was not sent, so it is counted apart and costs nothing. Counted once by line id; still activity for idle times. Saving: each sleep's context (the latest turn's) re-read at its model's cache-read price, a lower bound: after a long sleep the cache has often expired too, which P09 counts; the card shows at three sleeps or more | `FindFailures`, `ForFailures` | ADR 0050 |
+| Desktop-app tools never used (P07) | Tool-definition parts of MCP servers the desktop app adds (`ccd_`, `Claude_`, and the listed app servers) none of whose tools any turn called; "up to" is their whole carried cost | `UnusedAppServers`, `ForAppServers` | ADR 0050 |
+| Tool inputs | Each tool call's input size (bytes ÷ 4 as tokens), priced as carried from the next turn on, like tool output (arrival, then history price), until a compaction | `FindToolInputs` | ADR 0050 |
+| Thinking share (P14) | Each turn's output cost times its thinking tokens over its output tokens, over all turns, against all output cost | `ThinkingCost` | ADR 0050 |
+| Cost to start a session | Median cost of a main session's first turn (the median's rule); quoted on the long-break card | `StartCost` | ADR 0050 |
+| When you work | Priced turns' cost by local hour and day of the week; weekend share; the most main sessions whose first and last turns overlap | `FindWhen` | ADR 0050 |
+| Log retention | `cleanupPeriodDays` from Claude Code's settings file (that key only), else 30; a tip under 90 days | `Reader.Retention` | ADR 0050 |
+
+## 6. Live nudges
 
 | Figure | How it is worked out | Code | Decided in |
 |---|---|---|---|
