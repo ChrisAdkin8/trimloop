@@ -17,8 +17,9 @@ statusline`, `hook`, `setup`) are in `internal/live`; they write under
 `setup` writes the path of the running program into Claude Code's settings,
 so run it from a built binary (`go build -o ~/.local/bin/trimloop
 ./cmd/trimloop`), not `go run`. Before a commit, run `scripts/check.sh`
-(gofmt, vet, golangci-lint per `.golangci.yml`, race tests, govulncheck;
-`--offline` skips govulncheck) and keep it passing.
+(gofmt, vet, golangci-lint per `.golangci.yml`, race tests, plugin
+validation when `claude` is installed, govulncheck; `--offline` skips
+govulncheck) and keep it passing.
 
 - Entry points: `README.md` (what the prototype does today),
   `docs/measurements.md` (how each reported figure is worked out), the build
@@ -46,7 +47,8 @@ so run it from a built binary (`go build -o ~/.local/bin/trimloop
 - Privacy default is keyed hashes only (ADRs 0004, 0011): HMAC with a
   customer-held key; names are hashed too. Any feature that needs raw content
   must say so explicitly and run locally. Exception (ADR 0032): local
-  reports show session titles and project names (`--no-titles` hides them);
+  reports show session titles and project names (`--no-titles` hides the
+  titles, and the web page's session and connector ids; project names stay);
   stored files (history, nudge state, usage-limit readings) hold numbers
   only. Of Claude Code's account file (`.claude.json`) only the plan fields
   are read (ADR 0048).
@@ -67,4 +69,6 @@ so run it from a built binary (`go build -o ~/.local/bin/trimloop
   release, set `version` in `plugins/trimloop/.claude-plugin/plugin.json`
   to the new version. If the skill's commands or the JSON fields it names
   change, update `skills/trimloop/SKILL.md`. Run
-  `claude plugin validate . --strict` after changing either.
+  `claude plugin validate . --strict` (the marketplace) and `claude plugin
+  validate plugins/trimloop --strict` (the plugin) after changing either;
+  `scripts/check.sh` runs both.

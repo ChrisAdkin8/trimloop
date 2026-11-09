@@ -90,13 +90,29 @@ func TestStartedSinceKeepsHitOnlySessions(t *testing.T) {
 
 func TestPseudoVersion(t *testing.T) {
 	for v, want := range map[string]bool{
-		"v0.1.1-0.20261109101144-c0daee340df5":     true,
-		"v0.0.0-20261108192342-6a1a90719b1d+dirty": true,
+		"v0.1.1-0.20261109101144-c0daee340df5":      true,
+		"v0.0.0-20261108192342-6a1a90719b1d+dirty":  true,
+		"v0.2.0-rc.1.0.20261109101144-c0daee340df5": true,
 		"v0.1.0":      false,
 		"v1.2.3-rc.1": false,
 	} {
 		if got := pseudoVersion.MatchString(v); got != want {
 			t.Errorf("pseudoVersion(%q) = %v, want %v", v, got, want)
+		}
+	}
+	if m := pseudoVersion.FindStringSubmatch("v0.2.0-rc.1.0.20261109101144-c0daee340df5"); m == nil || m[1] != "c0daee340df5" {
+		t.Errorf("commit: got %q", m)
+	}
+}
+
+func TestShellArg(t *testing.T) {
+	for in, want := range map[string]string{
+		"/Users/a/.claude/settings.json":   "/Users/a/.claude/settings.json",
+		"/Users/a/My Claude/settings.json": "'/Users/a/My Claude/settings.json'",
+		"/tmp/it's/settings.json":          `'/tmp/it'\''s/settings.json'`,
+	} {
+		if got := shellArg(in); got != want {
+			t.Errorf("shellArg(%q) = %s, want %s", in, got, want)
 		}
 	}
 }

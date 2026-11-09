@@ -466,18 +466,24 @@ func TestParseLineLimitHit(t *testing.T) {
 		{"You've hit your session limit · resets 11:30pm (Europe/London)", "session"},
 		{"You've hit your weekly limit · resets 8am (Europe/London)", "weekly"},
 		{"You've hit your Opus limit", "other"},
+		{"5-hour limit reached ∙ resets 3pm", "session"},
+		{"Weekly limit reached ∙ resets Mon 8am", "weekly"},
+		{"Claude usage limit reached. Your limit will reset at 5pm", "other"},
 	} {
 		m, ok, err := parseLine([]byte(line(`"rate_limit"`, c.text)))
 		if err != nil || !ok || m.Kind != source.KindLimitHit || m.Limit != c.want || m.LineID != "u9" || m.Time.IsZero() {
 			t.Errorf("%q: got %+v, %v, %v; want a %s limit hit", c.text, m, ok, err, c.want)
 		}
 	}
-	// Other error replies are failures, sorted by their text (ADR 0050).
+	// Other error replies are failures, sorted by their text (ADRs 0050,
+	// 0052): one refused before any work was done was not charged.
 	for text, want := range map[string]string{
 		"API Error: Your computer went to sleep mid-response. The response above may be incomplete.": "sleep",
 		"API Error: Connection lost mid-response.":                                                   "network",
-		"API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)":             "network",
-		"API Error: Something else":                                                                  "other",
+		"API Error: Can't reach the API server — check your internet or DNS (ENOTFOUND)":             "not-sent",
+		"API Error: Connection refused — a firewall or proxy may be blocking it (ECONNREFUSED)":      "not-sent",
+		"Request timed out":         "network",
+		"API Error: Something else": "other",
 	} {
 		m, ok, _ := parseLine([]byte(line(`"unknown"`, text)))
 		if !ok || m.Kind != source.KindFailure || m.Failure != want || m.LineID != "u9" {
@@ -498,9 +504,11 @@ func TestParseLineRateLimitIsNotAUsageLimit(t *testing.T) {
 	}{
 		{"rate_limit", "You've hit your weekly limit · resets 8am", source.KindLimitHit, "weekly"},
 		{"rate_limit", "You've hit your Opus limit", source.KindLimitHit, "other"},
-		{"rate_limit", "API Error: 429 rate_limit_error: requests per minute", source.KindFailure, "network"},
+		{"rate_limit", "API Error: 429 rate_limit_error: requests per minute", source.KindFailure, "not-sent"},
+		{"rate_limit", "API Error: Rate limit reached", source.KindFailure, "not-sent"},
 		{"authentication_failed", "Login expired · Please run /login", source.KindFailure, "not-sent"},
-		{"unknown", "API Error: 529 Overloaded", source.KindFailure, "network"},
+		{"unknown", "API Error: 529 Overloaded", source.KindFailure, "not-sent"},
+		{"server_error", "API Error: Can't reach the API server (ENOTFOUND)", source.KindFailure, "not-sent"},
 		{"server_error", "API Error: 500", source.KindFailure, "network"},
 		{"server_error", "API Error: Your computer went to sleep mid-response.", source.KindFailure, "sleep"},
 	} {

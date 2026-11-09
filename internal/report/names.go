@@ -72,13 +72,51 @@ var injectedNames = map[string]string{
 	"budget_usd":              "Budget reminders",
 }
 
-// contextName describes a source of standing or injected context.
-func contextName(name string) string {
+// contextName describes a source of standing or injected context:
+// "mcp__<server>" for a server's tool definitions, "<server> (instructions)"
+// for its instructions. With hideIDs (--no-titles) a connector known only
+// by an identifier gets no part of it.
+func contextName(name string, hideIDs bool) string {
 	if d, ok := injectedNames[name]; ok {
 		return d
 	}
 	if rest, ok := strings.CutPrefix(name, "mcp__"); ok {
-		return "MCP server " + serverName(rest) + ": tool definitions"
+		return "MCP server " + serverLabel(rest, hideIDs) + ": tool definitions"
+	}
+	if server, ok := strings.CutSuffix(name, " (instructions)"); ok {
+		return "MCP server " + serverLabel(server, hideIDs) + ": instructions"
 	}
 	return strings.ReplaceAll(name, "_", " ")
+}
+
+// toolLabel names a tool or tool group ("mcp__<server>" or
+// "mcp__<server>__<tool>") for a report: a connector known only by an
+// identifier shows its first 8 characters, or none with hideIDs. Other
+// names are unchanged.
+func toolLabel(name string, hideIDs bool) string {
+	rest, ok := strings.CutPrefix(name, "mcp__")
+	if !ok {
+		return name
+	}
+	server, tool, hasTool := strings.Cut(rest, "__")
+	if !uuidLike.MatchString(server) {
+		return name
+	}
+	short := server[:8] + "…"
+	if hideIDs {
+		short = "unnamed-connector"
+	}
+	if !hasTool {
+		return "mcp__" + short
+	}
+	return "mcp__" + short + "__" + tool
+}
+
+// toolLabels is toolLabel for each name.
+func toolLabels(names []string, hideIDs bool) []string {
+	out := make([]string, len(names))
+	for i, n := range names {
+		out[i] = toolLabel(n, hideIDs)
+	}
+	return out
 }

@@ -35,6 +35,11 @@ func version() string {
 		return v
 	}
 	v, modified := "dev", false
+	if m := pseudoVersion.FindStringSubmatch(info.Main.Version); m != nil && !hasRevision(info) {
+		// 'go install module@commit' records no revision, only the
+		// version Go made up, which ends with the commit.
+		v += "-" + m[1][:8]
+	}
 	for _, s := range info.Settings {
 		switch {
 		case s.Key == "vcs.revision" && len(s.Value) >= 8:
@@ -49,10 +54,32 @@ func version() string {
 	return v
 }
 
-// pseudoVersion matches the versions Go makes up for unreleased commits:
-// a 14-digit time and a 12-letter commit hash, with "+dirty" if the
-// working tree had changes.
-var pseudoVersion = regexp.MustCompile(`-(?:\d+\.)?\d{14}-[0-9a-f]{12}(\+dirty)?$`)
+// pseudoVersion matches the versions Go makes up for unreleased commits
+// (v0.0.0-20261109101144-c0daee340df5, v0.1.1-0.20261109101144-c0daee340df5,
+// v0.2.0-rc.1.0.20261109101144-c0daee340df5): a 14-digit time and a
+// 12-letter commit hash, with "+dirty" if the working tree had changes.
+// The first group is the hash.
+var pseudoVersion = regexp.MustCompile(`^v\d+\.(?:0\.0-|\d+\.\d+-(?:[^+]*\.)?0\.)\d{14}-([0-9a-f]{12})(?:\+dirty)?$`)
+
+// hasRevision says whether the build recorded the commit it was made from.
+func hasRevision(info *debug.BuildInfo) bool {
+	for _, s := range info.Settings {
+		if s.Key == "vcs.revision" {
+			return true
+		}
+	}
+	return false
+}
+
+// shellArg quotes s for a POSIX shell when it holds anything but letters,
+// digits and / . _ ~ - (a space, say), so a command shown with it can be
+// copied as it is.
+func shellArg(s string) string {
+	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._~-") == "" {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
 
 // parseSince reads --since: a date (2026-11-01, local time) or a span back
 // from now in days or weeks (7d, 2w), which starts at the beginning of that

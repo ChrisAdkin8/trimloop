@@ -30,9 +30,10 @@ Each item is tagged **Done**, **Partly** or **Not built** for the prototype.
   [ADR 0028](docs/adr/0028-harness-recorded-signals.md),
   [ADR 0031](docs/adr/0031-m0-order-from-measured-spend.md),
   [ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md)). Done: P04,
-  P07, P09 and P19; in reduced fidelity, P01 (model switches), P02, P10,
-  P12 (replies cut off), P13 (sub-agents and main sessions) and P14. Not
-  built: P03, P05 and P06.
+  P07, P09 and P19; in reduced fidelity, P01 (model switches), P02,
+  P06 (desktop-app servers never used), P10, P12 (replies cut off), P13
+  (sub-agents and main sessions) and P14. Not built: P03, P05, and P06 for
+  servers the user added.
 - **Partly.** Reader also takes the harness's own cost and compaction
   records: reconciliation reports the gap with them (about 13 %). ADR 0028's
   acceptance test, within 2 % with auxiliary turns added, is not yet passed:
@@ -59,7 +60,8 @@ Each item is tagged **Done**, **Partly** or **Not built** for the prototype.
   is built as a per-session Go detector
   ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
 - **Partly.** Release: the installable release is built — one GoReleaser
-  job, signed checksums, `.deb` / `.rpm`, a Homebrew cask
+  job, checksums (signed once the repository is public), `.deb` / `.rpm`, a
+  Homebrew cask
   ([ADR 0047](docs/adr/0047-first-release-pure-go.md)); nothing is
   published yet. Still to do with cgo:
   the per-OS signed pipeline — signed binary on GitHub Releases, `.deb` / `.rpm`
@@ -103,7 +105,10 @@ Done:
 - from a second gap analysis: P01 from model switches, P12 from replies cut
   off, unused desktop-app tools, tool inputs in what fills a session, the
   whole thinking share, the cost to start a session, when you work, and log
-  retention ([ADR 0050](docs/adr/0050-second-gap-analysis-findings.md)).
+  retention ([ADR 0050](docs/adr/0050-second-gap-analysis-findings.md));
+  unused desktop-app tools filed as P06, and requests refused before any
+  work kept out of P12's re-sent cost
+  ([ADR 0052](docs/adr/0052-third-review-corrections.md)).
 
 To do:
 
@@ -114,7 +119,8 @@ To do:
    causes (beyond model switches); then P05, and P12 from harness retry
    records (its full fidelity, and P10's, stays in M3).
 4. Distribution: publish the first release after going public
-   ([ADR 0051](docs/adr/0051-private-releases-and-going-public.md)), minimal
+   from a fresh tag
+   ([ADR 0052](docs/adr/0052-third-review-corrections.md)), minimal
    conformance runner, profiles.
 5. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 

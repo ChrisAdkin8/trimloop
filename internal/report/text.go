@@ -63,7 +63,7 @@ func WriteText(out io.Writer, r Results) error {
 
 	reconcileSection(w, r.Reconciliation, all)
 	weeksSection(w, r.Weeks, r.Prices)
-	attributionSection(w, r.Attribution)
+	attributionSection(w, r.Attribution, r.HideIDs)
 
 	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
 	fmt.Fprintf(w, "  %s in %s sent more than %s tokens of context.\n",
@@ -94,13 +94,13 @@ func WriteText(out io.Writer, r Results) error {
 	}
 
 	cacheLifeSection(w, r.CacheLife, r.CacheLifeFix, all)
-	toolOutputSection(w, r.Tools, r.ToolFixes, all)
+	toolOutputSection(w, r.Tools, r.ToolFixes, all, r.HideIDs)
 	toolInputLine(w, r)
 	subAgentSection(w, r.SubAgents, r.SubAgentFix, all)
 	mainModelSection(w, r.MainModels, r.ModelFixes, all)
 	effortSection(w, r.Effort, r.EffortFix, all)
 	thinkingLine(w, r)
-	standingSection(w, r.Standing, all)
+	standingSection(w, r.Standing, all, r.HideIDs)
 	if len(r.StandingFixes) > 0 {
 		fmt.Fprintln(w, "\n  Recommended fixes:")
 		for _, f := range r.StandingFixes {

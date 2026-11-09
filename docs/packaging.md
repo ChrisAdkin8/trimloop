@@ -314,6 +314,23 @@ chart are published by their own jobs in the same workflow.
 Release notes list changed detectors, profiles and price-catalogue versions,
 because those change findings.
 
+### Pinned by hand
+
+Dependabot updates the GitHub Actions and Go modules. It cannot see the
+versions below, which are pinned to releases at least two weeks old and
+checked by hand before each release
+([ADR 0052](adr/0052-third-review-corrections.md)):
+
+| What | Version | Where |
+|---|---|---|
+| GoReleaser | v2.19.0 | `.github/workflows/release.yml`, `ci.yml` |
+| cosign | v3.1.4 | `.github/workflows/release.yml` |
+| golangci-lint | v2.15.0 | `.github/workflows/ci.yml`, `scripts/bootstrap.sh` |
+| govulncheck | v1.9.0 | `.github/workflows/ci.yml`, `scripts/bootstrap.sh` |
+| Claude Code (plugin validation) | 2.1.310 | `.github/workflows/ci.yml` |
+| Go, uv, Node.js on Linux, with SHA-256s | 1.27.3, 0.13.5, v24.22.1 | `scripts/bootstrap.sh` |
+| buf, protoc-gen-go, protoc-gen-go-grpc, DuckDB CLI | v1.75.0, v1.36.12, v1.6.2, v2.0.0 | `scripts/bootstrap.sh` |
+
 ## 11. Supply chain
 
 | Measure | Applies to |

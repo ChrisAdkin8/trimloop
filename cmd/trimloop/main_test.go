@@ -625,3 +625,23 @@ func TestLimitHitIsActivity(t *testing.T) {
 		t.Errorf("idle after a limit hit: got %+v", s.Turns)
 	}
 }
+
+// A session refused at its first message (a usage limit, a failure, a reply
+// the harness made up) has written no cache: its first real turn is still
+// the first, with no idle time before it from the refusals.
+func TestBuildSessionFirstTurnAfterRefusals(t *testing.T) {
+	d := logData{log: source.Log{Path: "/p/s.jsonl"}, msgs: []source.Message{
+		{Kind: source.KindLimitHit, ID: "l", Time: t0, Limit: "session"},
+		{Kind: source.KindFailure, ID: "f", Time: t0.Add(time.Minute), Failure: "network"},
+		{ID: "x", Model: claudecode.Synthetic, Time: t0.Add(2 * time.Minute)},
+		{ID: "a", Model: "claude-sonnet-4-5", Time: t0.Add(5 * time.Hour)},
+		{ID: "b", Model: "claude-sonnet-4-5", Time: t0.Add(6 * time.Hour)},
+	}}
+	s := buildSession(d, map[string]bool{})
+	if len(s.Turns) != 2 || !s.Turns[0].First || s.Turns[1].First {
+		t.Fatalf("first: got %+v", s.Turns)
+	}
+	if s.Turns[1].IdleBefore != time.Hour {
+		t.Errorf("idle before the second turn: got %v", s.Turns[1].IdleBefore)
+	}
+}

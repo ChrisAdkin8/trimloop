@@ -55,7 +55,10 @@ The rule is ADR 0045 rule 5.
 
 `buildSession` also remembers, across a log's lines: the latest activity
 time (for idle time before a turn), moved only by `active`, so a reply the
-harness made up (an API error) counts as activity like any other; message ids counted here (`turnOf`) and
+harness made up (an API error, a limit hit, a failure) counts as activity
+like any other; whether a real reply came yet (`replied`), which alone
+decides a session's first turn, since a refused request wrote no cache;
+message ids counted here (`turnOf`) and
 tool calls waiting for results (`callAt`); whether the user named the
 session (a generated title then never replaces it); the latest system
 prompt and tool list; and the harness's latest cost record per run (records

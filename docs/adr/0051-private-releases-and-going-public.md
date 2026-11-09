@@ -1,6 +1,6 @@
 # ADR 0051: Releases while private, the order of going public, and release hardening
 
-- Status: Accepted — built: workflows, GoReleaser settings, Dependabot and bootstrap pins; the steps for going public are for the maintainer
+- Status: Accepted — built: workflows, GoReleaser settings, Dependabot and bootstrap pins; decision 2 (the order of going public) replaced by [ADR 0052](0052-third-review-corrections.md)
 - Date: 2026-11-09
 - Amends: [ADR 0047](0047-first-release-pure-go.md) (signing, provenance and the tap while the repository is private; reproducible archives; hardening)
 

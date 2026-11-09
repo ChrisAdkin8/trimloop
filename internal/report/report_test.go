@@ -11,6 +11,7 @@ import (
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
+	"github.com/ChrisAdkin8/trimloop/pkg/fixes"
 )
 
 var t0 = time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
@@ -273,8 +274,9 @@ func TestContextName(t *testing.T) {
 	for in, want := range map[string]string{
 		"skill_listing": "List of available skills", "mcp__github": "MCP server github: tool definitions",
 		"Project CLAUDE.md": "Project CLAUDE.md", "some_new_kind": "some new kind",
+		"github (instructions)": "MCP server github: instructions",
 	} {
-		if got := contextName(in); got != want {
+		if got := contextName(in, false); got != want {
 			t.Errorf("contextName(%q) = %q, want %q", in, got, want)
 		}
 	}
@@ -466,15 +468,36 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 		s := DefaultSettings()
 		s.Titles = titles
 		r := Analyse(sample(), Read{Logs: 1}, s, t0)
-		r.Attribution.ByMCPServer = []detectors.Spend{{Name: "1a59c906-04da-521d-bda7-7f71b9f9e01c", Cost: 3, Turns: 1}}
-		var out bytes.Buffer
+		const id = "1a59c906-04da-521d-bda7-7f71b9f9e01c"
+		r.Attribution.ByMCPServer = []detectors.Spend{{Name: id, Cost: 3, Turns: 1}}
+		// Every other place a connector's name reaches the page or the text.
+		r.Tools.ByTool = append(r.Tools.ByTool, detectors.Group{Name: "mcp__" + id, Carried: 2, Calls: 1})
+		r.ToolInputs.Carried = 2
+		r.ToolInputs.ByTool = []detectors.Group{{Name: "mcp__" + id, Carried: 2, Calls: 1}}
+		r.Standing.Parts = append(r.Standing.Parts,
+			detectors.ContextPart{Name: "mcp__" + id, Cost: 1, Tokens: 10, Times: 1},
+			detectors.ContextPart{Name: id + " (instructions)", Cost: 1, Tokens: 10, Times: 1})
+		card := fixes.Recommendation{Pattern: "P04", Title: "Trim MCP tool results", Saving: 1e6,
+			Examples: []string{"mcp__" + id + "__search"}}
+		r.Actions = append([]fixes.Recommendation{card}, r.Actions...)
+		r.ToolFixes = append(r.ToolFixes, card)
+		var out, text bytes.Buffer
 		if err := WriteHTML(&out, r); err != nil {
+			t.Fatalf("titles %v: %v", titles, err)
+		}
+		if err := WriteText(&text, r); err != nil {
 			t.Fatalf("titles %v: %v", titles, err)
 		}
 		page := out.String()
 		hasID := strings.Contains(page, "1a59c906") || strings.Contains(page, `title="Session m1"`)
 		if hasID == !titles || !strings.Contains(page, "unnamed connector") || !strings.Contains(page, "</html>") {
 			t.Errorf("titles %v: ids shown %v; page ends %q", titles, hasID, page[len(page)-40:])
+		}
+		// The whole identifier is never shown; under --no-titles no part is.
+		for name, got := range map[string]string{"page": page, "text": text.String()} {
+			if strings.Contains(got, id) || (!titles && strings.Contains(got, "1a59c906")) {
+				t.Errorf("titles %v: the %s shows the connector's id", titles, name)
+			}
 		}
 	}
 }

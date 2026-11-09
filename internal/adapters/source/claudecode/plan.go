@@ -90,10 +90,11 @@ func (r Reader) Retention() (days int, set bool) {
 		return DefaultRetentionDays, false
 	}
 	var s struct {
-		CleanupPeriodDays *int `json:"cleanupPeriodDays"`
+		// A number, which may be written 365.0.
+		CleanupPeriodDays *float64 `json:"cleanupPeriodDays"`
 	}
 	if json.Unmarshal(b, &s) != nil || s.CleanupPeriodDays == nil {
 		return DefaultRetentionDays, false
 	}
-	return *s.CleanupPeriodDays, true
+	return int(*s.CleanupPeriodDays), true
 }

@@ -29,7 +29,7 @@ neutral, so P01 and P02 describe each provider cache model.
 | P03 | Repeated file reads | M0 | No (re-reads are shown under P04) | Go | 1 |
 | P04 | Oversized and noisy tool output | M0 | Yes | Go | 3 |
 | P05 | Tool-call loops | M0 | No | Go | 0 |
-| P06 | Unused tool definitions | M0 | No | SQL | 1 |
+| P06 | Unused tool definitions | M0 (desktop-app servers, reduced: [ADR 0052](adr/0052-third-review-corrections.md)) | Reduced | SQL (reduced form in Go) | 1 |
 | P07 | Bloated standing and injected context | M0 | Yes | Go ([ADR 0033](adr/0033-reconciliation-history-standing-context.md)) | 1 |
 | P08 | Stale context | M3 | No | Go | 3 |
 | P09 | Resume bloat | M0 ([ADR 0027](adr/0027-measured-m0-findings.md)) | Yes | Go | 1 |
@@ -274,6 +274,12 @@ when uncached).
 
 **Fix:** L1 — diff to disable the MCP server, or the specific tools, for that
 repo.
+
+**In M0 (reduced):** only the MCP servers the Claude desktop app adds, which
+`claude mcp remove` cannot remove: those defined but never called in the
+period get a card suggesting the terminal app for work that does not need
+them ([ADR 0052](adr/0052-third-review-corrections.md)). Servers the user
+added are priced under P07.
 
 ## P07 — Bloated standing and injected context
 

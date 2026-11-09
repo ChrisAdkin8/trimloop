@@ -1,6 +1,6 @@
 # ADR 0048: Usage limits for subscribers
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0052](0052-third-review-corrections.md) (other wordings of a limit message)
 - Date: 2026-11-08
 - Amends: [ADR 0032](0032-readable-reports.md) (what reports lead with), [ADR 0033](0033-reconciliation-history-standing-context.md) and [ADR 0045](0045-m0-measurement-method.md) rule 10 (a new weekly figure), [ADR 0034](0034-live-nudges.md) (the status line keeps limit readings)
 

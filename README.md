@@ -79,16 +79,17 @@ change worked. The codes (P19 and so on) refer to
 
 ## Install
 
-Any one of these:
+No release is published yet, so for now build it **from source** (the
+last option). Once releases are public, any one of these works:
 
-- **Homebrew** (macOS or Linux), once releases are public:
+- **Homebrew** (macOS or Linux):
 
   ```bash
   brew install --cask chrisadkin8/tap/trimloop
   ```
 
-- **Download** the archive for your system from the
-  [releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
+- **Download**, once releases are public, the archive for your system
+  from the [releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
   it, and put `trimloop` somewhere on your PATH (for example
   `~/.local/bin`). [Checking a download](#checking-a-download) says how to
   verify it, and what to do if macOS refuses to open it.
@@ -133,7 +134,8 @@ view never replaces full weeks.
 
 Reports show the titles Claude Code gives your sessions, which summarise
 what you asked, and your project names. Check a report before sharing it.
-`--no-titles` removes the titles; project, skill and server names stay.
+`--no-titles` removes the titles, and the web page then shows no session
+or connector identifiers either; project, skill and server names stay.
 
 ### Try it without your own logs
 
@@ -265,7 +267,7 @@ protobuf plugins, `uv` with Python 3.12, and Node.js 22 or later;
 Before committing Go changes:
 
 ```bash
-scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, govulncheck
+scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, plugin validation, govulncheck
 scripts/check.sh --offline   # the same without govulncheck, which needs the network
 ```
 
@@ -293,10 +295,12 @@ macOS and Linux (Apple silicon, Intel and arm64), `.deb` and `.rpm`
 packages, signed checksums, a software bill of materials and build
 provenance. Check the draft, then publish it. While the repository is private,
 releases skip the signature and provenance (both would need it public or a
-paid plan) and stay drafts. **Going public**, in this order: make this
-repository public, re-run the release workflow for the tag (it signs the
-files this time), publish the draft, then make the tap public
-([ADR 0051](docs/adr/0051-private-releases-and-going-public.md)). With a `HOMEBREW_TAP_TOKEN`
+paid plan) and stay drafts. **Going public**, in this order: decide whether
+to tidy the git history (it goes public too); make this repository public;
+delete the v0.1.0 draft and its tag, then tag the current commit and push
+the tag (re-running the old workflow would rebuild the old commit); check
+the new draft is signed and publish it; then make the tap public
+([ADR 0052](docs/adr/0052-third-review-corrections.md)). With a `HOMEBREW_TAP_TOKEN`
 secret the release also updates the `ChrisAdkin8/homebrew-tap` cask, for
 `brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
 release dry run ([ci.yml](.github/workflows/ci.yml)), on

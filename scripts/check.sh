@@ -6,7 +6,7 @@
 #   go vet         common mistakes
 #   golangci-lint  linters in .golangci.yml
 #   go test -race  tests, with the data-race detector
-#   claude plugin validate  the Claude Code plugin (skipped without claude)
+#   claude plugin validate  the marketplace and the plugin (skipped without claude)
 #   govulncheck    known vulnerabilities in dependencies (needs network)
 #
 # Usage: scripts/check.sh [--offline] [--help]
@@ -73,7 +73,8 @@ check "golangci-lint" golangci-lint run ./...
 check "go test -race" go test -race ./...
 # The Claude Code plugin and marketplace (ADR 0049); CI runs it too.
 if command -v claude >/dev/null 2>&1; then
-  check "claude plugin validate" claude plugin validate . --strict
+  check "claude plugin validate (marketplace)" claude plugin validate . --strict
+  check "claude plugin validate (plugin)" claude plugin validate plugins/trimloop --strict
 else
   printf '%s==> claude plugin validate%s\n  skipped (claude not installed; CI runs it)\n' "$BOLD" "$RESET"
 fi

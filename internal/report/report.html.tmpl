@@ -136,12 +136,12 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <p class="lead">Largest possible saving first. Several of these target the same money, so their savings can't be added up.</p>
 {{if not .First}}<p>Nothing found was worth changing.</p>{{end}}
 <div class="cards">
-{{range .First}}{{template "action" (args . $.Total)}}{{end}}
+{{range .First}}{{template "action" (args . $.Total $.HideIDs)}}{{end}}
 </div>
 {{if .More}}
 <details><summary>{{len .More}} smaller changes</summary>
 <div class="cards" style="margin-top:12px">
-{{range .More}}{{template "action" (args . $.Total)}}{{end}}
+{{range .More}}{{template "action" (args . $.Total $.HideIDs)}}{{end}}
 </div>
 </details>
 {{end}}
@@ -262,13 +262,13 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <h2 id="tools">Tool output</h2>
 {{with .Tools}}
 <p class="lead">When Claude runs a command or reads a file, the output stays in the session and is sent again on every later turn. Keeping it there cost {{dollars .Carried}} ({{pct .Carried $.Total}} of spend){{if .FileViews}}, and {{pct (float .Rereads) (float .FileViews)}} of file views re-read a file already seen{{end}}.</p>
-{{with $.ToolInputs}}{{if .Carried}}<p>What Claude <em>writes</em> in its tool calls (commands, scripts, file contents) stays in the session too: {{dollars .Carried}} to carry ({{pct .Carried $.Total}} of spend){{with .ByTool}}, mostly {{range $i, $g := .}}{{if lt $i 3}}{{if $i}}, {{end}}{{$g.Name}} {{dollars $g.Carried}}{{end}}{{end}}{{end}}. Compacting clears it as well.</p>{{end}}{{end}}
+{{with $.ToolInputs}}{{if .Carried}}<p>What Claude <em>writes</em> in its tool calls (commands, scripts, file contents) stays in the session too: {{dollars .Carried}} to carry ({{pct .Carried $.Total}} of spend){{with .ByTool}}, mostly {{range $i, $g := .}}{{if lt $i 3}}{{if $i}}, {{end}}{{$.Tool $g.Name}} {{dollars $g.Carried}}{{end}}{{end}}{{end}}. Compacting clears it as well.</p>{{end}}{{end}}
 <details><summary>Show details</summary>
 <div class="panel">
   <h3 style="margin-top:0">By tool</h3>
   <table>
     <tbody>
-    {{range .ByTool}}<tr><td class="name" style="width:14em">{{.Name}}</td><td class="n" style="width:6em">{{dollars .Carried}}</td>
+    {{range .ByTool}}<tr><td class="name" style="width:14em">{{$.Tool .Name}}</td><td class="n" style="width:6em">{{dollars .Carried}}</td>
       <td class="n muted" style="width:8em">{{thousands .Calls}} uses</td>
       <td><div class="bar" style="width: {{width .Carried $.MaxTool}}%"></div></td></tr>{{end}}
     </tbody>
@@ -302,7 +302,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
     <thead><tr><th>Source</th><th class="n">Cost</th><th class="n">Size</th><th>Who can change it</th><th class="barcell"></th></tr></thead>
     <tbody>
     {{range $i, $p := .Parts}}{{if lt $i 12}}<tr>
-      <td class="name">{{ctxname .Name}}</td><td class="n">{{dollars .Cost}}</td><td class="n">{{short .Tokens}} tokens</td>
+      <td class="name">{{$.CtxName .Name}}</td><td class="n">{{dollars .Cost}}</td><td class="n">{{short .Tokens}} tokens</td>
       <td class="muted small">{{if eq .Source "harness"}}Claude Code (no setting){{else if eq .Source "skills"}}you: skills and plugins{{else if eq .Source "mcp"}}you: MCP servers{{else}}you: memory files{{end}}</td>
       <td class="barcell"><div class="bar" style="width: {{width .Cost $.MaxPart}}%"></div></td>
     </tr>{{end}}{{end}}
@@ -436,11 +436,11 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 {{define "session"}}{{$l := index . 0}}{{$id := index . 1}}{{if $l.Title}}{{$l.Title}}{{else}}<span class="muted">Untitled session</span>{{end}}{{if $l.SubAgent}} <span class="muted small">(a sub-agent)</span>{{end}}{{if not $l.Start.IsZero}}<span class="id"{{if $id}} title="Session {{$id}}"{{end}}>{{day $l.Start}}</span>{{end}}{{end}}
 
-{{define "action"}}{{$a := index . 0}}{{$total := index . 1}}
+{{define "action"}}{{$a := index . 0}}{{$total := index . 1}}{{$hide := index . 2}}
 <div class="panel card">
   <h3>{{$a.Title}}</h3>
   {{if $a.Finding}}<p>{{$a.Finding}}</p>{{end}}
-  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join $a.Examples ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
+  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join (toolLabels $a.Examples $hide) ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
   <div class="fix">
     <p><b>{{$a.Primary.What}}</b></p>
     <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>

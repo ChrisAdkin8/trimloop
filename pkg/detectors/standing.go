@@ -224,8 +224,8 @@ func sameStanding(a, b *event.Standing) bool {
 
 // UnusedAppServers returns the tool-definition parts of MCP servers the
 // desktop app adds that were sent but never called in these sessions, most
-// costly first (ADR 0050). They cannot be removed like other servers, so
-// P07's "remove" card leaves them out.
+// costly first: P06 in reduced fidelity (ADRs 0050, 0052). They cannot be
+// removed like other servers, so P07's "remove" card leaves them out.
 func UnusedAppServers(f StandingContext, sessions []event.Session) []ContextPart {
 	called := map[string]bool{}
 	for _, s := range sessions {

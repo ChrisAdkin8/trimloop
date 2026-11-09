@@ -24,7 +24,7 @@ func toolInputLine(w io.Writer, r Results) {
 	}
 	var top []string
 	for _, g := range ti.ByTool[:min(3, len(ti.ByTool))] {
-		top = append(top, fmt.Sprintf("%s %s", g.Name, dollars(g.Carried)))
+		top = append(top, fmt.Sprintf("%s %s", toolLabel(g.Name, r.HideIDs), dollars(g.Carried)))
 	}
 	fmt.Fprintf(w, "  What Claude wrote in its tool calls (commands, scripts, file contents) also stays in the\n")
 	fmt.Fprintf(w, "  session: %s to carry (%.0f%% of spend; %s). Compacting clears it too.\n",
@@ -32,7 +32,7 @@ func toolInputLine(w io.Writer, r Results) {
 }
 
 // gapSections prints model switches (P01), cut-off replies (P12), unused
-// app servers (P07) and when the spend happened.
+// app servers (P06) and when the spend happened.
 func gapSections(w io.Writer, r Results) {
 	all := r.Total
 	if sw := r.Switches; sw.Switches > 0 {
@@ -57,7 +57,7 @@ func gapSections(w io.Writer, r Results) {
 		}
 	}
 	if r.AppServerFix != nil {
-		fmt.Fprintln(w, "\nP07 DESKTOP-APP TOOLS NEVER USED")
+		fmt.Fprintln(w, "\nP06 DESKTOP-APP TOOLS NEVER USED")
 		fmt.Fprintf(w, "  %s: %s\n", r.AppServerFix.Title, savingText(*r.AppServerFix, all))
 		printFixes(w, *r.AppServerFix)
 	}

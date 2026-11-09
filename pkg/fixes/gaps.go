@@ -53,22 +53,22 @@ func ForFailures(f detectors.Failures, minSaving float64) (Recommendation, bool)
 }
 
 // ForAppServers recommends the terminal app for work that does not need the
-// MCP servers the desktop app adds, when some were never called (P07,
-// ADR 0050), or returns false below minSaving.
+// MCP servers the desktop app adds, when some were never called (P06,
+// ADRs 0050, 0052), or returns false below minSaving.
 func ForAppServers(parts []detectors.ContextPart, minSaving float64) (Recommendation, bool) {
 	cost := 0.0
 	var names []string
 	for _, p := range parts {
 		cost += p.Cost
 		if len(names) < 3 {
-			names = append(names, strings.TrimPrefix(p.Name, "mcp__"))
+			names = append(names, connectorName(strings.TrimPrefix(p.Name, "mcp__")))
 		}
 	}
 	if cost < minSaving {
 		return Recommendation{}, false
 	}
 	return Recommendation{
-		Pattern: "P07",
+		Pattern: "P06",
 		Title:   "Use the terminal app when you don't need the desktop app's tools",
 		Finding: fmt.Sprintf("The desktop app adds its own MCP servers, whose tool definitions are sent with "+
 			"every request. Some were never used in this period (%s), and still cost %s.",

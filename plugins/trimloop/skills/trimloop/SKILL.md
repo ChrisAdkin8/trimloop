@@ -26,14 +26,15 @@ re-sending it cheaper").
 Run `trimloop --version`. If the command is not found, stop and tell the
 user how to install it; do not install it yourself without their yes:
 
-- macOS or Linux with Homebrew: `brew install --cask chrisadkin8/tap/trimloop`
-- otherwise: download the archive for their system from
-  https://github.com/ChrisAdkin8/trimloop/releases and put `trimloop` on
-  their PATH;
-- or, with Go 1.27.3 or later, from a clone of
+- with Go 1.27.3 or later, from a clone of
   https://github.com/ChrisAdkin8/trimloop:
-  `go build -o ~/.local/bin/trimloop ./cmd/trimloop` (the only way until a
-  release is published).
+  `go build -o ~/.local/bin/trimloop ./cmd/trimloop`. Until a release is
+  published, this is the only way.
+- once a release is published, on macOS or Linux with Homebrew:
+  `brew install --cask chrisadkin8/tap/trimloop`;
+- or download the archive for their system from
+  https://github.com/ChrisAdkin8/trimloop/releases and put `trimloop` on
+  their PATH.
 
 ## 2. Run the analysis
 

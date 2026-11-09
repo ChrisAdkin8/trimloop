@@ -69,7 +69,7 @@ func setup(args []string, home string) int {
 	if cfgDir != "" {
 		defaultSettings = filepath.Join(cfgDir, "settings.json")
 	}
-	settingsFile := fs.String("settings", defaultSettings, "the Claude Code settings file --check reads")
+	settingsFile := fs.String("settings", defaultSettings, "the Claude Code settings file --check reads and plain setup names")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -87,8 +87,8 @@ func setup(args []string, home string) int {
 		return checkSetup(os.Stdout, *settingsFile, exe, home, cfgDir)
 	}
 	if *write == "" {
-		fmt.Printf("Add this to %s (or a project's .claude/settings.json), or run\n", defaultSettings)
-		fmt.Printf("'trimloop setup --write %s' to add it for you:\n", defaultSettings)
+		fmt.Printf("Add this to %s (or a project's .claude/settings.json), or run\n", *settingsFile)
+		fmt.Printf("'trimloop setup --write %s' to add it for you:\n", shellArg(*settingsFile))
 		fmt.Println()
 		fmt.Println(live.SetupSnippet(exe))
 		return 0
@@ -411,6 +411,7 @@ func oldestFirst(data []logData) {
 func buildSession(d logData, seen map[string]bool) event.Session {
 	s := sessionFor(d.log.Path)
 	var last time.Time            // latest response time so far in this log
+	replied := false              // a real reply (not one the harness made up) came earlier in this log
 	turnOf := map[string]int{}    // message id -> index in s.Turns, for ids counted here
 	callAt := map[string][2]int{} // tool-use id -> turn index, call index
 	// active marks activity at time t: idle time before a turn runs from the
@@ -527,7 +528,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Seq:             len(s.Turns),
 				Model:           m.Model,
 				Time:            m.Time,
-				First:           last.IsZero(),
+				First:           !replied, // limit hits and failures before it wrote no cache
 				Usage:           m.Usage,
 				Fast:            m.Fast,
 				Effort:          m.Effort,
@@ -570,6 +571,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 			}
 		}
 		active(m.Time)
+		replied = true
 	}
 	s.Harness = sumRuns(runs)
 	if s.Kind == event.SubAgentSession && s.AgentType == "" {

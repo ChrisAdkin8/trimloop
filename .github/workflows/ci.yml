@@ -63,5 +63,9 @@ jobs:
 
       # The Claude Code plugin and marketplace (ADR 0049). Claude Code is
       # pinned to a release at least two weeks old; validating needs no login.
-      - name: Validate the plugin
-        run: npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate . --strict
+      # The first command checks the marketplace file, the second the
+      # plugin itself (its manifest and skill).
+      - name: Validate the marketplace and the plugin
+        run: |
+          npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate . --strict
+          npx --yes @anthropic-ai/claude-code@2.1.310 plugin validate plugins/trimloop --strict

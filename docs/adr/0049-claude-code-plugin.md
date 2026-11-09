@@ -50,5 +50,7 @@ program: trimloop comes from Homebrew or a release download.
   skill names only fields that format guarantees.
 - While the repository is private, only people with access can add the
   marketplace (Claude Code uses their own git credentials).
-- `claude plugin validate . --strict` checks the marketplace and plugin;
-  run it when either changes.
+- `claude plugin validate . --strict` checks the marketplace, and
+  `claude plugin validate plugins/trimloop --strict` the plugin; run both
+  when either changes (`scripts/check.sh` does; see
+  [ADR 0052](0052-third-review-corrections.md)).

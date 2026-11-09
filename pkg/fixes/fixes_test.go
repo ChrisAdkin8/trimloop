@@ -230,7 +230,7 @@ func TestGapCards(t *testing.T) {
 		t.Errorf("sleep: got %+v", r)
 	}
 	parts := []detectors.ContextPart{{Name: "mcp__claude-artifacts", Cost: 10}, {Name: "mcp__ccd_session", Cost: 2}}
-	if r, ok := ForAppServers(parts, 1); !ok || r.Pattern != "P07" || r.Saving != 12 ||
+	if r, ok := ForAppServers(parts, 1); !ok || r.Pattern != "P06" || r.Saving != 12 ||
 		!strings.Contains(r.Finding, "claude-artifacts, ccd_session") || !strings.Contains(r.Primary.What, "terminal") {
 		t.Errorf("app servers: got %+v", r)
 	}

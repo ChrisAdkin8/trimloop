@@ -55,8 +55,10 @@ func TestRetention(t *testing.T) {
 	if d, set := r.Retention(); d != DefaultRetentionDays || set {
 		t.Errorf("key missing: got %d, %v", d, set)
 	}
-	write(`{"cleanupPeriodDays": 365}`)
-	if d, set := r.Retention(); d != 365 || !set {
-		t.Errorf("set: got %d, %v", d, set)
+	for _, v := range []string{"365", "365.0"} {
+		write(`{"cleanupPeriodDays": ` + v + `}`)
+		if d, set := r.Retention(); d != 365 || !set {
+			t.Errorf("set to %s: got %d, %v", v, d, set)
+		}
 	}
 }

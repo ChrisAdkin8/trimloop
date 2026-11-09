@@ -21,6 +21,7 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 	"trimPrefix":   strings.TrimPrefix,
 	"retentionTip": RetentionTip,
 	"serverLabel":  serverLabel,
+	"toolLabels":   toolLabels,
 	"limitShare": func(a fixes.Recommendation) string {
 		return strings.TrimPrefix(limitText(a), "; ")
 	},
@@ -50,7 +51,6 @@ var htmlPage = template.Must(template.New("report").Funcs(template.FuncMap{
 	"server":   serverName,
 	"agent":    agentName,
 	"model":    modelName,
-	"ctxname":  contextName,
 	"duration": func(d time.Duration) string { return duration(d.Round(time.Second)) },
 	"join":     strings.Join,
 	"add":      func(a, b int) int { return a + b },
@@ -256,5 +256,8 @@ func (v view) SessID(id string) string {
 	return id
 }
 
-// Server names an MCP server for the page (serverLabel).
-func (v view) Server(n string) string { return serverLabel(n, v.HideIDs) }
+// CtxName names a source of standing context for the page (contextName).
+func (v view) CtxName(n string) string { return contextName(n, v.HideIDs) }
+
+// Tool names a tool or tool group for the page (toolLabel).
+func (v view) Tool(n string) string { return toolLabel(n, v.HideIDs) }

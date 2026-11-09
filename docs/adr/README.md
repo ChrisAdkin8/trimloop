@@ -17,14 +17,14 @@ Which record governs what in the M0 prototype:
 
 | Topic | Governing ADRs |
 |---|---|
-| What the prototype measures, and how | [0045](0045-m0-measurement-method.md), [0050](0050-second-gap-analysis-findings.md) |
+| What the prototype measures, and how | [0045](0045-m0-measurement-method.md), [0050](0050-second-gap-analysis-findings.md), [0052](0052-third-review-corrections.md) |
 | Which findings are in M0, and in what order | [0027](0027-measured-m0-findings.md), [0031](0031-m0-order-from-measured-spend.md), [0042](0042-p02-p14-and-main-session-models.md) |
 | How fixes are chosen and worded | [0030](0030-how-fixes-are-chosen.md) |
 | What reports show | [0032](0032-readable-reports.md), [0048](0048-usage-limits-for-subscribers.md) (subscribers) |
 | Reconciliation and weekly history | [0033](0033-reconciliation-history-standing-context.md), [0043](0043-weekly-trend-for-new-findings.md) |
 | Live nudges | [0034](0034-live-nudges.md) |
 | Licensing | [0046](0046-licensing.md) |
-| Releases | [0047](0047-first-release-pure-go.md), then [0014](0014-release-builds-per-os.md) once cgo arrives; [0049](0049-claude-code-plugin.md) (the plugin); [0051](0051-private-releases-and-going-public.md) (private releases, going public) |
+| Releases | [0047](0047-first-release-pure-go.md), then [0014](0014-release-builds-per-os.md) once cgo arrives; [0049](0049-claude-code-plugin.md) (the plugin); [0051](0051-private-releases-and-going-public.md) (private releases), [0052](0052-third-review-corrections.md) (going public) |
 | Privacy | [0004](0004-local-first-hashes-only.md), [0011](0011-keyed-fingerprints.md), [0032](0032-readable-reports.md) (the local-report exception) |
 
 ## All records
@@ -84,10 +84,11 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0045](0045-m0-measurement-method.md) | The M0 measurement method | Measurements (M0) | Yes | Amended by 0048, 0050 |
 | [0046](0046-licensing.md) | Licensing — FSL core, Apache-2.0 connectors, commercial team features | Licensing | Partly: LICENSE.md | Yes |
 | [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Amended by 0049, 0051 |
-| [0048](0048-usage-limits-for-subscribers.md) | Usage limits for subscribers | Reports (M0) | Yes | Yes |
+| [0048](0048-usage-limits-for-subscribers.md) | Usage limits for subscribers | Reports (M0) | Yes | Amended by 0052 |
 | [0049](0049-claude-code-plugin.md) | A Claude Code plugin with a trimloop skill | Packaging | Yes: not yet tried by users | Yes |
-| [0050](0050-second-gap-analysis-findings.md) | Findings from the second gap analysis | Findings (M0) | Yes | Yes |
-| [0051](0051-private-releases-and-going-public.md) | Releases while private, the order of going public, and release hardening | Packaging | Yes | Yes |
+| [0050](0050-second-gap-analysis-findings.md) | Findings from the second gap analysis | Findings (M0) | Yes | Amended by 0052 |
+| [0051](0051-private-releases-and-going-public.md) | Releases while private, the order of going public, and release hardening | Packaging | Yes | Amended by 0052 |
+| [0052](0052-third-review-corrections.md) | Going public from a fresh tag, refused requests, and unused app servers | Packaging; Findings (M0) | Yes: going public is for the maintainer | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

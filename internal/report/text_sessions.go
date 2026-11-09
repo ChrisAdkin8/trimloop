@@ -9,20 +9,24 @@ import (
 	"github.com/ChrisAdkin8/trimloop/pkg/fixes"
 )
 
-// attributionSection prints spend by project, skill, plugin and MCP server.
-func attributionSection(w io.Writer, a detectors.Attribution) {
+// attributionSection prints spend by project, skill, plugin and MCP server;
+// hideIDs is --no-titles.
+func attributionSection(w io.Writer, a detectors.Attribution, hideIDs bool) {
 	fmt.Fprintln(w, "\nWHERE THE SPEND WENT")
-	spendTable(w, "By project", a.ByProject, a.Cost, true)
+	spendTable(w, "By project", a.ByProject, a.Cost, true, nil)
 	fmt.Fprintln(w, "\n  Turns the harness attributes to a skill, plugin or MCP server:")
 	if len(a.BySkill)+len(a.ByPlugin)+len(a.ByMCPServer) == 0 {
 		fmt.Fprintln(w, "    none.")
 	}
-	spendTable(w, "By skill", a.BySkill, a.Cost, false)
-	spendTable(w, "By plugin", a.ByPlugin, a.Cost, false)
-	spendTable(w, "By MCP server", a.ByMCPServer, a.Cost, false)
+	spendTable(w, "By skill", a.BySkill, a.Cost, false, nil)
+	spendTable(w, "By plugin", a.ByPlugin, a.Cost, false, nil)
+	spendTable(w, "By MCP server", a.ByMCPServer, a.Cost, false,
+		func(n string) string { return serverLabel(n, hideIDs) })
 }
 
-func spendTable(w io.Writer, title string, rows []detectors.Spend, total float64, sub bool) {
+// spendTable prints rows of spend; name, if not nil, says how to show a
+// row's name.
+func spendTable(w io.Writer, title string, rows []detectors.Spend, total float64, sub bool, name func(string) string) {
 	if len(rows) == 0 {
 		return
 	}
@@ -37,7 +41,11 @@ func spendTable(w io.Writer, title string, rows []detectors.Spend, total float64
 		if sub {
 			fmt.Fprintf(w, " %9.0f%%", pct(r.SubAgentCost, r.Cost))
 		}
-		fmt.Fprintf(w, "  %s\n", printable(r.Name))
+		n := r.Name
+		if name != nil {
+			n = name(n)
+		}
+		fmt.Fprintf(w, "  %s\n", printable(n))
 	}
 }
 

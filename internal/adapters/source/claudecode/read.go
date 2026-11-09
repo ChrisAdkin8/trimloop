@@ -542,18 +542,22 @@ func limitError(raw json.RawMessage) bool {
 
 // limitKind tells which subscription limit a harness limit message names,
 // from its text ("You've hit your session limit · resets 11:30pm", "...
-// weekly limit ...", "... Opus limit ..."): "session", "weekly", "other",
-// or "" when the text names no usage limit (an API key's rate limit).
+// weekly limit ...", "... Opus limit ...", or wordings such as "5-hour limit
+// reached" and "Usage limit reached"): "session", "weekly", "other", or ""
+// when the text names no usage limit (an API key's rate limit).
 func limitKind(bs []block) string {
 	for _, b := range bs {
 		t := strings.ToLower(b.Text)
-		if !strings.Contains(t, "hit your") || !strings.Contains(t, "limit") {
+		named := strings.Contains(t, "hit your") && strings.Contains(t, "limit") ||
+			strings.Contains(t, "usage limit") ||
+			strings.Contains(t, "limit reached") && !strings.Contains(t, "rate limit")
+		if !named {
 			continue
 		}
 		switch {
-		case strings.Contains(t, "weekly limit"):
+		case strings.Contains(t, "weekly"):
 			return "weekly"
-		case strings.Contains(t, "session limit"):
+		case strings.Contains(t, "session limit"), strings.Contains(t, "5-hour"), strings.Contains(t, "five-hour"):
 			return "session"
 		}
 		return "other"
@@ -568,34 +572,39 @@ func errorText(raw json.RawMessage) string {
 	return s
 }
 
-// failureKind sorts an error reply the harness wrote, by its error field
-// and text: "sleep" ("API Error: Your computer went to sleep
-// mid-response"); "network" for connection and server errors ("Can't reach
-// the API server", "Connection lost", overloaded, a rate limit); "not-sent"
-// when the request was refused before it was sent and nothing was sent again
-// (an expired login, a bad request); or "other".
+// failureKind sorts an error reply the harness wrote, by its text and error
+// field: "sleep" ("API Error: Your computer went to sleep mid-response"),
+// "not-sent" (refused before any work was done, so nothing was charged: an
+// expired login, a rate limit, an overloaded service, a server that could
+// not be reached), "network" (a connection lost or a server error during
+// the request), or "other".
 func failureKind(errField string, bs []block) string {
-	// The text comes first: Claude Code marks a reply cut off by sleep with
-	// a server error.
+	// The text comes first: Claude Code marks a reply cut off by sleep, and
+	// a server it could not reach, with a server error.
 	for _, b := range bs {
-		if strings.Contains(strings.ToLower(b.Text), "went to sleep") {
+		t := strings.ToLower(b.Text)
+		switch {
+		case strings.Contains(t, "went to sleep"):
 			return "sleep"
+		case strings.Contains(t, "/login"), strings.Contains(t, "login expired"),
+			strings.Contains(t, "enotfound"), strings.Contains(t, "econnrefused"),
+			strings.Contains(t, "connection refused"), strings.Contains(t, "reach the api server"):
+			return "not-sent"
 		}
 	}
 	switch errField {
-	case "authentication_failed", "invalid_request", "billing_error":
+	case "authentication_failed", "invalid_request", "billing_error", "rate_limit", "overloaded":
 		return "not-sent"
-	case "rate_limit", "server_error", "overloaded":
+	case "server_error":
 		return "network"
 	}
 	for _, b := range bs {
 		t := strings.ToLower(b.Text)
 		switch {
-		case strings.Contains(t, "/login"), strings.Contains(t, "login expired"):
+		case strings.Contains(t, "rate limit"), strings.Contains(t, "overloaded"):
 			return "not-sent"
-		case strings.Contains(t, "reach the api server"), strings.Contains(t, "connection"),
-			strings.Contains(t, "network"), strings.Contains(t, "enotfound"), strings.Contains(t, "timed out"),
-			strings.Contains(t, "overloaded"), strings.Contains(t, "server error"), strings.Contains(t, "rate limit"):
+		case strings.Contains(t, "connection"), strings.Contains(t, "network"),
+			strings.Contains(t, "timed out"), strings.Contains(t, "server error"):
 			return "network"
 		}
 	}

@@ -84,7 +84,7 @@ type Failures struct {
 	Sleep    int `json:"sleep"`   // the computer slept mid-response
 	Network  int `json:"network"` // a connection or server error
 	Other    int `json:"other"`
-	NotSent  int `json:"not_sent"` // refused before sending (an expired login): nothing was sent again
+	NotSent  int `json:"not_sent"` // refused before any work (a login, a rate limit, no connection): nothing was charged
 	Sessions int `json:"sessions"`
 	// Resent is what sending the context again cost, at least: each
 	// failure's context re-read from the cache. The cut-off output is not

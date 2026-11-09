@@ -1,6 +1,6 @@
 # ADR 0050: Findings from the second gap analysis
 
-- Status: Accepted — built in the M0 prototype
+- Status: Accepted — built in the M0 prototype; amended by [ADR 0052](0052-third-review-corrections.md) (refused requests are "not sent"; unused app servers are P06)
 - Date: 2026-11-09
 - Amends: [ADR 0045](0045-m0-measurement-method.md) (new figures), [ADR 0042](0042-p02-p14-and-main-session-models.md) (P14 shows the whole thinking share), [ADR 0033](0033-reconciliation-history-standing-context.md) (P07 names unused app servers)
 

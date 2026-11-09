@@ -13,8 +13,8 @@ import (
 )
 
 // toolOutputSection prints what fills the context (P04) and the fixes for it.
-// all is the total spend, for percentages.
-func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recommendation, all float64) {
+// all is the total spend, for percentages; hideIDs is --no-titles.
+func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recommendation, all float64, hideIDs bool) {
 	fmt.Fprintf(w, "\nP04 WHAT FILLS YOUR CONTEXT: TOOL OUTPUT\n")
 	fmt.Fprintf(w, "  %s tool results added about %s tokens (at %d bytes per token).\n",
 		thousands(f.Calls), thousands(f.Tokens), event.BytesPerToken)
@@ -33,8 +33,8 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 		fmt.Fprintf(w, "  the session; carrying them cost %s.\n", dollars(f.RereadCarried))
 	}
 
-	groupTable(w, "By tool", "tool", f.ByTool, f.Carried, false)
-	groupTable(w, "Shell commands by shape", "shape", f.ByShape, f.Carried, true)
+	groupTable(w, "By tool", "tool", f.ByTool, f.Carried, false, hideIDs)
+	groupTable(w, "Shell commands by shape", "shape", f.ByShape, f.Carried, true, hideIDs)
 
 	if len(recs) == 0 {
 		return
@@ -43,7 +43,7 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 	for i, r := range recs {
 		fmt.Fprintf(w, "\n  %d. %s: %s", i+1, r.Title, savingText(r, all))
 		if len(r.Examples) > 0 {
-			fmt.Fprintf(w, " (mostly %s)", printable(strings.Join(r.Examples, ", ")))
+			fmt.Fprintf(w, " (mostly %s)", printable(strings.Join(toolLabels(r.Examples, hideIDs), ", ")))
 		}
 		fmt.Fprintln(w)
 		printFixes(w, r)
@@ -52,7 +52,7 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 }
 
 // groupTable prints groups with their carried cost and share.
-func groupTable(w io.Writer, title, nameLabel string, groups []detectors.Group, total float64, filtered bool) {
+func groupTable(w io.Writer, title, nameLabel string, groups []detectors.Group, total float64, filtered, hideIDs bool) {
 	if len(groups) == 0 {
 		return
 	}
@@ -68,7 +68,7 @@ func groupTable(w io.Writer, title, nameLabel string, groups []detectors.Group, 
 		if filtered {
 			fmt.Fprintf(w, " %8.0f%%", pct(float64(g.Filtered), float64(g.Calls)))
 		}
-		fmt.Fprintf(w, "  %s\n", printable(g.Name))
+		fmt.Fprintf(w, "  %s\n", printable(toolLabel(g.Name, hideIDs)))
 	}
 }
 

@@ -50,7 +50,7 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 }
 
 // standingSection prints what every request carries (P07).
-func standingSection(w io.Writer, s detectors.StandingContext, all float64) {
+func standingSection(w io.Writer, s detectors.StandingContext, all float64, hideIDs bool) {
 	fmt.Fprintln(w, "\nP07 WHAT EVERY REQUEST CARRIES")
 	fmt.Fprintf(w, "  Sending the system prompt and tool definitions on every turn cost %s;\n", money(s.SystemPrompt+s.ToolDefinitions))
 	fmt.Fprintf(w, "  text Claude Code added to the conversation cost %s while it stayed there.\n", money(s.Injected))
@@ -61,7 +61,7 @@ func standingSection(w io.Writer, s detectors.StandingContext, all float64) {
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "\n    %-10s %8s  %s\n", "cost", "tokens", "source")
 	for _, p := range s.Parts[:min(12, len(s.Parts))] {
-		fmt.Fprintf(w, "    %-10s %8s  %s\n", money(p.Cost), thousands(p.Tokens), printable(contextName(p.Name)))
+		fmt.Fprintf(w, "    %-10s %8s  %s\n", money(p.Cost), thousands(p.Tokens), printable(contextName(p.Name, hideIDs)))
 	}
 }
 

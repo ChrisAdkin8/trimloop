@@ -83,7 +83,9 @@ type Results struct {
 	Labels map[string]Label `json:"labels"`
 
 	// HideIDs is true under --no-titles: the web page then shows no session
-	// or connector identifiers either. Not in the JSON, which is for scripts.
+	// or connector identifiers either, and the text no connector
+	// identifiers (it keeps session ids, to find a session by). Not in the
+	// JSON, which is for scripts.
 	HideIDs bool `json:"-"`
 }
 
