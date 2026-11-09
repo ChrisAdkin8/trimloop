@@ -101,7 +101,11 @@ object. `--write` reports when nothing changed. Tests: `TestIsTrimloop`,
 
 Known edges, left alone: replacing another program's status line drops its
 other keys (the backup keeps them); duplicate trimloop hooks are updated, not
-removed; there is no `--remove`; each changing write leaves a backup file;
+removed; there is no `--remove`; each changing write leaves a backup file
+in `~/.trimloop/backups` (folder 0700, file 0600, since settings can hold
+API keys; named `settings.json-<id>.trimloop-backup-<time>`, the id a hash
+of the settings file's path), never next to the settings file, which may be
+a link into a dotfiles repository; backups are never removed;
 `disableAllHooks` is read from the one settings file checked, not from
 managed or project settings.
 

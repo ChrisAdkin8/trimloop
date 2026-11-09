@@ -619,3 +619,45 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 		}
 	}
 }
+
+// The compaction card's two counts are of the same sessions: main sessions
+// with a priced turn, the ones its replay changes. A sub-agent or an
+// unpriced turn past 500k is left out of both, though the growth figures
+// count it.
+func TestCompactionCardCountsMainPricedSessions(t *testing.T) {
+	turn := func(ctx int, priced bool) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: priced}
+	}
+	grow := func(top int, priced bool) []event.Turn {
+		var ts []event.Turn
+		for ctx := 100_000; ctx <= top; ctx += 50_000 {
+			ts = append(ts, turn(ctx, priced))
+		}
+		return ts
+	}
+	compacted := grow(600_000, true)
+	compacted[5] = turn(50_000, true) // the first request after a compaction
+	compacted[5].CompactedBefore = true
+	compacted[5].Compaction = event.Compaction{Before: 350_000, After: 20_000}
+	sessions := []event.Session{
+		{ID: "long", Kind: event.MainSession, Turns: grow(900_000, true)},           // over both
+		{ID: "mid", Kind: event.MainSession, Turns: grow(300_000, true)},            // over 200k only
+		{ID: "done", Kind: event.MainSession, Turns: compacted},                     // compacted
+		{ID: "long/agent", Kind: event.SubAgentSession, Turns: grow(900_000, true)}, // a sub-agent
+		{ID: "unpriced", Kind: event.MainSession, Turns: grow(900_000, false)},      // no price
+	}
+	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	if r.CompactFix == nil {
+		t.Fatal("no compaction card")
+	}
+	got := r.CompactFix.Finding
+	for _, want := range []string{"3 sessions passed 200,000 tokens", "1 session went past 500,000 tokens without compacting"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("finding %q has no %q", got, want)
+		}
+	}
+	if r.Growth.Uncompacted != 3 {
+		t.Errorf("growth: got %d never compacted, want 3 (every session)", r.Growth.Uncompacted)
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -112,6 +113,8 @@ func TestShellArg(t *testing.T) {
 		"/Users/a/.claude/settings.json":   "/Users/a/.claude/settings.json",
 		"/Users/a/My Claude/settings.json": "'/Users/a/My Claude/settings.json'",
 		"/tmp/it's/settings.json":          `'/tmp/it'\''s/settings.json'`,
+		"~/settings.json":                  "'~/settings.json'",
+		"/a/~b/settings.json":              "/a/~b/settings.json",
 	} {
 		if got := shellArg(in); got != want {
 			t.Errorf("shellArg(%q) = %s, want %s", in, got, want)
@@ -137,6 +140,17 @@ func TestCheckOptions(t *testing.T) {
 		{"unknown command", cliOptions{args: []string{"report"}, first: true, format: "summary"},
 			`unknown command "report": run "trimloop" to analyse your logs, or "trimloop setup"`},
 		{"word after options", cliOptions{args: []string{"extra"}, format: "text"}, `unexpected "extra"`},
+		{"setup after options", cliOptions{args: []string{"setup"}, format: "summary"},
+			`"setup" goes first, with its own options after it`},
+		{"analyse after options", cliOptions{args: []string{"analyse"}, format: "summary"}, `"analyse" goes first, or not at all`},
+		{"hook after options", cliOptions{args: []string{"hook", "stop"}, format: "summary"}, `"hook" goes first, with nothing before it`},
+		{"help after options", cliOptions{args: []string{"help"}, format: "summary"}, `"help" goes on its own`},
+		{"open to standard output", cliOptions{format: "html", open: true, out: "-"}, "cannot be used with it"},
+		{"to standard output", cliOptions{format: "json", out: "-"}, ""},
+		{"to /dev/stdout", cliOptions{format: "text", out: "/dev/stdout"}, ""},
+		{"to /dev/null", cliOptions{format: "html", out: "/dev/null"}, ""},
+		{"json out is a folder", cliOptions{format: "json", out: dir}, filepath.Join(dir, "trimloop-report.json")},
+		{"summary out is a folder", cliOptions{format: "summary", out: dir}, filepath.Join(dir, "trimloop-report.txt")},
 		{"unknown format", cliOptions{format: "txt"}, `unknown format "txt": use summary, text, html or json`},
 		{"open needs html", cliOptions{format: "json", open: true}, "--open opens the web page, so it needs --format html"},
 		{"missing folder", cliOptions{format: "html", out: "nodir/x.html"}, "the folder nodir does not exist"},
@@ -162,5 +176,59 @@ func TestCheckOptions(t *testing.T) {
 		case c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)):
 			t.Errorf("%s: got %v, want %q", c.name, err, c.want)
 		}
+	}
+	// A device is refused before any log is read.
+	if _, err := os.Lstat("/dev/zero"); err == nil {
+		err := checkOptions(cliOptions{format: "text", out: "/dev/zero"})
+		if err == nil || !strings.Contains(err.Error(), "exists and is not a file") {
+			t.Errorf("device: got %v", err)
+		}
+	}
+}
+
+// parseArgs explains a mistake in one line with the help hint and exit
+// code 2, prints help to standard output with exit code 0, and stops only
+// when it should.
+func TestParseArgs(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		args    []string
+		code    int
+		goOn    bool
+		out     string // in standard output
+		errLine string // the first line of standard error, exactly
+	}{
+		{"defaults", nil, 0, true, "", ""},
+		{"unknown option", []string{"--foo"}, 2, false, "", "unknown option --foo."},
+		{"unknown short option", []string{"-foo=1"}, 2, false, "", "unknown option --foo."},
+		{"missing value", []string{"--out"}, 2, false, "", "--out needs a value."},
+		{"bad boolean", []string{"--open=maybe"}, 2, false, "", `invalid boolean value "maybe" for --open: parse error.`},
+		{"help", []string{"--help"}, 0, false, "Usage: trimloop", ""},
+		{"short help", []string{"-h"}, 0, false, "--no-history", ""},
+		{"version", []string{"--version"}, 0, false, "trimloop ", ""},
+		{"setup after an option", []string{"--no-history", "setup"}, 2, false, "", `"setup" goes first, with its own options after it: "trimloop setup --help" lists them.`},
+		{"bad since", []string{"--since", "soon"}, 2, false, "", `--since "soon": give a date such as 2026-11-01, or a number of days or weeks such as 7d or 2w`},
+	} {
+		var out, errOut strings.Builder
+		o, code, ok := parseArgs(c.args, &out, &errOut)
+		if code != c.code || ok != c.goOn {
+			t.Errorf("%s: got code %d, go on %v; want %d, %v", c.name, code, ok, c.code, c.goOn)
+		}
+		if !strings.Contains(out.String(), c.out) || (c.out == "" && out.Len() > 0) {
+			t.Errorf("%s: standard output %.80q, want %q", c.name, out.String(), c.out)
+		}
+		lines := strings.Split(strings.TrimSuffix(errOut.String(), "\n"), "\n")
+		if lines[0] != c.errLine {
+			t.Errorf("%s: standard error %q, want first line %q", c.name, errOut.String(), c.errLine)
+		}
+		if c.code == 2 && !strings.HasPrefix(c.name, "bad since") && (len(lines) != 2 || lines[1] != strings.TrimSuffix(helpHint, "\n")) {
+			t.Errorf("%s: standard error %q, want one line and the hint", c.name, errOut.String())
+		}
+		if c.name == "defaults" && o.format != "summary" {
+			t.Errorf("defaults: format %q", o.format)
+		}
+	}
+	if o, _, ok := parseArgs([]string{"--open"}, io.Discard, io.Discard); !ok || o.format != "html" {
+		t.Errorf("--open: got format %q, ok %v; want html", o.format, ok)
 	}
 }

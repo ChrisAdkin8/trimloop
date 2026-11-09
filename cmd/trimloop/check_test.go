@@ -129,6 +129,7 @@ func TestWriteSetupMessages(t *testing.T) {
 		{name: "config dir, file in it", cfgDir: true, code: 0, notErrs: []string{"Warning"}},
 	} {
 		home := t.TempDir()
+		t.Setenv("HOME", home)                    // setup keeps backups in ~/.trimloop/backups
 		dir := filepath.Join(home, "my settings") // a space, so paths are quoted
 		if c.inClaude {
 			dir = filepath.Join(home, ".claude")
@@ -266,5 +267,46 @@ func TestUnreadSettings(t *testing.T) {
 		if got := unreadSettings(c.path, home, c.cfgDir); got != c.want {
 			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}
+	}
+}
+
+// ~/.claude/settings.json that links to the file in CLAUDE_CONFIG_DIR is
+// the file Claude Code reads, whether that file is made yet or not; a link
+// elsewhere is still warned about.
+func TestUnreadSettingsFollowsLinks(t *testing.T) {
+	home, cfg, other := t.TempDir(), t.TempDir(), t.TempDir()
+	claude := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(claude, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(claude, "settings.json")
+	reads := filepath.Join(cfg, "settings.json")
+	link := func(target string) {
+		_ = os.Remove(path)
+		if err := os.Symlink(target, path); err != nil {
+			t.Skip("no symlinks here:", err)
+		}
+	}
+	link(reads) // not made yet
+	if got := unreadSettings(path, home, cfg); got != "" {
+		t.Errorf("link to a file not made yet: got %q, want no warning", got)
+	}
+	if err := os.WriteFile(reads, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadSettings(path, home, cfg); got != "" {
+		t.Errorf("link to the file: got %q, want no warning", got)
+	}
+	rel, err := filepath.Rel(claude, reads)
+	if err != nil {
+		t.Fatal(err)
+	}
+	link(rel)
+	if got := unreadSettings(path, home, cfg); got != "" {
+		t.Errorf("relative link: got %q, want no warning", got)
+	}
+	link(filepath.Join(other, "settings.json"))
+	if got := unreadSettings(path, home, cfg); got != reads {
+		t.Errorf("link elsewhere: got %q, want %q", got, reads)
 	}
 }

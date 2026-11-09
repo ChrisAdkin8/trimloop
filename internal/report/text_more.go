@@ -47,7 +47,7 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	}
 	fmt.Fprintf(w, "\n    %-10s %-10s %-10s %s\n", "recorded", "in logs", "gap", "model")
 	for _, m := range c.ByModel {
-		fmt.Fprintf(w, "    %-10s %-10s %-10s %s\n", money(m.Harness), money(m.Ours), money(m.Gap), modelName(m.Model))
+		fmt.Fprintf(w, "    %-10s %-10s %-10s %s\n", money(m.Harness), money(m.Ours), money(m.Gap), printable(modelName(m.Model)))
 	}
 }
 

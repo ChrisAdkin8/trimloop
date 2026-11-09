@@ -191,7 +191,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	}
 	summary = min(summary, after)
 	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after, summary)
-	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, mainSessionsOver(sessions, s.ContextThreshold),
+	if f, ok := fixes.ForCompaction(compactionCounts(sessions, s.ContextThreshold, s.UncompactedLimit),
 		upTo, likely, after, s.MinFixSaving); ok {
 		// The likely saving rests on the size after a compaction, measured
 		// on few compactions: show what its quartiles give.
@@ -386,20 +386,30 @@ func sortActions(r *Results) {
 	})
 }
 
-// mainSessionsOver counts the main sessions with a turn over threshold
-// tokens of context: those the compaction card's replay can change.
-func mainSessionsOver(sessions []event.Session, threshold int) int {
-	n := 0
+// compactionCounts counts, for the compaction card, the main sessions with
+// a priced turn over threshold tokens of context, and those with a priced
+// turn over limit that never compacted: the sessions the card's replay can
+// change (detectors.LikelyCompactionSaving). The growth figures count every
+// session, sub-agents and unpriced turns included, so they can differ.
+func compactionCounts(sessions []event.Session, threshold, limit int) fixes.CompactionCounts {
+	c := fixes.CompactionCounts{Threshold: threshold, Limit: limit}
 	for _, s := range sessions {
 		if s.Kind != event.MainSession {
 			continue
 		}
+		peak, compacted := 0, len(s.Unreplied) > 0
 		for _, t := range s.Turns {
-			if t.Context() > threshold {
-				n++
-				break
+			compacted = compacted || t.CompactedBefore
+			if t.Priced {
+				peak = max(peak, t.Context())
 			}
 		}
+		if peak > threshold {
+			c.Over++
+		}
+		if peak > limit && !compacted {
+			c.Uncompacted++
+		}
 	}
-	return n
+	return c
 }

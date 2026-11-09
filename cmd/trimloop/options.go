@@ -77,10 +77,12 @@ func hasRevision(info *debug.BuildInfo) bool {
 }
 
 // shellArg quotes s for a POSIX shell when it holds anything but letters,
-// digits and / . _ ~ - (a space, say), so a command shown with it can be
-// copied as it is.
+// digits and / . _ ~ - (a space, say), or starts with ~, which the shell
+// would expand to a home folder, so a command shown with it can be copied
+// as it is.
 func shellArg(s string) string {
-	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._~-") == "" {
+	if s != "" && !strings.HasPrefix(s, "~") &&
+		strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._~-") == "" {
 		return s
 	}
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
@@ -197,6 +199,16 @@ func checkOptions(o cliOptions) error {
 		if o.first {
 			return fmt.Errorf(`unknown command %q: run "trimloop" to analyse your logs, or "trimloop setup" to add live nudges to Claude Code`, o.args[0])
 		}
+		switch w := o.args[0]; w {
+		case "setup":
+			return errors.New(`"setup" goes first, with its own options after it: "trimloop setup --help" lists them`)
+		case "statusline", "hook":
+			return fmt.Errorf("%q goes first, with nothing before it; Claude Code runs it for you once 'trimloop setup' has added it", w)
+		case "analyse", "analyze":
+			return fmt.Errorf(`%q goes first, or not at all: "trimloop %s --format text" and "trimloop --format text" do the same`, w, w)
+		case "help":
+			return errors.New(`"help" goes on its own: run "trimloop help"`)
+		}
 		return fmt.Errorf("unexpected %q: options go before it, and trimloop takes no other words", o.args[0])
 	}
 	if !validFormat[o.format] {
@@ -208,7 +220,13 @@ func checkOptions(o cliOptions) error {
 	if o.out == "" {
 		return nil
 	}
-	if err := checkOutFolder(o.out); err != nil {
+	if o.out == discard || toStdout(o.out) {
+		if o.open {
+			return fmt.Errorf("--open opens the page it writes, so --out %s cannot be used with it: give a file name", o.out)
+		}
+		return nil
+	}
+	if err := checkOutFolder(o.out, o.format); err != nil {
 		return err
 	}
 	ext := strings.ToLower(filepath.Ext(o.out))
@@ -235,11 +253,16 @@ func extFor(format string) string {
 	return ".txt"
 }
 
-// checkOutFolder makes sure the report can go to path: its folder exists
-// and path is not itself a folder.
-func checkOutFolder(path string) error {
+// checkOutFolder makes sure a report in format can go to path: its folder
+// exists, and path is not itself a folder or anything else but a file or a
+// link (write replaces those).
+func checkOutFolder(path, format string) error {
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		return fmt.Errorf("--out %s is a folder: give a file name, such as %s", path, filepath.Join(path, defaultHTML))
+		return fmt.Errorf("--out %s is a folder: give a file name, such as %s",
+			path, filepath.Join(path, reportName+extFor(format)))
+	}
+	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() && info.Mode()&fs.ModeSymlink == 0 {
+		return fmt.Errorf("--out %s exists and is not a file: choose another name", path)
 	}
 	dir := filepath.Dir(path)
 	info, err := os.Stat(dir)

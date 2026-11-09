@@ -100,12 +100,15 @@ func wrap(s string, width int) []string {
 	return lines
 }
 
-// printable replaces control characters in s, which comes from logs (shapes
-// are built from commands the agent wrote, tool names from the harness), so
-// that printing it cannot send escape sequences to the user's terminal.
+// printable replaces control characters, format characters (unicode.Cf:
+// bidi overrides, zero-width characters) and invalid UTF-8 in s, which comes
+// from logs (shapes are built from commands the agent wrote, tool names from
+// the harness), so that printing it cannot send escape sequences to the
+// user's terminal or reorder what it shows. The log reader cleans these
+// strings already; this is the second guard.
 func printable(s string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) || r == utf8.RuneError {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || r == utf8.RuneError {
 			return '?'
 		}
 		return r

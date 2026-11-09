@@ -76,8 +76,11 @@ check "go test -race" go test -race ./...
 
 # The end-to-end test's logs and expected answers must be what
 # scripts/gen-golden.py and scripts/recount.py make today: regenerate both
-# into a scratch folder and compare every file but the README
-# (testdata/golden/README.md), so a stray or missing file fails too.
+# into a scratch folder and compare every file git tracks under
+# testdata/golden, and every file the scripts make, but the READMEs
+# (testdata/golden/README.md). So a tracked file the scripts no longer make,
+# or a made file missing from git, fails, but untracked junk such as
+# .DS_Store does not.
 # It runs in a subshell, so its EXIT trap removes the scratch folder however
 # it ends.
 golden_fresh() (
@@ -95,14 +98,39 @@ golden_fresh() (
     echo "$hint"
     return 1
   fi
-  if ! diff -r -x README.md testdata/golden "$tmp" >/dev/null; then
-    diff -rq -x README.md testdata/golden "$tmp" | sed 's/^/  /' || true
+  local tracked made f differ=()
+  if ! tracked="$(git ls-files -- testdata/golden)"; then
+    echo "  git ls-files failed: the golden check needs a git checkout"
+    return 1
+  fi
+  tracked="$(sed 's|^testdata/golden/||' <<<"$tracked" | not_readme | LC_ALL=C sort)"
+  made="$(cd "$tmp" && find . -type f | sed 's|^\./||' | not_readme | LC_ALL=C sort)"
+  while IFS= read -r f; do
+    if [[ -n $f ]]; then
+      differ+=("Only in testdata/golden (tracked, no longer made): $f")
+    fi
+  done < <(LC_ALL=C comm -23 <(printf '%s\n' "$tracked") <(printf '%s\n' "$made"))
+  while IFS= read -r f; do
+    if [[ -n $f ]]; then
+      differ+=("Only in what the scripts make (not tracked by git): $f")
+    fi
+  done < <(LC_ALL=C comm -13 <(printf '%s\n' "$tracked") <(printf '%s\n' "$made"))
+  while IFS= read -r f; do
+    if [[ -n $f ]] && ! cmp -s "testdata/golden/$f" "$tmp/$f"; then
+      differ+=("Files testdata/golden/$f and the made copy differ")
+    fi
+  done < <(LC_ALL=C comm -12 <(printf '%s\n' "$tracked") <(printf '%s\n' "$made"))
+  if ((${#differ[@]})); then
+    printf '  %s\n' "${differ[@]}"
     echo "  testdata/golden differs from what its scripts make"
     echo "$hint"
     status=1
   fi
   return "$status"
 )
+
+# not_readme drops README.md files from a list of paths, one per line.
+not_readme() { grep -v -e '^README\.md$' -e '/README\.md$' || true; }
 
 if command -v python3 >/dev/null 2>&1; then
   check "golden drift" golden_fresh

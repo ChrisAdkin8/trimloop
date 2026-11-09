@@ -2,6 +2,7 @@ package live
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ChrisAdkin8/trimloop/internal/history"
 )
 
 // The events trimloop hooks into, and the argument each hook command takes.
@@ -224,12 +227,11 @@ func decodeSettings(path string, b []byte) (map[string]any, error) {
 // file or its "hooks" are not shaped as Claude Code expects, or when
 // anything follows the settings object. A settings file that is a link is
 // followed: the file it points to is updated, keeping its permissions. Other
-// values keep their exact text; only key order may change. It returns the
-// backup's path ("" if none) and whether the file was written.
+// values keep their exact text; only key order may change. The backup goes
+// in ~/.trimloop/backups (see writeBackup). It returns the backup's path
+// ("" if none) and whether the file was written.
 func WriteSettings(path, exe string, replace bool) (backup string, changed bool, err error) {
-	if target, err := filepath.EvalSymlinks(path); err == nil {
-		path = target
-	}
+	path = linkTarget(path)
 	cfg := map[string]any{}
 	mode := fs.FileMode(0o600)
 	old, err := os.ReadFile(path)
@@ -309,7 +311,7 @@ func WriteSettings(path, exe string, replace bool) (backup string, changed bool,
 		return "", false, err
 	}
 	if old != nil {
-		if backup, err = writeBackup(path, old, mode); err != nil {
+		if backup, err = writeBackup(path, old); err != nil {
 			return "", false, err
 		}
 	}
@@ -377,13 +379,32 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// writeBackup copies data to a new backup file next to path, never
-// replacing an earlier backup.
-func writeBackup(path string, data []byte, mode fs.FileMode) (string, error) {
-	base := fmt.Sprintf("%s.trimloop-backup-%s", path, time.Now().Format("20060102-150405"))
+// writeBackup copies data, the settings file at path as it was, to a new
+// file in ~/.trimloop/backups, never replacing an earlier backup. Settings
+// can hold secrets (API keys in "env", an "apiKeyHelper"), so the backup is
+// readable by the user only (0600, in a 0700 folder), and it is not put next
+// to the settings file, which may be a link into a dotfiles repository. Its
+// name says which file it copies and when: settings.json-<id>.trimloop-
+// backup-<time>, where id is a hash of the file's path, so backups of the
+// settings in different configuration folders stay apart.
+func writeBackup(path string, data []byte) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot back up %s: %w; nothing was written", path, err)
+	}
+	dir := history.PathFor(home, "", "backups", "") // ~/.trimloop/backups
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("cannot back up %s: %w; nothing was written", path, err)
+	}
+	if abs, err := filepath.Abs(path); err == nil {
+		path = abs
+	}
+	sum := sha256.Sum256([]byte(filepath.Clean(path)))
+	base := filepath.Join(dir, fmt.Sprintf("%s-%x.trimloop-backup-%s",
+		filepath.Base(path), sum[:4], time.Now().Format("20060102-150405")))
 	name := base
 	for i := 2; ; i++ {
-		f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+		f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if errors.Is(err, fs.ErrExist) {
 			name = fmt.Sprintf("%s-%d", base, i)
 			continue
@@ -393,6 +414,7 @@ func writeBackup(path string, data []byte, mode fs.FileMode) (string, error) {
 		}
 		if _, err := f.Write(data); err != nil {
 			_ = f.Close()
+			_ = os.Remove(name)
 			return "", err
 		}
 		return name, f.Close()
@@ -422,4 +444,25 @@ func writeAtomic(path string, data []byte, mode fs.FileMode) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// linkTarget is the file a settings path stands for: the file a link points
+// to, followed through every link, even when that file does not exist yet
+// (a dotfiles link made before the file), so writing it never replaces the
+// link with a plain file. Any other path is returned as it is.
+func linkTarget(path string) string {
+	for range 40 { // links to links, but not a loop
+		if target, err := filepath.EvalSymlinks(path); err == nil {
+			return target
+		}
+		dest, err := os.Readlink(path)
+		if err != nil {
+			return path // not a link: a plain file, or none yet
+		}
+		if !filepath.IsAbs(dest) {
+			dest = filepath.Join(filepath.Dir(path), dest)
+		}
+		path = dest
+	}
+	return path
 }

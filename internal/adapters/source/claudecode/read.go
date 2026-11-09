@@ -180,6 +180,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 	if err := json.Unmarshal(line, &rec); err != nil {
 		return source.Message{}, false, err
 	}
+	rec.clean()
 	// A timestamp that is missing or in an unexpected format leaves Time
 	// zero rather than failing the line: the rest is still worth counting.
 	var ts time.Time
@@ -206,7 +207,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			ID:        rec.Message.ID,
 			SessionID: rec.SessionID,
 			Time:      ts,
-			Project:   projectOf(rec.Cwd),
+			Project:   cleanFolder(projectOf(rec.Cwd)),
 			Model:     rec.Message.Model,
 			Usage:     replyUsage(u.Usage, u.Iterations),
 			Fast:      u.Speed == "fast",
@@ -259,10 +260,12 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			m.Record.Start = time.UnixMilli(startMs).UTC()
 		}
 		for model, u := range rec.ModelUsage {
-			m.Record.ByModel[model] = event.ModelRecord{
+			// Two ids that clean to the same one are added together.
+			model = clean(model)
+			m.Record.ByModel[model] = m.Record.ByModel[model].Add(event.ModelRecord{
 				Cost: u.CostUSD, InputUncached: u.InputTokens, CacheRead: u.CacheReadInputTokens,
 				CacheWrite: u.CacheCreationInputTokens, Output: u.OutputTokens, WebSearches: u.WebSearchRequests,
-			}
+			})
 		}
 		return m, true, nil
 
@@ -279,6 +282,17 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return m, true, nil
 	}
 	return source.Message{}, false, nil
+}
+
+// clean removes control and format characters from the record's
+// human-readable fields (see clean). The working folder is left as logged:
+// file identities are hashed from it, and the project folder is cleaned
+// apart (cleanFolder).
+func (rec *record) clean() {
+	rec.AITitle, rec.CustomTitle = clean(rec.AITitle), clean(rec.CustomTitle)
+	rec.Effort, rec.Message.Model = clean(rec.Effort), clean(rec.Message.Model)
+	rec.AttributionSkill, rec.AttributionPlugin = clean(rec.AttributionSkill), clean(rec.AttributionPlugin)
+	rec.AttributionMcpServer, rec.AttributionAgent = clean(rec.AttributionMcpServer), clean(rec.AttributionAgent)
 }
 
 // blocks decodes a content list. Content that is a plain string, or a list in
@@ -304,11 +318,12 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 		}
 		var in input
 		_ = json.Unmarshal(b.Input, &in) // lenient: other argument types leave in empty
+		b.Name = clean(b.Name)
 		c := event.ToolCall{ID: b.ID, Tool: b.Name, InputBytes: len(b.Input)}
 		switch {
 		case b.Name == "Bash":
 			s := cmdshape.Parse(in.Command)
-			c.Shape, c.Noise, c.Filtered = s.String(), s.Noise, s.Filtered
+			c.Shape, c.Noise, c.Filtered = clean(s.String()), s.Noise, s.Filtered
 			if s.File != "" {
 				c.File, c.FileOp = fileKey(s.File, cwd), event.FileView
 				c.Part = partKey(s.Part)
@@ -466,7 +481,7 @@ func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 			st.SystemBytes += len(p)
 		}
 		for _, t := range snap.Tools {
-			st.Tools = append(st.Tools, event.ToolDef{Name: t.Name, Bytes: len(t.Name) + len(t.Description) + len(t.Schema)})
+			st.Tools = append(st.Tools, event.ToolDef{Name: clean(t.Name), Bytes: len(t.Name) + len(t.Description) + len(t.Schema)})
 		}
 		if st.Bytes() == 0 {
 			return source.Message{}, false, nil
@@ -487,10 +502,10 @@ func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 	case a.Type == "mcp_instructions_delta" && len(a.AddedNames) > 0 && len(a.AddedNames) == len(a.AddedBlocks):
 		// One piece per server, so each can be sorted by who can change it.
 		for i, name := range a.AddedNames {
-			pieces = append(pieces, event.Injected{Kind: a.Type, Name: name, Bytes: len(a.AddedBlocks[i])})
+			pieces = append(pieces, event.Injected{Kind: a.Type, Name: clean(name), Bytes: len(a.AddedBlocks[i])})
 		}
 	default:
-		pieces = []event.Injected{{Kind: a.Type, Bytes: size}}
+		pieces = []event.Injected{{Kind: clean(a.Type), Bytes: size}}
 	}
 	return source.Message{Kind: source.KindInjected, SessionID: rec.SessionID, Time: ts, Injected: pieces, LineID: rec.UUID}, true, nil
 }
@@ -521,9 +536,9 @@ func renderedSize(raw json.RawMessage) int {
 func memoryName(f memFile) string {
 	name := filepath.Base(f.Path)
 	if f.Type != "" {
-		return f.Type + " " + name
+		name = f.Type + " " + name
 	}
-	return name
+	return clean(name)
 }
 
 // replyUsage normalises a reply's usage. When the top level is all zero but

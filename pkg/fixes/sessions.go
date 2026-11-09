@@ -59,21 +59,30 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 	}, true
 }
 
+// CompactionCounts are the sessions the compaction card names: main
+// sessions with a priced turn, the ones its replay can change.
+type CompactionCounts struct {
+	Threshold   int // the context size, in tokens, at which to compact
+	Over        int // sessions with a priced turn past Threshold
+	Limit       int // the size past which a session that never compacted is named
+	Uncompacted int // sessions with a priced turn past Limit and no compaction
+}
+
 // ForCompaction recommends compacting earlier when sessions grew past the
 // limit without compacting (P19's fix, with P10's records; ADR 0031), or
-// returns false if compacting would save less than minCost. threshold is the context
-// size, in tokens, at which to compact, and over the number of main sessions
-// that passed it; likely and upTo come from detectors.LikelyCompactionSaving,
-// and after is the size it assumed.
-func ForCompaction(g detectors.Growth, threshold, over int, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
+// returns false if compacting would save less than minCost. likely and upTo
+// come from detectors.LikelyCompactionSaving, and after is the size it
+// assumed.
+func ForCompaction(c CompactionCounts, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
 	if upTo < minCost {
 		return Recommendation{}, false
 	}
+	threshold := c.Threshold
 	finding := fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
 		"%s passed %s tokens; Claude Code compacts on its own only near the limit.",
-		plural(over, "session"), thousandsInt(threshold))
-	if g.Uncompacted > 0 {
-		finding += fmt.Sprintf(" %s went past %s tokens without compacting at all.", plural(g.Uncompacted, "session"), thousandsInt(g.Limit))
+		plural(c.Over, "session"), thousandsInt(threshold))
+	if c.Uncompacted > 0 {
+		finding += fmt.Sprintf(" %s went past %s tokens without compacting at all.", plural(c.Uncompacted, "session"), thousandsInt(c.Limit))
 	}
 	return Recommendation{
 		Pattern:   "P19",

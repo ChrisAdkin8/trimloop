@@ -124,7 +124,9 @@ trimloop --format json --out ~/trimloop.json   # every figure, for scripts
 
 It reads the logs in `~/.claude/projects` and sends nothing anywhere. The
 web page is saved as `trimloop-report.html` in the current folder;
-`--out` puts it elsewhere.
+`--out` puts it elsewhere (`--out -` prints it instead). Writing replaces
+the file; a link at that path is replaced, not followed. `trimloop help`
+lists every option.
 
 ### Did a change work?
 
@@ -203,10 +205,11 @@ trimloop setup --check                              # is everything set up and w
 With `CLAUDE_CONFIG_DIR` set, Claude Code's settings file is
 `settings.json` in that folder: `trimloop setup` names the right one.
 
-`setup --write` saves a backup of your settings first and says how to put
-it back. If you already have another status line, it changes nothing at
-all, hooks included: add `--replace-statusline` to replace yours, or add
-the hooks by hand from what `trimloop setup` prints. `setup --check`
+`setup --write` saves a backup of your settings in `~/.trimloop/backups`
+first and says how to put it back. If you already have another status
+line, it changes nothing at all, hooks included: add `--replace-statusline`
+to replace yours, or add just the hooks by hand from the snippet it (and
+`setup --check`) then prints, appending to any hooks you already have. `setup --check`
 changes nothing. New Claude Code sessions pick up the change. To undo,
 copy the backup back, or delete trimloop's `statusLine` and `hooks`
 entries. Details:
@@ -223,6 +226,7 @@ Everything stays on your machine, readable by you only:
 | `~/.trimloop/live/<session>.json` | Which nudges a session has been shown |
 | `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
 | `~/.trimloop/limits.jsonl` (or `limits-<id>.jsonl`) | Pro and Max only: how much of your 5-hour and weekly limits was used, each time it changed |
+| `~/.trimloop/backups/settings.json-<id>.trimloop-backup-<time>` | A copy of your Claude Code settings from before each `setup --write` that changed them; it can hold API keys from those settings. Delete old ones when you no longer need them |
 
 ## The plan
 

@@ -85,11 +85,11 @@ func TestForSubAgents(t *testing.T) {
 }
 
 func TestForCompaction(t *testing.T) {
-	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 2, 7, 3, 30_000, 1)
+	r, ok := ForCompaction(CompactionCounts{Threshold: 200_000, Over: 2, Limit: 500_000}, 7, 3, 30_000, 1)
 	if !ok || r.Saving != 7 || r.Likely != 3 || r.Expected() != 7 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
-	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 2, 0.5, 0.2, 30_000, 1); ok {
+	if _, ok := ForCompaction(CompactionCounts{Threshold: 200_000, Over: 2, Limit: 500_000}, 0.5, 0.2, 30_000, 1); ok {
 		t.Error("a saving under the minimum should give no recommendation")
 	}
 	// The finding counts the sessions that passed where to compact, and
@@ -97,7 +97,7 @@ func TestForCompaction(t *testing.T) {
 	if !strings.Contains(r.Finding, "2 sessions passed 200,000 tokens") || strings.Contains(r.Finding, "without compacting") {
 		t.Errorf("finding: %q", r.Finding)
 	}
-	r, _ = ForCompaction(detectors.Growth{Uncompacted: 1, Limit: 500_000}, 200_000, 3, 7, 3, 30_000, 1)
+	r, _ = ForCompaction(CompactionCounts{Threshold: 200_000, Over: 3, Limit: 500_000, Uncompacted: 1}, 7, 3, 30_000, 1)
 	if !strings.Contains(r.Finding, "3 sessions passed 200,000 tokens") || !strings.Contains(r.Finding, "1 session went past 500,000 tokens without compacting") {
 		t.Errorf("finding: %q", r.Finding)
 	}

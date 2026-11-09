@@ -1,12 +1,34 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/ChrisAdkin8/trimloop/internal/live"
 )
+
+// TestMain points HOME at a scratch folder for every test in the package,
+// so nothing a test runs (setup's backups in ~/.trimloop/backups, say) can
+// write into the real home folder.
+func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "trimloop-test-home-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	for _, v := range []string{"HOME", "USERPROFILE"} { // USERPROFILE on Windows
+		if err := os.Setenv(v, home); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	code := m.Run()
+	_ = os.RemoveAll(home)
+	os.Exit(code)
+}
 
 // TestRunNudgeSwallowsPanics checks that a panic in the status line or a
 // hook prints nothing and does not escape: Go would exit with code 2, which

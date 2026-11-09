@@ -24,7 +24,7 @@ func toolInputLine(w io.Writer, r Results) {
 	}
 	var top []string
 	for _, g := range ti.ByTool[:min(3, len(ti.ByTool))] {
-		top = append(top, fmt.Sprintf("%s %s", toolLabel(g.Name, r.HideIDs), dollars(g.Carried)))
+		top = append(top, fmt.Sprintf("%s %s", printable(toolLabel(g.Name, r.HideIDs)), dollars(g.Carried)))
 	}
 	fmt.Fprintf(w, "  What Claude wrote in its tool calls (commands, scripts, file contents) also stays in the\n")
 	fmt.Fprintf(w, "  session: %s to carry (%.0f%% of spend; %s). Compacting clears it too.\n",

@@ -25,5 +25,5 @@ func AgentType(logPath string) string {
 	if json.Unmarshal(b, &meta) != nil || len(meta.AgentType) > 128 {
 		return ""
 	}
-	return meta.AgentType
+	return clean(meta.AgentType)
 }

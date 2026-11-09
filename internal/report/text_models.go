@@ -49,13 +49,13 @@ func mainModelSection(w io.Writer, m detectors.MainModels, recs []fixes.Recommen
 	for _, g := range m.ByModel {
 		newer, tier := "", ""
 		if g.Newer != "" {
-			newer = modelName(g.Newer)
+			newer = printable(modelName(g.Newer))
 		}
 		if g.Tier != "" {
-			tier = modelName(g.Tier)
+			tier = printable(modelName(g.Tier))
 		}
 		fmt.Fprintf(w, "    %-10s %5.1f%% %8s  %-18s %10s  %-18s %10s\n", dollars(g.Cost), pct(g.Cost, all), thousands(g.Turns),
-			modelName(g.Model), orDash(newer, g.NewerSave), tier, orDash(tier, g.TierSave))
+			printable(modelName(g.Model)), orDash(newer, g.NewerSave), tier, orDash(tier, g.TierSave))
 	}
 	for _, rec := range recs {
 		fmt.Fprintf(w, "\n  %s: %s\n", rec.Title, savingText(rec, all))
@@ -76,7 +76,7 @@ func effortSection(w io.Writer, e detectors.Effort, rec *fixes.Recommendation, a
 	}
 	fmt.Fprintf(w, "    %-10s %8s %10s %12s %16s\n", "level", "turns", "spend", "output cost", perTurn)
 	for _, g := range e.ByLevel {
-		level := g.Level
+		level := printable(g.Level)
 		if level == "" {
 			level = "not logged"
 		}
