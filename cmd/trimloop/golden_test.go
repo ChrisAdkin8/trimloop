@@ -3,12 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
+	_ "time/tzdata" // the zones below, wherever the test runs
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
@@ -21,9 +25,15 @@ import (
 // them (expected.json). See testdata/golden/README.md.
 var goldenDir = filepath.Join("..", "..", "testdata", "golden")
 
-// centTolerance is how far a dollar figure may differ from the recount's:
-// half a cent. Counts must match exactly.
-const centTolerance = 0.005
+// tolerance is how far a dollar figure may differ from the recount's, in
+// dollars: the two sides add the same products in different orders, so they
+// agree to about 1e-9. Counts must match exactly.
+const tolerance = 1e-6
+
+// goldenZones are the time zones the test runs the report in. Weeks are
+// calendar weeks in the report's zone (the CLI uses local time), so the
+// recount works them out in each (expected.json "zones").
+var goldenZones = []string{"UTC", "America/Los_Angeles", "Asia/Kolkata", "Pacific/Auckland"}
 
 // tally is a count of turns and their cost.
 type tally struct {
@@ -31,24 +41,28 @@ type tally struct {
 	Cost  float64 `json:"cost"`
 }
 
-// golden is expected.json: the recount's figures.
-type golden struct {
-	TZ          string             `json:"tz"`
-	Prices      string             `json:"prices"`
-	ReadRaw     map[string]int     `json:"read"`
-	Tokens      map[string]int     `json:"tokens"`
-	Cost        map[string]float64 `json:"cost"`
-	Total       float64            `json:"total"`
-	ByModel     map[string]tally   `json:"by_model"`
-	MainByModel map[string]tally   `json:"main_by_model"`
-	SubAgents   struct {
-		Runs    int              `json:"runs"`
-		Turns   int              `json:"turns"`
-		Cost    float64          `json:"cost"`
-		ByModel map[string]tally `json:"by_model"`
-	} `json:"sub_agents"`
-	Sessions map[string]tally `json:"sessions"`
-	Weeks    map[string]struct {
+// rates are one tier of a model's prices in the recount's table, in US
+// dollars per million tokens.
+type rates struct {
+	Input        float64 `json:"input"`
+	CacheWrite5m float64 `json:"cache_write_5m"`
+	CacheWrite1h float64 `json:"cache_write_1h"`
+	CacheRead    float64 `json:"cache_read"`
+	Output       float64 `json:"output"`
+}
+
+// modelRates is one model in the recount's price table.
+type modelRates struct {
+	Rates     rates   `json:"rates"`
+	LongAbove int     `json:"long_above"`
+	Long      *rates  `json:"long"`
+	Fast      float64 `json:"fast"`
+	USOnly    float64 `json:"us_only"`
+}
+
+// zoneFigures are the figures that depend on the time zone.
+type zoneFigures struct {
+	Weeks map[string]struct {
 		Spend       float64 `json:"spend"`
 		Turns       int     `json:"turns"`
 		Compactions int     `json:"compactions"`
@@ -57,6 +71,29 @@ type golden struct {
 		Days    int     `json:"days"`
 		PerWeek float64 `json:"per_week"`
 	} `json:"period"`
+}
+
+// golden is expected.json: the recount's figures.
+type golden struct {
+	Rates       map[string]modelRates  `json:"rates"`
+	Zones       map[string]zoneFigures `json:"zones"`
+	ReadRaw     map[string]int         `json:"read"`
+	Tokens      map[string]int         `json:"tokens"`
+	Cost        map[string]float64     `json:"cost"`
+	Total       float64                `json:"total"`
+	MainByModel map[string]tally       `json:"main_by_model"`
+	SubAgents   struct {
+		Runs   int     `json:"runs"`
+		Turns  int     `json:"turns"`
+		Cost   float64 `json:"cost"`
+		ByType map[string]struct {
+			Runs  int     `json:"runs"`
+			Turns int     `json:"turns"`
+			Cost  float64 `json:"cost"`
+			Model string  `json:"model"`
+		} `json:"by_type"`
+	} `json:"sub_agents"`
+	Sessions    map[string]tally `json:"sessions"`
 	Compactions struct {
 		Total  int `json:"total"`
 		Manual int `json:"manual"`
@@ -124,8 +161,15 @@ func (f figures) count(name string, got, want int) {
 
 func (f figures) dollars(name string, got, want float64) {
 	f.t.Helper()
-	if math.Abs(got-want) > centTolerance {
-		f.t.Errorf("%s: trimloop $%.4f, recount $%.4f (differs by $%.4f)", name, got, want, got-want)
+	if math.Abs(got-want) > tolerance {
+		f.t.Errorf("%s: trimloop $%.9f, recount $%.9f (differs by $%.9f)", name, got, want, got-want)
+	}
+}
+
+func (f figures) text(name, got, want string) {
+	f.t.Helper()
+	if got != want {
+		f.t.Errorf("%s: trimloop %q, recount %q", name, got, want)
 	}
 }
 
@@ -147,19 +191,11 @@ func mapKeys[V any](m map[string]V) []string {
 	return out
 }
 
-// modelKey groups a model id as the catalogue resolves it; an unknown id
-// stays as written.
-func modelKey(model string) string {
-	if k, ok := price.Key(model); ok {
-		return k
-	}
-	return model
-}
-
 // TestGolden runs trimloop on the golden logs and compares every figure
-// with expected.json, which scripts/recount.py worked out independently. A
-// failure names the figure: decide from docs/measurements.md which side is
-// right before changing either (testdata/golden/README.md).
+// with expected.json, which scripts/recount.py worked out independently, in
+// each of goldenZones. A failure names the figure: decide from
+// docs/measurements.md which side is right before changing either
+// (testdata/golden/README.md).
 func TestGolden(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join(goldenDir, "expected.json"))
 	if err != nil {
@@ -169,18 +205,70 @@ func TestGolden(t *testing.T) {
 	if err := json.Unmarshal(b, &want); err != nil {
 		t.Fatal(err)
 	}
-	if want.TZ != "UTC" {
-		t.Fatalf("expected.json was made with --tz %s; the test runs in UTC", want.TZ)
+	if !t.Run("prices", func(t *testing.T) { comparePrices(t, want.Rates) }) {
+		return // every cost would differ: fix the price table first
 	}
-	if want.Prices != price.Version {
-		t.Fatalf("expected.json was priced with %s, the catalogue is now %s: update RATES in scripts/recount.py "+
-			"and regenerate expected.json (testdata/golden/README.md)", want.Prices, price.Version)
+	figures{t}.keys("zones", mapKeys(want.Zones), append([]string(nil), goldenZones...))
+	for _, zone := range goldenZones {
+		t.Run(zone, func(t *testing.T) {
+			loc, err := time.LoadLocation(zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compareReport(t, want, want.Zones[zone], loc)
+		})
 	}
+}
 
+// comparePrices checks the recount's price table against pkg/price's
+// catalogue, model by model, so that a price change in either is noticed
+// even when the version string is not changed.
+func comparePrices(t *testing.T, want map[string]modelRates) {
+	const fix = "update RATES, LONG, FAST or NO_US_SURCHARGE in scripts/recount.py to match pkg/price " +
+		"and regenerate expected.json (testdata/golden/README.md)"
+	tier := func(r price.Rates) rates {
+		return rates{r.Input, r.CacheWrite5m, r.CacheWrite1h, r.CacheRead, r.Output}
+	}
+	cat := price.Catalogue()
+	for _, id := range slices.Sorted(maps.Keys(cat)) {
+		m := cat[id]
+		w, ok := want[id]
+		if !ok {
+			t.Errorf("%s is in the catalogue but not in the recount's price table: %s", id, fix)
+			continue
+		}
+		var long *rates
+		if m.LongAbove > 0 {
+			l := tier(m.Long)
+			long = &l
+		}
+		got := modelRates{Rates: tier(m.Rates), LongAbove: m.LongAbove, Long: long, Fast: m.Fast, USOnly: m.USOnly}
+		if !reflect.DeepEqual(got, w) {
+			t.Errorf("%s: the catalogue has %s, the recount %s: %s", id, describe(got), describe(w), fix)
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(want)) {
+		if _, ok := cat[id]; !ok {
+			t.Errorf("%s is in the recount's price table but not in the catalogue: %s", id, fix)
+		}
+	}
+}
+
+func describe(m modelRates) string {
+	s := fmt.Sprintf("%+v, fast x%g, US-only x%g", m.Rates, m.Fast, m.USOnly)
+	if m.Long != nil {
+		s += fmt.Sprintf(", above %d tokens %+v", m.LongAbove, *m.Long)
+	}
+	return s
+}
+
+// compareReport runs the report in time zone loc, as the CLI does in local
+// time, and compares its figures with the recount's.
+func compareReport(t *testing.T, want golden, zone zoneFigures, loc *time.Location) {
 	sessions, read := goldenSessions(t)
 	settings := report.DefaultSettings()
-	settings.Location = time.UTC // weeks are calendar weeks in UTC, as in the recount
-	settings.TopGroups = 1000    // every project, not only the largest ten
+	settings.Location = loc   // weeks are calendar weeks in this zone, as in the recount
+	settings.TopGroups = 1000 // every project, not only the largest ten
 	r := report.Analyse(sessions, read, settings, time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC))
 	f := figures{t}
 
@@ -190,23 +278,17 @@ func TestGolden(t *testing.T) {
 	f.count("read.turns", r.Read.Turns, want.ReadRaw["turns"])
 	f.count("read.unpriced", r.Read.Unpriced, want.ReadRaw["unpriced"])
 
+	// Tokens and spend per session are not in the report: add them up from
+	// the sessions the report was given.
 	var tok event.Usage
-	byModel, subByModel := map[string]tally{}, map[string]tally{}
 	perSession := map[string]tally{}
 	for _, s := range sessions {
 		for _, tn := range s.Turns {
 			tok = tok.Add(tn.Usage)
-			add := func(m map[string]tally, k string) {
-				x := m[k]
-				x.Turns++
-				x.Cost += tn.Cost.Total()
-				m[k] = x
-			}
-			add(byModel, modelKey(tn.Model))
-			add(perSession, s.ID)
-			if s.Kind == event.SubAgentSession {
-				add(subByModel, modelKey(tn.Model))
-			}
+			x := perSession[s.ID]
+			x.Turns++
+			x.Cost += tn.Cost.Total()
+			perSession[s.ID] = x
 		}
 	}
 	f.count("tokens.input_uncached", tok.InputUncached, want.Tokens["input_uncached"])
@@ -231,8 +313,11 @@ func TestGolden(t *testing.T) {
 			f.dollars(name+"."+k+".cost", g.Cost, w.Cost)
 		}
 	}
-	compareTallies("by_model", byModel, want.ByModel)
 	compareTallies("sessions", perSession, want.Sessions)
+
+	// P13's tables, as trimloop reports them: main-session spend by model
+	// and sub-agent spend by agent type, with the model that cost each
+	// type most. Both group a model's ids under its catalogue name.
 	mainByModel := map[string]tally{}
 	for _, m := range r.MainModels.ByModel {
 		mainByModel[m.Model] = tally{Turns: m.Turns, Cost: m.Cost}
@@ -241,19 +326,29 @@ func TestGolden(t *testing.T) {
 	f.count("sub_agents.runs", r.SubAgents.Runs, want.SubAgents.Runs)
 	f.count("sub_agents.turns", r.SubAgents.Turns, want.SubAgents.Turns)
 	f.dollars("sub_agents.cost", r.SubAgents.Cost, want.SubAgents.Cost)
-	compareTallies("sub_agents.by_model", subByModel, want.SubAgents.ByModel)
+	types := map[string]bool{}
+	for _, g := range r.SubAgents.ByType {
+		types[g.Type] = true
+		e := want.SubAgents.ByType[g.Type]
+		name := "sub_agents.by_type." + g.Type
+		f.count(name+".runs", g.Runs, e.Runs)
+		f.count(name+".turns", g.Turns, e.Turns)
+		f.dollars(name+".cost", g.Cost, e.Cost)
+		f.text(name+".model", g.Model, e.Model)
+	}
+	f.keys("sub_agents.by_type", mapKeys(types), mapKeys(want.SubAgents.ByType))
 
 	weeks := map[string]bool{}
 	for _, w := range r.Weeks {
 		weeks[w.Week] = true
-		e := want.Weeks[w.Week]
+		e := zone.Weeks[w.Week]
 		f.dollars("weeks."+w.Week+".spend", w.Spend, e.Spend)
 		f.count("weeks."+w.Week+".turns", w.Turns, e.Turns)
 		f.count("weeks."+w.Week+".compactions", w.Compactions, e.Compactions)
 	}
-	f.keys("weeks", mapKeys(weeks), mapKeys(want.Weeks))
-	f.count("period.days", r.Period.Days, want.Period.Days)
-	f.dollars("period.per_week", r.Period.PerWeek, want.Period.PerWeek)
+	f.keys("weeks", mapKeys(weeks), mapKeys(zone.Weeks))
+	f.count("period.days", r.Period.Days, zone.Period.Days)
+	f.dollars("period.per_week", r.Period.PerWeek, zone.Period.PerWeek)
 
 	f.count("compactions.total", r.Growth.Compactions, want.Compactions.Total)
 	f.count("compactions.manual", r.Growth.Manual, want.Compactions.Manual)

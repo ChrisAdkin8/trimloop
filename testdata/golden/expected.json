@@ -1,56 +1,14 @@
 {
- "by_model": {
-  "claude-fable-5": {
-   "cost": 0.151669,
-   "turns": 1
-  },
-  "claude-fable-5-1": {
-   "cost": 9.507875875,
-   "turns": 10
-  },
-  "claude-haiku-4-5-20251001": {
-   "cost": 0.0393561,
-   "turns": 3
-  },
-  "claude-haiku-5-5": {
-   "cost": 0.27226909,
-   "turns": 9
-  },
-  "claude-nova-1": {
-   "cost": 0.0,
-   "turns": 1
-  },
-  "claude-opus-4-8": {
-   "cost": 0.5701355,
-   "turns": 5
-  },
-  "claude-opus-5": {
-   "cost": 0.5378925,
-   "turns": 2
-  },
-  "claude-opus-5-5": {
-   "cost": 4.3325332,
-   "turns": 21
-  },
-  "claude-sonnet-5": {
-   "cost": 0.2516054,
-   "turns": 4
-  },
-  "claude-sonnet-5-5": {
-   "cost": 0.3574067,
-   "turns": 12
-  }
- },
  "compactions": {
   "manual": 2,
   "total": 4
  },
  "cost": {
-  "cache_read": 0.603632765,
+  "cache_read": 0.633607065,
   "cache_write_1h": 14.05912,
-  "cache_write_5m": 0.70614,
-  "input_uncached": 0.0012806,
-  "output": 0.65057
+  "cache_write_5m": 1.061725,
+  "input_uncached": 0.0013686,
+  "output": 0.67519
  },
  "main_by_model": {
   "claude-fable-5": {
@@ -60,6 +18,10 @@
   "claude-fable-5-1": {
    "cost": 9.507875875,
    "turns": 10
+  },
+  "claude-haiku-4-5": {
+   "cost": 0.2814019,
+   "turns": 4
   },
   "claude-haiku-5-5": {
    "cost": 0.1430666,
@@ -92,11 +54,6 @@
   "sessions": 4,
   "turns": 6
  },
- "period": {
-  "days": 25,
-  "per_week": 4.485808142
- },
- "prices": "anthropic-list-2026-11-09",
  "projects": {
   "beta": {
    "conversations": 2,
@@ -122,6 +79,12 @@
    "sub_agent_cost": 0.0,
    "turns": 6
   },
+  "eta": {
+   "conversations": 1,
+   "cost": 0.3566644,
+   "sub_agent_cost": 0.0752625,
+   "turns": 7
+  },
   "feat": {
    "conversations": 1,
    "cost": 0.009939,
@@ -134,11 +97,23 @@
    "sub_agent_cost": 0.0,
    "turns": 2
   },
+  "iota": {
+   "conversations": 1,
+   "cost": 0.0173174,
+   "sub_agent_cost": 0.0173174,
+   "turns": 1
+  },
   "sub": {
    "conversations": 1,
    "cost": 0.00089434,
    "sub_agent_cost": 0.00089434,
    "turns": 1
+  },
+  "theta": {
+   "conversations": 1,
+   "cost": 0.0362855,
+   "sub_agent_cost": 0.0362855,
+   "turns": 2
   },
   "tools": {
    "conversations": 1,
@@ -159,11 +134,214 @@
    "turns": 7
   }
  },
+ "rates": {
+  "claude-fable-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 1,
+    "cache_write_1h": 20,
+    "cache_write_5m": 12.5,
+    "input": 10,
+    "output": 50
+   },
+   "us_only": 1.1
+  },
+  "claude-fable-5-1": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.25,
+    "cache_write_1h": 20,
+    "cache_write_5m": 12.5,
+    "input": 10,
+    "output": 50
+   },
+   "us_only": 1.1
+  },
+  "claude-haiku-4-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.1,
+    "cache_write_1h": 2,
+    "cache_write_5m": 1.25,
+    "input": 1,
+    "output": 5
+   },
+   "us_only": 0
+  },
+  "claude-haiku-4-5-20251001": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.1,
+    "cache_write_1h": 2,
+    "cache_write_5m": 1.25,
+    "input": 1,
+    "output": 5
+   },
+   "us_only": 0
+  },
+  "claude-haiku-5-5": {
+   "fast": 0,
+   "long": {
+    "cache_read": 0.05,
+    "cache_write_1h": 1,
+    "cache_write_5m": 0.625,
+    "input": 0.5,
+    "output": 2.5
+   },
+   "long_above": 100000,
+   "rates": {
+    "cache_read": 0.01,
+    "cache_write_1h": 0.2,
+    "cache_write_5m": 0.125,
+    "input": 0.1,
+    "output": 0.5
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-4-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 0
+  },
+  "claude-opus-4-6": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-4-7": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-4-8": {
+   "fast": 2,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-5": {
+   "fast": 2,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-5-5": {
+   "fast": 2,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.2,
+    "cache_write_1h": 8,
+    "cache_write_5m": 5,
+    "input": 4,
+    "output": 20
+   },
+   "us_only": 1.1
+  },
+  "claude-sonnet-4-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.3,
+    "cache_write_1h": 6,
+    "cache_write_5m": 3.75,
+    "input": 3,
+    "output": 15
+   },
+   "us_only": 0
+  },
+  "claude-sonnet-4-6": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.3,
+    "cache_write_1h": 6,
+    "cache_write_5m": 3.75,
+    "input": 3,
+    "output": 15
+   },
+   "us_only": 1.1
+  },
+  "claude-sonnet-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.2,
+    "cache_write_1h": 4,
+    "cache_write_5m": 2.5,
+    "input": 2,
+    "output": 10
+   },
+   "us_only": 1.1
+  },
+  "claude-sonnet-5-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.1,
+    "cache_write_1h": 4,
+    "cache_write_5m": 2.5,
+    "input": 2,
+    "output": 10
+   },
+   "us_only": 1.1
+  }
+ },
  "read": {
   "bad_lines": 0,
-  "logs": 13,
-  "sessions": 12,
-  "turns": 68,
+  "logs": 16,
+  "sessions": 15,
+  "turns": 78,
   "unpriced": 2
  },
  "reconciliation": {
@@ -174,8 +352,8 @@
   "ours": 4.97754779,
   "sessions": 4,
   "unpriced": 1,
-  "unrecorded": 2,
-  "unrecorded_cost": 0.7501384
+  "unrecorded": 4,
+  "unrecorded_cost": 1.1604057
  },
  "sessions": {
   "alpha-1": {
@@ -218,6 +396,18 @@
    "cost": 0.2150458,
    "turns": 3
   },
+  "eta-1": {
+   "cost": 0.2814019,
+   "turns": 4
+  },
+  "eta-1/agent-e1plan01": {
+   "cost": 0.0752625,
+   "turns": 3
+  },
+  "theta-1/agent-t1orphan01": {
+   "cost": 0.0536029,
+   "turns": 3
+  },
   "work-alpha-1": {
    "cost": 0.6895615,
    "turns": 4
@@ -228,57 +418,156 @@
   }
  },
  "sub_agents": {
-  "by_model": {
-   "claude-haiku-4-5-20251001": {
-    "cost": 0.0393561,
-    "turns": 3
+  "by_type": {
+   "Explore": {
+    "cost": 0.2293921,
+    "model": "claude-opus-5-5",
+    "runs": 2,
+    "turns": 7
    },
-   "claude-haiku-5-5": {
+   "Plan": {
+    "cost": 0.1146186,
+    "model": "claude-haiku-4-5",
+    "runs": 2,
+    "turns": 6
+   },
+   "general-purpose": {
     "cost": 0.12920249,
+    "model": "claude-haiku-5-5",
+    "runs": 1,
     "turns": 5
    },
-   "claude-opus-5-5": {
-    "cost": 0.1757892,
-    "turns": 4
-   },
-   "claude-sonnet-5-5": {
+   "unknown": {
     "cost": 0.0605769,
+    "model": "claude-sonnet-5-5",
+    "runs": 1,
     "turns": 3
    }
   },
-  "cost": 0.40492469,
-  "runs": 4,
-  "turns": 15
+  "cost": 0.53379009,
+  "runs": 6,
+  "turns": 21
  },
  "tokens": {
-  "cache_read": 2990001,
+  "cache_read": 3289744,
   "cache_write_1h": 1035015,
-  "cache_write_5m": 658306,
-  "input_uncached": 392,
-  "output": 29433
+  "cache_write_5m": 909774,
+  "input_uncached": 456,
+  "output": 33070
  },
- "total": 16.020743365,
- "tz": "UTC",
- "weeks": {
-  "2026-10-12": {
-   "compactions": 2,
-   "spend": 13.625363275,
-   "turns": 28
+ "total": 16.431010665,
+ "zones": {
+  "America/Los_Angeles": {
+   "period": {
+    "days": 25,
+    "per_week": 4.600682986
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 1,
+     "spend": 1.28712929,
+     "turns": 26
+    },
+    "2026-10-26": {
+     "compactions": 0,
+     "spend": 0.1141798,
+     "turns": 6
+    },
+    "2026-11-02": {
+     "compactions": 1,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
   },
-  "2026-10-19": {
-   "compactions": 1,
-   "spend": 1.09536179,
-   "turns": 24
+  "Asia/Kolkata": {
+   "period": {
+    "days": 25,
+    "per_week": 4.600682986
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 1,
+     "spend": 0.71699379,
+     "turns": 20
+    },
+    "2026-10-26": {
+     "compactions": 0,
+     "spend": 0.6843153,
+     "turns": 12
+    },
+    "2026-11-02": {
+     "compactions": 1,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
   },
-  "2026-10-26": {
-   "compactions": 0,
-   "spend": 0.2523444,
-   "turns": 5
+  "Pacific/Auckland": {
+   "period": {
+    "days": 25,
+    "per_week": 4.600682986
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 1,
+     "spend": 0.71699379,
+     "turns": 20
+    },
+    "2026-10-26": {
+     "compactions": 0,
+     "spend": 0.6843153,
+     "turns": 12
+    },
+    "2026-11-02": {
+     "compactions": 1,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
   },
-  "2026-11-02": {
-   "compactions": 1,
-   "spend": 1.0476739,
-   "turns": 11
+  "UTC": {
+   "period": {
+    "days": 25,
+    "per_week": 4.600682986
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 1,
+     "spend": 1.09536179,
+     "turns": 24
+    },
+    "2026-10-26": {
+     "compactions": 0,
+     "spend": 0.3059473,
+     "turns": 8
+    },
+    "2026-11-02": {
+     "compactions": 1,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
   }
  }
 }

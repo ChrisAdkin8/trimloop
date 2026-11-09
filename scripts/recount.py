@@ -2,7 +2,7 @@
 """Recount trimloop's headline figures from Claude Code logs, independently.
 
     python3 -I scripts/recount.py <CLAUDE_CONFIG_DIR> [--json out.json]
-        [--compare trimloop.json] [--tz UTC] [--tolerance 0.005]
+        [--compare trimloop.json] [--tz ZONE[,ZONE...]] [--tolerance 1e-6]
 
 This is a second implementation of docs/measurements.md, written from the
 documents and the log format, not from the Go code. It exists so that
@@ -14,13 +14,20 @@ Keep it independent: when a figure differs, decide from the documents (the
 measurements page, the ADRs it cites, docs/data-model.md) which side is
 right, and fix only the side that is wrong. Do not copy Go logic here.
 
+Weeks are calendar weeks in a time zone, so the figures are worked out once
+per zone in --tz (by default the four in ZONES): the output holds the
+figures that do not depend on the zone at the top level, and each zone's
+weeks and period under "zones". It also holds the price table used
+("rates"), which the Go test compares with pkg/price's catalogue.
+
 --compare reads `trimloop --no-history --format json` output and prints each
-figure beside this script's, exiting 1 if any differs by more than
---tolerance dollars (counts must match exactly). Run trimloop with the same
-time zone as --tz (TZ=UTC), since weeks are calendar weeks in local time.
+figure beside this script's for the first zone in --tz, exiting 1 if any
+differs by more than --tolerance dollars (counts must match exactly). Run
+trimloop in that zone (TZ=UTC for --tz UTC), since trimloop's weeks are
+calendar weeks in local time.
 
 Standard library only. The price table below copies pkg/price/price.go's
-catalogue (version RATES_VERSION): update it whenever the catalogue changes.
+catalogue: update it whenever the catalogue changes (the Go test says so).
 """
 
 import argparse
@@ -35,8 +42,6 @@ from datetime import datetime, timedelta, timezone
 # ---------------------------------------------------------------------------
 # Prices: US dollars per million tokens, as (input, 5m write, 1h write, cache
 # read, output). Copied from pkg/price/price.go; keep in step with it.
-
-RATES_VERSION = "anthropic-list-2026-11-09"
 
 RATES = {
     "claude-opus-5-5": (4, 5, 8, 0.20, 20),
@@ -71,7 +76,8 @@ NO_US_SURCHARGE = {
 US_SURCHARGE = 1.1
 
 CLASSES = ("input_uncached", "cache_read", "cache_write_5m", "cache_write_1h", "output")
-THRESHOLD = 200_000  # P19
+THRESHOLD = 200_000  # P19: a turn counts when its context is over this
+ZONES = ("UTC", "America/Los_Angeles", "Asia/Kolkata", "Pacific/Auckland")
 STALE = timedelta(minutes=10)  # reconciliation: ADR 0033, 0035
 BYTES_PER_TOKEN = 4
 SYNTHETIC = "<synthetic>"
@@ -99,6 +105,36 @@ def resolve(model):
     if len(m) > 9 and m[-9] in "-@" and m[-8:].isdigit():
         m = m[:-9]
     return m if m in RATES else None
+
+
+def group(model):
+    """The name turns on a model are grouped under (measurements.md, P13
+    row): the catalogue model its id resolves to, so a provider or dated id
+    is the same row as the plain id (a dated key the catalogue also holds
+    without its date goes under the plain one); an unknown id as written."""
+    key = resolve(model)
+    if key is None:
+        return model
+    if len(key) > 9 and key[-9] == "-" and key[-8:].isdigit() and key[:-9] in RATES:
+        return key[:-9]
+    return key
+
+
+def rate_table():
+    """The prices this script uses, model by model, for the Go test to
+    compare with pkg/price's catalogue."""
+    names = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output")
+    out = {}
+    for key, r in RATES.items():
+        long_above, long = LONG.get(key, (0, None))
+        out[key] = {
+            "rates": dict(zip(names, r)),
+            "long_above": long_above,
+            "long": dict(zip(names, long)) if long else None,
+            "fast": FAST.get(key, 0),
+            "us_only": 0 if key in NO_US_SURCHARGE else US_SURCHARGE,
+        }
+    return out
 
 
 def price(model, tok, fast, us):
@@ -205,6 +241,7 @@ class Log:
         self.compactions = []  # (line uuid, trigger, time)
         self.records = []  # (startTime, totalCostUSD, unknown, date of the last reply before it)
         self.first_cwd = None
+        self.agent_type = None  # the harness's attributionAgent, else meta.json
         self.times = []
         self.bad = 0
         self.read()
@@ -267,6 +304,8 @@ class Log:
                         or f"line:{o.get('uuid') or self.path + ':' + str(n)}"
                     )
                     tok = reply_tokens(u)
+                    if self.agent_type is None and o.get("attributionAgent"):
+                        self.agent_type = o["attributionAgent"]
                     prev = self.replies.get(mid)
                     if prev is None:
                         self.replies[mid] = dict(
@@ -284,6 +323,12 @@ class Log:
                         prev["tok"] = tok  # the fullest line of a streamed reply counts
                     if t and (last_reply is None or t > last_reply):
                         last_reply = t
+        if self.sub and self.agent_type is None:
+            try:
+                with open(self.path[: -len(".jsonl")] + ".meta.json") as f:
+                    self.agent_type = json.load(f).get("agentType") or None
+            except (OSError, ValueError, AttributeError):
+                pass
 
     def span(self):
         return (min(self.times), max(self.times)) if self.times else (None, None)
@@ -367,7 +412,7 @@ def recount(cfg, tz):
             turns.append(r)
     with_turns = {r["log"].id: r["log"] for r in turns}
 
-    R = {"tz": getattr(tz, "key", None) or str(tz), "prices": RATES_VERSION}
+    R = {}
     R["read"] = {
         "logs": len(logs),
         "bad_lines": sum(log.bad for log in logs),
@@ -381,30 +426,38 @@ def recount(cfg, tz):
     R["cost"] = dict(zip(CLASSES, cost))
     R["total"] = sum(cost)
 
-    # By model, grouped by the catalogue model an id names (an unknown id as
-    # written). by_model has every turn; main_by_model is P13's table of
-    # main-session turns, which prices turns again on another model, so
+    # By model, grouped by the catalogue model an id names (group). P13's
+    # table of main-session turns prices turns again on another model, so
     # it holds priced turns only.
-    by_model = defaultdict(lambda: {"turns": 0, "cost": 0.0})
     main_models = defaultdict(lambda: {"turns": 0, "cost": 0.0})
-    sub_models = defaultdict(lambda: {"turns": 0, "cost": 0.0})
     for r in turns:
-        key = resolve(r["model"]) or r["model"]
-        groups = [by_model]
-        if r["log"].sub:
-            groups.append(sub_models)
-        elif r["priced"]:
-            groups.append(main_models)
-        for group in groups:
-            group[key]["turns"] += 1
-            group[key]["cost"] += r["total"]
-    R["by_model"] = dict(sorted(by_model.items()))
+        if not r["log"].sub and r["priced"] and r["model"]:
+            main_models[group(r["model"])]["turns"] += 1
+            main_models[group(r["model"])]["cost"] += r["total"]
     R["main_by_model"] = dict(sorted(main_models.items()))
+
+    # Sub-agents (P13) by agent type: runs, turns, spend, and the model
+    # that cost the type most (by group; on a tie, the first name).
+    by_type = defaultdict(
+        lambda: {"runs": 0, "turns": 0, "cost": 0.0, "models": defaultdict(float)}
+    )
+    for log in with_turns.values():
+        if log.sub:
+            by_type[log.agent_type or "unknown"]["runs"] += 1
+    for r in turns:
+        if r["log"].sub:
+            g = by_type[r["log"].agent_type or "unknown"]
+            g["turns"] += 1
+            g["cost"] += r["total"]
+            g["models"][group(r["model"])] += r["total"]
+    for g in by_type.values():
+        models = g.pop("models")
+        g["model"] = min(models, key=lambda m: (-models[m], m)) if models else ""
     R["sub_agents"] = {
         "runs": sum(1 for log in with_turns.values() if log.sub),
         "turns": sum(1 for r in turns if r["log"].sub),
         "cost": sum(r["total"] for r in turns if r["log"].sub),
-        "by_model": dict(sorted(sub_models.items())),
+        "by_type": dict(sorted(by_type.items())),
     }
     per_session = defaultdict(lambda: {"turns": 0, "cost": 0.0})
     for r in turns:
@@ -419,10 +472,12 @@ def recount(cfg, tz):
             w["spend"] += r["total"]
             w["turns"] += 1
 
-    # Period: whole 24-hour spans from the first line to the last, plus one.
-    first = min(t for log in logs for t in log.times[:1])
-    last = max(t for log in logs for t in log.times[-1:])
-    days = int((last - first).total_seconds() // 86400) + 1
+    # Period: whole 24-hour spans from the first counted reply to the last,
+    # plus one. Lines that are not replies (prompts, titles) do not count.
+    times = [r["time"] for r in turns if r["time"]]
+    days = 0
+    if times:
+        days = int((max(times) - min(times)).total_seconds() // 86400) + 1
     R["period"] = {
         "days": days,
         "per_week": R["total"] / (days / 7) if days >= 7 else 0.0,
@@ -445,6 +500,7 @@ def recount(cfg, tz):
     # 200k as removed history, placed just after the fixed start and priced
     # by where they sit in the request: read, written, or uncached.
     p19 = {"turns": 0, "sessions": set(), "cost": 0.0, "saving": 0.0}
+    # Over 200k means more than 200,000: a turn of exactly 200,000 does not count.
     for r in turns:
         u, rd, w5, w1, _ = r["tok"]
         ctx = u + rd + w5 + w1
@@ -594,6 +650,9 @@ def theirs(T):
     sa = T.get("p13_sub_agents", {})
     for k in ("runs", "turns", "cost"):
         out[f"sub_agents.{k}"] = sa.get(k)
+    for g in sa.get("by_type") or []:
+        for k in ("runs", "turns", "cost", "model"):
+            out[f"sub_agents.by_type.{g['type']}.{k}"] = g.get(k)
     for w in T.get("weeks") or []:
         out[f"weeks.{w['week']}.spend"] = w.get("spend")
         out[f"weeks.{w['week']}.turns"] = w.get("turns")
@@ -638,6 +697,9 @@ def ours(R):
         out[f"main_by_model.{m}.cost"] = v["cost"]
     for k in ("runs", "turns", "cost"):
         out[f"sub_agents.{k}"] = R["sub_agents"][k]
+    for typ, v in R["sub_agents"]["by_type"].items():
+        for k in ("runs", "turns", "cost", "model"):
+            out[f"sub_agents.by_type.{typ}.{k}"] = v[k]
     for w, v in R["weeks"].items():
         out[f"weeks.{w}.spend"] = v["spend"]
         out[f"weeks.{w}.turns"] = v["turns"]
@@ -678,7 +740,7 @@ def compare(R, T, tol):
         print(f"{k:<{width}}  {fx:>14}  {fy:>14}{'' if ok else '   <-- differs'}")
     print(
         f"\n{bad} difference(s) above ${tol} (counts exact). Not in trimloop's JSON, so not compared: "
-        "tokens, by_model (all turns), sub_agents.by_model, sessions."
+        "tokens, sessions."
     )
     return bad
 
@@ -692,6 +754,30 @@ def rounded(v):
     return v
 
 
+def zone(name):
+    if name == "UTC":
+        return timezone.utc
+    from zoneinfo import ZoneInfo
+
+    return ZoneInfo(name)
+
+
+def by_zone(cfg, zones):
+    """The figures in each zone: those that do not depend on it once, at the
+    top level, and each zone's weeks and period under "zones"."""
+    out, per = None, {}
+    for name in zones:
+        R = recount(cfg, zone(name))
+        per[name] = {"weeks": R.pop("weeks"), "period": R.pop("period")}
+        if out is None:
+            out = R
+        elif rounded(R) != rounded(out):
+            sys.exit(f"recount: figures other than weeks and period differ in {name}")
+    out["zones"] = per
+    out["rates"] = rate_table()
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Recount trimloop's figures from Claude Code logs, independently."
@@ -703,35 +789,34 @@ def main():
     ap.add_argument(
         "--compare",
         metavar="FILE",
-        help="trimloop --format json output to compare with",
+        help="trimloop --format json output to compare with (in the first zone)",
     )
     ap.add_argument(
         "--tz",
-        default="UTC",
-        help="time zone for calendar weeks (IANA name; default UTC)",
+        default=",".join(ZONES),
+        help="time zones for calendar weeks, IANA names separated by commas "
+        f"(default {','.join(ZONES)})",
     )
     ap.add_argument(
         "--tolerance",
         type=float,
-        default=0.005,
-        help="dollars a figure may differ by (0.005)",
+        default=1e-6,
+        help="dollars a figure may differ by (1e-6)",
     )
     a = ap.parse_args()
-    if a.tz == "UTC":
-        tz = timezone.utc
-    else:
-        from zoneinfo import ZoneInfo
-
-        tz = ZoneInfo(a.tz)
-    R = recount(a.config_dir, tz)
+    zones = [z.strip() for z in a.tz.split(",") if z.strip()]
+    if not zones:
+        ap.error("--tz names no zone")
+    if a.compare:
+        R = recount(a.config_dir, zone(zones[0]))
+        with open(a.compare) as f:
+            sys.exit(1 if compare(R, json.load(f), a.tolerance) else 0)
+    R = by_zone(a.config_dir, zones)
     if a.json:
         with open(a.json, "w", newline="\n") as f:
             json.dump(rounded(R), f, indent=1, sort_keys=True)
             f.write("\n")
-    if a.compare:
-        with open(a.compare) as f:
-            sys.exit(1 if compare(R, json.load(f), a.tolerance) else 0)
-    if not a.json:
+    else:
         json.dump(rounded(R), sys.stdout, indent=1, sort_keys=True)
         print()
 

@@ -6,6 +6,7 @@
 package price
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 
@@ -72,6 +73,14 @@ var catalogue = map[string]Model{
 	"claude-sonnet-4-5":         {Rates: Rates{3, 3.75, 6, 0.30, 15}},
 	"claude-haiku-4-5-20251001": {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 	"claude-haiku-4-5":          {Rates: Rates{1, 1.25, 2, 0.10, 5}},
+}
+
+// Catalogue returns a copy of the catalogue, by model id, for checks that
+// compare it with another copy of the price list (the end-to-end test in
+// cmd/trimloop compares it with scripts/recount.py's). Changing the copy
+// changes nothing here.
+func Catalogue() map[string]Model {
+	return maps.Clone(catalogue)
 }
 
 // Key returns the catalogue key a model id resolves to, and false if the

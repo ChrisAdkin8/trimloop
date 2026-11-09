@@ -50,7 +50,42 @@ def at(s):
     return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
 
 
-WORDS = ["alpha", "beta", "gamma", "delta", "parse", "build", "check", "order", "queue", "cache", "table", "row", "column", "value", "field", "index", "token", "buffer", "stream", "render", "layout", "report", "widget", "handler", "config", "option", "flag", "module", "package", "import", "export", "return", "error", "result"]
+WORDS = [
+    "alpha",
+    "beta",
+    "gamma",
+    "delta",
+    "parse",
+    "build",
+    "check",
+    "order",
+    "queue",
+    "cache",
+    "table",
+    "row",
+    "column",
+    "value",
+    "field",
+    "index",
+    "token",
+    "buffer",
+    "stream",
+    "render",
+    "layout",
+    "report",
+    "widget",
+    "handler",
+    "config",
+    "option",
+    "flag",
+    "module",
+    "package",
+    "import",
+    "export",
+    "return",
+    "error",
+    "result",
+]
 
 
 def filler(n):
@@ -375,7 +410,10 @@ class Log:
     def write(self):
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with open(self.path, "w", newline="\n") as f:
-            f.writelines(json.dumps(d, separators=(",", ":"), ensure_ascii=False) + "\n" for d in self.lines)
+            f.writelines(
+                json.dumps(d, separators=(",", ":"), ensure_ascii=False) + "\n"
+                for d in self.lines
+            )
         if self.meta:
             with open(self.meta[0], "w", newline="\n") as f:
                 f.write(json.dumps(self.meta[1], separators=(",", ":")) + "\n")
@@ -424,7 +462,9 @@ def alpha_1(root):
                 cwd=cwd,
                 tool="sed -n '1,80p' web/app.js" if cwd else None,
             )
-    t += timedelta(minutes=70)  # a long pause: past the hour's cache, so the context is written again
+    t += timedelta(
+        minutes=70
+    )  # a long pause: past the hour's cache, so the context is written again
     s.prompt(t - timedelta(seconds=30))
     s.reply(t, "claude-opus-5-5", usage(read=0, w1=s.ctx + 2_000, unc=4, out=500))
     s.ctx += 2_504
@@ -788,6 +828,70 @@ def epsilon_2(root):
     s.write()
 
 
+def theta_orphan(root):
+    """A sub-agent whose main session's log is gone and which moves: from its
+    own start folder (theta) to an unrelated folder (iota), then into a
+    subfolder of its start folder (theta/sub). With no main log, its own
+    first folder stands in for the conversation's (ADR 0053), so the
+    subfolder's turn counts as theta and the unrelated one as iota."""
+    th = "/home/dev/theta"
+    a = Log(root, th, "theta-1", th, agent="t1orphan01", agent_type="Explore")
+    a.life = "5m"
+    t = at("2026-10-29 11:00")
+    a.prompt(t)
+    for new, cwd in ((8_000, None), (5_000, "/home/dev/iota"), (4_000, th + "/sub")):
+        t += timedelta(minutes=1, seconds=rng.randint(0, 40))
+        a.grow(t, "claude-sonnet-5-5", new, out=rng.randint(150, 400), cwd=cwd)
+    a.write()
+
+
+def eta_1(root):
+    """Haiku 4.5 as the main model under two ids, the plain claude-haiku-4-5
+    and a Bedrock id with US-only inference (no surcharge on Haiku 4.5): one
+    model in the tables. A turn of exactly 200,000 tokens of context, which
+    is not over 200k. A prompt two days after the last reply, the last line
+    of all the logs: the period ends at the last reply, not the last line.
+    One Plan sub-agent on plain Haiku 4.5 and Sonnet 5.5: grouped by model,
+    Haiku 4.5 (both ids, with beta-1's Plan run) costs the Plan type more
+    than Sonnet 5.5; counted id by id, Sonnet 5.5 would cost the most."""
+    e = "/home/dev/eta"
+    bedrock = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+    s = Log(root, e, "eta-1", e)
+    s.life = "5m"
+    t = at("2026-11-05 15:00")
+    s.prompt(t)
+    t += timedelta(seconds=5)
+    s.grow(t, "claude-haiku-4-5", 30_000, out=400)
+    t += timedelta(minutes=2)
+    s.grow(t, bedrock, 45_000, out=500, geo="us")
+    t += timedelta(minutes=2)
+    s.grow(t, "claude-haiku-4-5", 60_000, out=600)
+    t += timedelta(minutes=2)
+    # Exactly 200,000 tokens of context: at the threshold, not over it.
+    unc = 7
+    s.reply(
+        t,
+        bedrock,
+        usage(read=s.ctx, w5=200_000 - s.ctx - unc, unc=unc, out=300, geo="us"),
+    )
+    s.ctx = 200_300
+    s.prompt(t + timedelta(days=2))  # no reply followed: outside the period
+    s.write()
+
+    a = Log(root, e, "eta-1", e, agent="e1plan01", agent_type="Plan")
+    a.life = "5m"
+    t = at("2026-11-05 15:03")
+    a.prompt(t)
+    for model, new, out in (
+        ("claude-haiku-4-5", 14_000, 300),
+        ("claude-haiku-4-5", 6_000, 250),
+        ("claude-sonnet-5-5", 16_000, 400),
+    ):
+        t += timedelta(seconds=40)
+        a.grow(t, model, new, out=out)
+    a.write()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     here = os.path.dirname(os.path.abspath(__file__))
@@ -808,6 +912,8 @@ def main():
         work_alpha_1,
         epsilon_1,
         epsilon_2,
+        theta_orphan,
+        eta_1,
     ):
         build(root)
     print("wrote", os.path.join(root, "projects"))
