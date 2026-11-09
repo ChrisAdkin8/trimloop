@@ -69,7 +69,7 @@ type Message struct {
 	// resumed or forked session copies earlier lines with their ids, so the
 	// caller counts injected text and compactions once per LineID.
 	LineID  string
-	Project string // name of the project folder the line was logged in; "" if not known
+	Project string // the project folder the line was logged in (a worktree's project); "" if not known
 
 	// KindTurn: a model response that carries usage.
 	ID        string // provider message id; usage is counted once per id

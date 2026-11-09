@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -246,8 +247,8 @@ func TestToolFixture(t *testing.T) {
 	if c := s.Turns[5].Compaction; !s.Turns[5].CompactedBefore || !c.Manual || c.Before != 12_000 || c.After != 2_000 {
 		t.Errorf("the last turn should follow a manual compaction from 12k to 2k tokens; got %+v", c)
 	}
-	if s.Project != "repo" || s.Turns[0].Project != "repo" {
-		t.Errorf("project: got %q, want repo (from the cwd)", s.Project)
+	if s.Project != "/repo" || s.Turns[0].Project != "/repo" {
+		t.Errorf("project: got %q, want /repo (from the cwd; named later, across sessions)", s.Project)
 	}
 
 	f := detectors.FindToolOutput([]event.Session{s}, 500, 10)
@@ -643,5 +644,72 @@ func TestBuildSessionFirstTurnAfterRefusals(t *testing.T) {
 	}
 	if s.Turns[1].IdleBefore != time.Hour {
 		t.Errorf("idle before the second turn: got %v", s.Turns[1].IdleBefore)
+	}
+}
+
+// A turn is credited to its session's project when it runs in a subfolder
+// of it or a folder above it, and to another project only when it runs
+// somewhere else.
+func TestProjectFor(t *testing.T) {
+	home := "/code/api"
+	for dir, want := range map[string]string{
+		"":                  home,
+		"/code/api":         home,
+		"/code/api/cmd/x":   home,
+		"/code":             home, // cd ..
+		"/code/api-tools":   "/code/api-tools",
+		"/elsewhere/notes":  "/elsewhere/notes",
+		"/code/web/sub/api": "/code/web/sub/api",
+	} {
+		if got := projectFor(dir, home); got != want {
+			t.Errorf("projectFor(%q) = %q, want %q", dir, got, want)
+		}
+	}
+	if got := projectFor("/code/api", ""); got != "" {
+		t.Errorf("no home yet: got %q, want \"\" (the session's first turn sets it)", got)
+	}
+}
+
+// Two projects with the same folder name are told apart by their parent
+// folders; others keep their own name.
+func TestNameProjects(t *testing.T) {
+	sessions := []event.Session{
+		{Project: "/work/api", Turns: []event.Turn{{Project: "/work/api"}, {Project: "/work/notes"}}},
+		{Project: "/home/me/api", Turns: []event.Turn{{Project: "/home/me/api"}}},
+		{Project: "/a/x/web", Turns: []event.Turn{{Project: "/b/x/web"}, {Project: ""}}},
+		{Project: ""},
+	}
+	nameProjects(sessions)
+	got := []string{sessions[0].Project, sessions[0].Turns[1].Project, sessions[1].Project,
+		sessions[2].Project, sessions[2].Turns[0].Project, sessions[2].Turns[1].Project, sessions[3].Project}
+	want := []string{"work/api", "notes", "me/api", "a/x/web", "b/x/web", "", ""}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// A session that moves into a subfolder stays one project; the reader's
+// folders become short names only after all sessions are read.
+func TestSessionProjectAcrossSubfolders(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "s1.jsonl")
+	lines := `{"type":"assistant","sessionId":"s1","cwd":"/code/api","timestamp":"2026-11-01T09:00:00Z","message":{"id":"m1","model":"claude-opus-5-5","usage":{"output_tokens":1}}}
+{"type":"assistant","sessionId":"s1","cwd":"/code/api/web","timestamp":"2026-11-01T09:01:00Z","message":{"id":"m2","model":"claude-opus-5-5","usage":{"output_tokens":1}}}
+{"type":"assistant","sessionId":"s1","cwd":"/code","timestamp":"2026-11-01T09:02:00Z","message":{"id":"m3","model":"claude-opus-5-5","usage":{"output_tokens":1}}}
+`
+	if err := os.WriteFile(path, []byte(lines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l := source.Log{Path: path}
+	s, _, err := readSession(cc, &l, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessions := []event.Session{s}
+	nameProjects(sessions)
+	for _, turn := range sessions[0].Turns {
+		if turn.Project != "api" {
+			t.Errorf("turn %s: got project %q, want api", turn.ID, turn.Project)
+		}
 	}
 }

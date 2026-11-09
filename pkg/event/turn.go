@@ -23,8 +23,9 @@ type Turn struct {
 	USOnly bool   // US-only inference, which changes the price
 	Effort string // effort level requested; "" if not recorded
 
-	// Project is the name of the project folder the turn ran in; "" if not
-	// known. A session can move between projects.
+	// Project is the name of the project the turn ran in; "" if not known.
+	// It is the session's project unless the turn ran in a folder outside
+	// it (not a subfolder), so a session can move between projects.
 	Project string
 
 	// Attribution is what the harness says caused the turn, if anything.

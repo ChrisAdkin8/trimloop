@@ -149,18 +149,31 @@ func addTo(g *Group, cc callCost, saving float64) {
 // never sent, cost nothing.
 func carry(s event.Session) []callCost {
 	var out []callCost
-	viewed := map[string]bool{} // files viewed, unchanged, since the last compaction
-	walkCarried(s, func() { viewed = map[string]bool{} },
+	// viewed holds, for each file viewed and unchanged since the last
+	// compaction, the parts of it viewed ("" is the whole file).
+	viewed := map[string]map[string]bool{}
+	walkCarried(s, func() { viewed = map[string]map[string]bool{} },
 		func(c event.ToolCall) (int, bool) { return c.Result.Tokens(), c.HasResult },
 		func(t event.Turn, c event.ToolCall, cost float64) func(float64) {
 			cc := callCost{call: c, carried: cost, at: t.Time}
 			switch {
 			case c.File == "":
 			case c.FileOp == event.FileView:
-				cc.reread = viewed[c.File]
-				viewed[c.File] = true
+				// A call that also writes files may have changed this one
+				// before viewing it: its view is not counted as a re-read.
+				cc.reread = viewed[c.File][c.Part] && len(c.Writes) == 0 && !c.WritesUnknown
+				if viewed[c.File] == nil {
+					viewed[c.File] = map[string]bool{}
+				}
+				viewed[c.File][c.Part] = true
 			case c.FileOp == event.FileEdit:
 				delete(viewed, c.File)
+			}
+			for _, w := range c.Writes {
+				delete(viewed, w)
+			}
+			if c.WritesUnknown {
+				clear(viewed)
 			}
 			out = append(out, cc)
 			k := len(out) - 1

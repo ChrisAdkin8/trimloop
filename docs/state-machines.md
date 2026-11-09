@@ -74,19 +74,25 @@ is in one `EntryState`:
 | State | Meaning | `setup --write` | `setup --check` |
 |---|---|---|---|
 | `Missing` | not there | adds it | "missing" |
-| `Current` | runs this trimloop (however its path is quoted), with today's timeout | leaves it | "up to date" |
-| `Stale` | runs a program named `trimloop` from another path, or with an old timeout | updates it | "out of date" |
-| `Other` | a status line that is not trimloop's | refuses, unless `--replace-statusline` | "another program's" |
+| `Current` | runs this trimloop (however its path is quoted), with today's hook timeout or status-line `type` and `refreshInterval` | leaves it | "up to date" |
+| `Stale` | runs a program named `trimloop` from another path, or with an old or missing timeout, `type` or `refreshInterval` | updates trimloop's keys, keeping the user's others (such as `padding`) | "out of date" |
+| `Other` | a status line that is not trimloop's | refuses, unless `--replace-statusline`, which replaces it whole | "another program's" |
 
 A command is trimloop's only when its program is named exactly `trimloop`;
 `trimloop-wrapper` is someone else's. `setup --check` exits 0 when all three
-are `Current`, 1 otherwise, and also says whether usage-limit readings are
-arriving. Tests: `TestIsTrimloop`, `TestCheckSettingsStates`,
-`TestWriteSettings*`, `TestCheckSetup`.
+are `Current` and the file does not set `"disableAllHooks": true` (which
+stops Claude Code running any hook or status line; `--check` says so), 1
+otherwise, and also says whether usage-limit readings are arriving. Both
+`--write` and `--check` refuse a file with anything after its settings
+object. `--write` reports when nothing changed. Tests: `TestIsTrimloop`,
+`TestCheckSettings*`, `TestSettingsTrailingData`, `TestWriteSettings*`,
+`TestCheckSetup*`, `TestWriteSetup`.
 
-Known edges, left alone: replacing a status line drops its other keys (for
-example `padding`); duplicate trimloop hooks are updated, not removed; there
-is no `--remove`; each changing write leaves a backup file.
+Known edges, left alone: replacing another program's status line drops its
+other keys (the backup keeps them); duplicate trimloop hooks are updated, not
+removed; there is no `--remove`; each changing write leaves a backup file;
+`disableAllHooks` is read from the one settings file checked, not from
+managed or project settings.
 
 ## 4. Size and pause nudges per session (explicit)
 
@@ -179,7 +185,7 @@ replaced or rotated file is noticed.
 | P02 short waits (`cache_life.go`) | the session's cache lifetime from its latest write (the cache clock); whether it ever wrote for 5 minutes or an hour; from its first hour write on (for the hour-against-5-minutes range) | Three questions on purpose, all from one rule, `Usage.WriteLife` (the hour if any write was for the hour, else 5 minutes, else none), which the status line's countdown also uses. "Wholly on the 5-minute cache" means it never wrote for an hour, by design (ADR 0045 rule 7) |
 | P09 long breaks, weekly `userBreak` (`long_pause.go`) | nothing but the turn's idle time and who ended it | P02 counts waits of 5 minutes to an hour; P09 waits longer than its gap setting, an hour by default, and the card names the gap it used |
 | Compaction replay (`likely.go`) | how much a simulated compaction has removed so far | Reset by a real compaction, and by a fall of more than half with no marker (`TestLikelyCompactionResetsOnAnUnmarkedDrop`) |
-| Carried tool calls (`tool_output.go` `walkCarried`) | what each turn's tool calls left in the session, cleared by a compaction | One walk for tool output (`carry`, which also remembers files viewed since their last change and forgets them at a compaction) and tool inputs (`FindToolInputs`). It tells its users of each compaction, so per-user state resets with it (`TestWalkCarriedReportsCompactions`) |
+| Carried tool calls (`tool_output.go` `walkCarried`) | what each turn's tool calls left in the session, cleared by a compaction | One walk for tool output (`carry`, which also remembers the parts of files viewed since their last change, forgets a file when a call edits or writes it, forgets them all when a call may change files it does not name, and forgets them all at a compaction; `TestRereadsPagesAndShellWrites`) and tool inputs (`FindToolInputs`). It tells its users of each compaction, so per-user state resets with it (`TestWalkCarriedReportsCompactions`) |
 | Carried text (`standing.go`) | the text Claude Code added, still in the session | Priced like tool calls (ADR 0045 rule 4), but text arriving on a compaction turn is new and priced as such, so it keeps its own walk |
 | Weekly figures (`weekly.go`) | the week of each turn | |
 | Reconciliation (`reconcile.go`) | per main session: recorded, unpriced, behind, or compared | Decided by the order of its checks |

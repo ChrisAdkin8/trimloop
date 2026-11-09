@@ -93,16 +93,26 @@ func setup(args []string, home string) int {
 		fmt.Println(live.SetupSnippet(exe))
 		return 0
 	}
-	backup, err := live.WriteSettings(*write, exe, *replace)
+	return writeSetup(os.Stdout, os.Stderr, *write, exe, *replace)
+}
+
+// writeSetup adds the nudges to a settings file for 'trimloop setup --write'
+// and says what it did.
+func writeSetup(stdout, stderr io.Writer, path, exe string, replace bool) int {
+	backup, changed, err := live.WriteSettings(path, exe, replace)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	fmt.Printf("Added trimloop's status line and hooks to %s.\n", *write)
-	if backup != "" {
-		fmt.Printf("The previous file is saved as %s.\n", backup)
+	if !changed {
+		fmt.Fprintf(stdout, "trimloop's status line and hooks in %s are already up to date; nothing changed.\n", path)
+		return 0
 	}
-	fmt.Println("They take effect in new Claude Code sessions.")
+	fmt.Fprintf(stdout, "Added trimloop's status line and hooks to %s.\n", path)
+	if backup != "" {
+		fmt.Fprintf(stdout, "The previous file is saved as %s.\n", backup)
+	}
+	fmt.Fprintln(stdout, "They take effect in new Claude Code sessions.")
 	return 0
 }
 
@@ -209,6 +219,7 @@ func analyse() {
 		}
 	}
 	inheritProjects(sessions)
+	nameProjects(sessions)
 	read := report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines}
 	if !since.IsZero() {
 		// Weekly figures from part of the logs would replace fuller stored
@@ -533,7 +544,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Fast:            m.Fast,
 				Effort:          m.Effort,
 				USOnly:          m.USOnly,
-				Project:         m.Project,
+				Project:         projectFor(m.Project, s.Project),
 				Attribution:     m.Attribution,
 				CompactedBefore: h.compaction != nil,
 				Prompted:        h.prompted,
@@ -544,7 +555,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				t.Compaction = *h.compaction
 			}
 			if s.Project == "" {
-				s.Project = m.Project
+				s.Project, t.Project = m.Project, m.Project
 			}
 			if s.Kind == event.SubAgentSession && s.AgentType == "" {
 				s.AgentType = m.Attribution.Agent
@@ -650,6 +661,76 @@ func inheritProjects(sessions []event.Session) {
 			}
 		}
 	}
+}
+
+// projectFor returns the project folder to credit a turn that ran in dir to,
+// in a session whose project folder is home: home when dir is home, a
+// folder inside it, or a folder above it (a cd into a subfolder or up to
+// the parent is still the same work); dir when it is somewhere else.
+func projectFor(dir, home string) string {
+	if dir == "" || home == "" || within(dir, home) || within(home, dir) {
+		return home
+	}
+	return dir
+}
+
+// within reports whether path is dir or inside it.
+func within(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// nameProjects replaces the project folders of sessions and turns with short
+// names: the folder's own name, or, where two folders share a name, as many
+// of their parent folders' names as tell them apart ("work/api" and
+// "home/api"). Reports show these names, never the paths (ADR 0032).
+func nameProjects(sessions []event.Session) {
+	dirs := map[string]bool{}
+	for _, s := range sessions {
+		dirs[s.Project] = true
+		for _, t := range s.Turns {
+			dirs[t.Project] = true
+		}
+	}
+	delete(dirs, "")
+	names := shortNames(dirs)
+	for i := range sessions {
+		sessions[i].Project = names[sessions[i].Project]
+		for j := range sessions[i].Turns {
+			sessions[i].Turns[j].Project = names[sessions[i].Turns[j].Project]
+		}
+	}
+}
+
+// shortNames gives each folder the fewest trailing path elements that no
+// other folder in dirs shares.
+func shortNames(dirs map[string]bool) map[string]string {
+	names := map[string]string{"": ""}
+	for depth := 1; len(dirs) > 0; depth++ {
+		byName := map[string][]string{}
+		for d := range dirs {
+			byName[tail(d, depth)] = append(byName[tail(d, depth)], d)
+		}
+		for name, ds := range byName {
+			if len(ds) == 1 || tail(ds[0], depth+1) == name { // unique, or nothing left to add
+				for _, d := range ds {
+					names[d] = name
+					delete(dirs, d)
+				}
+			}
+		}
+	}
+	return names
+}
+
+// tail returns the last n elements of a slash- or separator-separated path,
+// joined with "/".
+func tail(path string, n int) string {
+	parts := strings.FieldsFunc(filepath.ToSlash(path), func(r rune) bool { return r == '/' })
+	if len(parts) == 0 {
+		return path
+	}
+	return strings.Join(parts[max(0, len(parts)-n):], "/")
 }
 
 // sessionFor names the session a log holds. A main session log is named after

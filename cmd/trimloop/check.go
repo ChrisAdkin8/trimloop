@@ -30,6 +30,10 @@ func checkSetup(w io.Writer, settings, exe, home, cfgDir string) int {
 		s := c.Hooks[h.event]
 		fmt.Fprintf(w, "  %s (%s): %s%s\n", h.what, h.event, s, advice(s, "hook"))
 	}
+	if c.HooksOff {
+		fmt.Fprintln(w, "  hooks are turned off: this file sets \"disableAllHooks\": true, so Claude Code runs no")
+		fmt.Fprintln(w, "  hooks and no status line, trimloop's included; remove it to see the nudges")
+	}
 
 	path := history.LimitsPath(home, cfgDir)
 	readings, err := history.LoadLimits(path)

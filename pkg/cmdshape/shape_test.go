@@ -1,6 +1,7 @@
 package cmdshape
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -95,6 +96,68 @@ func TestParseSedInPlaceIsAnEdit(t *testing.T) {
 	}
 	if s := Parse(`sed -n '1p' x.go`); s.Edit {
 		t.Error("sed -n reported as an edit")
+	}
+	for _, cmd := range []string{`sed --in-place 's/a/b/' x.go`, `sed --in-place=.bak -e 's/a/b/' x.go`, `sed -ni 's/a/b/p' x.go`} {
+		if s := Parse(cmd); !s.Edit || s.File != "x.go" || !slices.Equal(s.Writes, []string{"x.go"}) {
+			t.Errorf("%s: got edit=%v file=%q writes=%q, want an edit of x.go", cmd, s.Edit, s.File, s.Writes)
+		}
+	}
+}
+
+// Writes names the files every command in a line writes, and WritesUnknown
+// says a command may have changed files it does not name.
+func TestParseWrites(t *testing.T) {
+	tests := []struct {
+		cmd     string
+		writes  []string
+		unknown bool
+	}{
+		{cmd: "cat > a.go <<'EOF'\nx\nEOF", writes: []string{"a.go"}},
+		{cmd: `echo x >> a.go`, writes: []string{"a.go"}},
+		{cmd: `go test ./... > out.log 2> err.log`, writes: []string{"out.log", "err.log"}},
+		{cmd: `go test ./... &> all.log`, writes: []string{"all.log"}},
+		{cmd: `go test ./... 2>&1 | tee run.log`, writes: []string{"run.log"}},
+		{cmd: `cd x && printf y | tee -a a b`, writes: []string{"a", "b"}},
+		{cmd: `go build ./... && sed -i 's/a/b/' x.go y.go`, writes: []string{"x.go", "y.go"}},
+		{cmd: `go test ./... > /dev/null 2>&1`},
+		{cmd: `ls >&2`},
+		{cmd: `cat a.go`},
+		{cmd: `git checkout -- a.go`, unknown: true},
+		{cmd: `git stash && go test ./...`, unknown: true},
+		{cmd: `git status`},
+		{cmd: `gofmt -w .`, unknown: true},
+		{cmd: `gofmt -l .`},
+		{cmd: `npx prettier --write src`, unknown: true},
+		{cmd: `perl -pi -e 's/a/b/' x.go`, unknown: true},
+		{cmd: `mv a.go b.go`, unknown: true},
+		{cmd: `npm install left-pad`, unknown: true},
+		{cmd: `npm test`},
+	}
+	for _, tt := range tests {
+		s := Parse(tt.cmd)
+		if !slices.Equal(s.Writes, tt.writes) || s.WritesUnknown != tt.unknown {
+			t.Errorf("%q: got writes %q, unknown %v; want %q, %v", tt.cmd, s.Writes, s.WritesUnknown, tt.writes, tt.unknown)
+		}
+	}
+}
+
+// Part tells views of different parts of a file apart, so paging is not
+// taken for re-reading.
+func TestParsePart(t *testing.T) {
+	tests := []struct{ cmd, file, part string }{
+		{`sed -n '1,50p' a.go`, "a.go", "1,50p"},
+		{`sed -n -e '51,100p' a.go`, "a.go", "51,100p"},
+		{`head -n 40 a.go`, "a.go", "head -n 40"},
+		{`head -40 a.go`, "a.go", "head -40"},
+		{`tail -n50 a.go`, "a.go", "tail -n50"},
+		{`head a.go`, "a.go", "head"},
+		{`cat -n a.go`, "a.go", ""},
+		{`sed -i 's/a/b/' a.go`, "a.go", ""}, // an edit, not a view
+	}
+	for _, tt := range tests {
+		if s := Parse(tt.cmd); s.File != tt.file || s.Part != tt.part {
+			t.Errorf("%q: got file %q, part %q; want %q, %q", tt.cmd, s.File, s.Part, tt.file, tt.part)
+		}
 	}
 }
 

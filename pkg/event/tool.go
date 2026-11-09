@@ -25,6 +25,17 @@ type ToolCall struct {
 	// and is used in memory only. Empty if the call touched no single file.
 	File   string
 	FileOp FileOp
+	// Part identifies the part of File a view printed (a hash of, say, the
+	// Read tool's offset and limit, or sed's script); "" for the whole file.
+	// Views of different parts are not re-reads of each other.
+	Part string
+	// Writes lists other files the call wrote or changed, hashed like File:
+	// a shell redirection, tee, sed -i.
+	Writes []string
+	// WritesUnknown is true when the call may have changed files it does
+	// not name (git checkout, mv, a formatter): no earlier view counts as
+	// unchanged after it.
+	WritesUnknown bool
 
 	Result    ToolResult
 	HasResult bool // false if the log has no result for the call

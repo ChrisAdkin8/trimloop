@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -18,6 +19,11 @@ var hookEvents = map[string]string{"Stop": "stop", "UserPromptSubmit": "prompt"}
 // hookTimeout is how long Claude Code waits for a trimloop hook, in seconds.
 const hookTimeout = 5
 
+// statusRefresh is how often, in seconds, Claude Code reruns the status line
+// even when nothing happens, so the cache countdown moves while the user is
+// away.
+const statusRefresh = 30
+
 // shellQuote quotes s for a POSIX shell, which runs hook and status-line
 // commands: inside single quotes nothing is expanded.
 func shellQuote(s string) string {
@@ -28,17 +34,23 @@ func statusCommand(exe string) string { return shellQuote(exe) + " statusline" }
 
 func hookCommand(exe, arg string) string { return shellQuote(exe) + " hook " + arg }
 
-// Settings Claude Code needs to run the nudges. The status line refreshes
-// every 30 seconds so the cache countdown moves while the user is away.
+// Settings Claude Code needs to run the nudges.
 func claudeSettings(exe string) map[string]any {
 	hooks := map[string]any{}
 	for event, arg := range hookEvents {
 		hooks[event] = []any{hookEntry(exe, arg)}
 	}
 	return map[string]any{
-		"statusLine": map[string]any{"type": "command", "command": statusCommand(exe), "refreshInterval": 30},
+		"statusLine": statusEntry(exe),
 		"hooks":      hooks,
 	}
+}
+
+// statusEntry is trimloop's status line. These are the keys trimloop owns;
+// any other key in an existing status line (such as "padding") is the
+// user's.
+func statusEntry(exe string) map[string]any {
+	return map[string]any{"type": "command", "command": statusCommand(exe), "refreshInterval": statusRefresh}
 }
 
 func hookEntry(exe, arg string) map[string]any {
@@ -93,7 +105,7 @@ type EntryState int
 const (
 	Missing EntryState = iota // not there: added
 	Current                   // runs this trimloop with today's settings: left alone
-	Stale                     // runs trimloop from another path or with old settings: updated
+	Stale                     // runs trimloop from another path or with old settings: trimloop's keys updated
 	Other                     // a status line that is not trimloop's: kept unless replace is set
 )
 
@@ -111,11 +123,27 @@ func statusLineState(cfg map[string]any, exe string) EntryState {
 	cmd, _ := slMap["command"].(string)
 	switch {
 	case runsExe(cmd, exe, "statusline"):
-		return Current
+		if slMap["type"] == "command" && sameNumber(slMap["refreshInterval"], statusRefresh) {
+			return Current
+		}
+		return Stale
 	case isTrimloop(cmd, "statusline"):
 		return Stale
 	}
 	return Other
+}
+
+// sameNumber reports whether a JSON value is the number want, however it is
+// written (5, 5.0) and whether it was decoded as a float64 or a json.Number.
+func sameNumber(v any, want int) bool {
+	switch n := v.(type) {
+	case json.Number:
+		f, err := n.Float64()
+		return err == nil && f == float64(want)
+	case float64:
+		return n == float64(want)
+	}
+	return false
 }
 
 // runsExe reports whether cmd runs exe with args, however exe is quoted.
@@ -157,7 +185,28 @@ func trimloopHooks(list []any, arg string) []map[string]any {
 
 func staleHook(hook map[string]any, exe, arg string) bool {
 	cmd, _ := hook["command"].(string)
-	return !runsExe(cmd, exe, "hook "+arg) || fmt.Sprint(hook["timeout"]) != fmt.Sprint(hookTimeout)
+	return !runsExe(cmd, exe, "hook "+arg) || !sameNumber(hook["timeout"], hookTimeout)
+}
+
+// decodeSettings parses a settings file's contents, which must be a single
+// JSON object and nothing after it: WriteSettings would otherwise drop what
+// follows, and Claude Code may not read it. Numbers are kept as written so
+// large ones stay exact.
+func decodeSettings(path string, b []byte) (map[string]any, error) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		return nil, fmt.Errorf("%s is not valid JSON: %w", path, err)
+	}
+	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("%s has more after its settings object (a comment or a second value)", path)
+	}
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%s does not hold a settings object", path)
+	}
+	return m, nil
 }
 
 // WriteSettings adds the nudges to the Claude Code settings file at path,
@@ -165,11 +214,12 @@ func staleHook(hook map[string]any, exe, arg string) bool {
 // already run trimloop are updated in place (for example after the binary
 // moved); another status line is replaced only if replace is true; nothing
 // is written if nothing changes. It refuses, rather than guesses, when the
-// file or its "hooks" are not shaped as Claude Code expects. A settings file
-// that is a link is followed: the file it points to is updated, keeping its
-// permissions. Other values keep their exact text; only key order may
-// change. It returns the backup's path ("" if none).
-func WriteSettings(path, exe string, replace bool) (string, error) {
+// file or its "hooks" are not shaped as Claude Code expects, or when
+// anything follows the settings object. A settings file that is a link is
+// followed: the file it points to is updated, keeping its permissions. Other
+// values keep their exact text; only key order may change. It returns the
+// backup's path ("" if none) and whether the file was written.
+func WriteSettings(path, exe string, replace bool) (backup string, changed bool, err error) {
 	if target, err := filepath.EvalSymlinks(path); err == nil {
 		path = target
 	}
@@ -180,48 +230,48 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 	case errors.Is(err, fs.ErrNotExist):
 		old = nil
 	case err != nil:
-		return "", err
+		return "", false, err
 	default:
 		if info, err := os.Stat(path); err == nil {
 			mode = info.Mode().Perm()
 		}
-		dec := json.NewDecoder(bytes.NewReader(old))
-		dec.UseNumber() // keep large numbers exact
-		var v any
-		if err := dec.Decode(&v); err != nil {
-			return "", fmt.Errorf("%s is not valid JSON: %w", path, err)
+		if cfg, err = decodeSettings(path, old); err != nil {
+			return "", false, fmt.Errorf("%w; not changing it", err)
 		}
-		m, ok := v.(map[string]any)
-		if !ok {
-			return "", fmt.Errorf("%s does not hold a settings object; not changing it", path)
-		}
-		cfg = m
 	}
 
-	want := claudeSettings(exe)
-	changed := false
 	switch statusLineState(cfg, exe) {
 	case Current:
+	case Stale:
+		// trimloop's own status line: update only the keys trimloop
+		// owns, keeping the user's others (such as "padding").
+		sl := cfg["statusLine"].(map[string]any)
+		for k, v := range statusEntry(exe) {
+			sl[k] = v
+		}
+		changed = true
 	case Other:
 		if !replace {
-			return "", ErrStatusLineTaken
+			return "", false, ErrStatusLineTaken
 		}
-		cfg["statusLine"], changed = want["statusLine"], true
-	default: // Missing, Stale
-		cfg["statusLine"], changed = want["statusLine"], true
+		// Someone else's status line is replaced whole: its other keys
+		// were set for that program, and the backup keeps them.
+		cfg["statusLine"], changed = statusEntry(exe), true
+	case Missing:
+		cfg["statusLine"], changed = statusEntry(exe), true
 	}
 
 	hooks := map[string]any{}
 	if h, ok := cfg["hooks"]; ok {
 		if hooks, ok = h.(map[string]any); !ok {
-			return "", fmt.Errorf("%s: \"hooks\" is not an object; not changing it", path)
+			return "", false, fmt.Errorf("%s: \"hooks\" is not an object; not changing it", path)
 		}
 	}
 	for event, arg := range hookEvents {
 		var list []any
 		if l, ok := hooks[event]; ok {
 			if list, ok = l.([]any); !ok {
-				return "", fmt.Errorf("%s: hooks for %s are not a list; not changing them", path, event)
+				return "", false, fmt.Errorf("%s: hooks for %s are not a list; not changing them", path, event)
 			}
 		}
 		switch hookState(list, exe, arg) {
@@ -236,7 +286,7 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 	}
 	cfg["hooks"] = hooks
 	if !changed {
-		return "", nil
+		return "", false, nil
 	}
 
 	var buf bytes.Buffer
@@ -244,15 +294,17 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 	enc.SetEscapeHTML(false) // keep & < > as written in other commands
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(cfg); err != nil {
-		return "", err
+		return "", false, err
 	}
-	backup := ""
 	if old != nil {
 		if backup, err = writeBackup(path, old, mode); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
-	return backup, writeAtomic(path, buf.Bytes(), mode)
+	if err := writeAtomic(path, buf.Bytes(), mode); err != nil {
+		return backup, false, err
+	}
+	return backup, true, nil
 }
 
 // Check is where each of trimloop's settings entries stands in a settings
@@ -260,11 +312,14 @@ func WriteSettings(path, exe string, replace bool) (string, error) {
 type Check struct {
 	StatusLine EntryState
 	Hooks      map[string]EntryState // by Claude Code event: "Stop", "UserPromptSubmit"
+	// HooksOff is set when the file has "disableAllHooks": true, which
+	// stops Claude Code running any hook or status line, trimloop's too.
+	HooksOff bool
 }
 
-// OK reports whether every entry is up to date.
+// OK reports whether every entry is up to date and Claude Code will run them.
 func (c Check) OK() bool {
-	if c.StatusLine != Current {
+	if c.HooksOff || c.StatusLine != Current {
 		return false
 	}
 	for _, s := range c.Hooks {
@@ -290,10 +345,11 @@ func CheckSettings(path, exe string) (Check, error) {
 	if err != nil {
 		return c, err
 	}
-	var cfg map[string]any
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return c, fmt.Errorf("%s is not a settings object: %w", path, err)
+	cfg, err := decodeSettings(path, b)
+	if err != nil {
+		return c, err
 	}
+	c.HooksOff = cfg["disableAllHooks"] == true
 	c.StatusLine = statusLineState(cfg, exe)
 	hooks, _ := cfg["hooks"].(map[string]any)
 	for event, arg := range hookEvents {

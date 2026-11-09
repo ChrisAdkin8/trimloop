@@ -110,6 +110,11 @@ type input struct {
 	Command      string `json:"command"`       // Bash
 	FilePath     string `json:"file_path"`     // Read, Edit, Write
 	NotebookPath string `json:"notebook_path"` // NotebookEdit
+
+	// Read: the part of the file read. Kept raw, as a number or a string.
+	Offset json.RawMessage `json:"offset"`
+	Limit  json.RawMessage `json:"limit"`
+	Pages  string          `json:"pages"` // a PDF's pages
 }
 
 // attachment is the part of an attachment line Read uses. A prompt snapshot
@@ -306,13 +311,25 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 			c.Shape, c.Noise, c.Filtered = s.String(), s.Noise, s.Filtered
 			if s.File != "" {
 				c.File, c.FileOp = fileKey(s.File, cwd), event.FileView
+				c.Part = partKey(s.Part)
 				if s.Edit {
 					c.FileOp = event.FileEdit
+				}
+			}
+			c.WritesUnknown = s.WritesUnknown
+			for _, w := range s.Writes {
+				if k := fileKey(w, cwd); k != "" {
+					c.Writes = append(c.Writes, k)
+				} else {
+					c.WritesUnknown = true // a variable or a glob: which file is not known
 				}
 			}
 		case b.Name == "Read" || b.Name == "NotebookRead":
 			c.Noise = event.NoiseFileView
 			c.File, c.FileOp = fileKey(firstOf(in.FilePath, in.NotebookPath), cwd), event.FileView
+			if part := strings.TrimSpace(rawArg(in.Offset) + " " + rawArg(in.Limit) + " " + in.Pages); part != "" {
+				c.Part = partKey("read " + part)
+			}
 		case b.Name == "Edit" || b.Name == "MultiEdit" || b.Name == "Write" || b.Name == "NotebookEdit":
 			c.File, c.FileOp = fileKey(firstOf(in.FilePath, in.NotebookPath), cwd), event.FileEdit
 		case b.Name == "Grep" || b.Name == "Glob" || b.Name == "LS":
@@ -381,6 +398,24 @@ func fileKey(p, cwd string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
+// partKey identifies the part of a file a view printed by a hash, so a
+// script or count is never kept; "" stays "" (the whole file).
+func partKey(part string) string {
+	if part == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(part))
+	return hex.EncodeToString(sum[:8])
+}
+
+// rawArg is an argument as logged, "" if absent or null.
+func rawArg(r json.RawMessage) string {
+	if string(r) == "null" {
+		return ""
+	}
+	return string(r)
+}
+
 func firstOf(a, b string) string {
 	if a != "" {
 		return a
@@ -392,8 +427,10 @@ func firstOf(a, b string) string {
 // for a sub-agent: <project>/.claude/worktrees/<name>.
 var worktrees = string(filepath.Separator) + filepath.Join(".claude", "worktrees") + string(filepath.Separator)
 
-// projectOf names the project a working folder belongs to: the folder's own
-// name, or for a worktree, the name of the project it was copied from.
+// projectOf returns the project folder a working folder belongs to: the
+// folder itself, or for a worktree, the folder of the project it was copied
+// from. The caller turns folders into short names (ADR 0032 shows project
+// names, not paths).
 func projectOf(cwd string) string {
 	if cwd == "" {
 		return ""
@@ -401,7 +438,7 @@ func projectOf(cwd string) string {
 	if i := strings.Index(cwd, worktrees); i > 0 {
 		cwd = cwd[:i]
 	}
-	return filepath.Base(cwd)
+	return filepath.Clean(cwd)
 }
 
 // parseAttachment reads an attachment line: a snapshot of the system prompt
