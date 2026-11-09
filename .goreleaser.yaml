@@ -77,7 +77,9 @@ homebrew_casks:
     repository:
       owner: ChrisAdkin8
       name: homebrew-tap
-      token: '{{ envOrDefault "HOMEBREW_TAP_TOKEN" "" }}'
+      # The release workflow always sets HOMEBREW_TAP_TOKEN, and skips this
+      # step when it is empty. (envOrDefault is not available in this field.)
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     commit_msg_template: "trimloop {{ .Tag }}"
     # The macOS binaries are not yet signed and notarised by Apple (ADR 0047),
     # so macOS would refuse to run one installed from the cask. Until they
@@ -97,8 +99,11 @@ release:
   github:
     owner: ChrisAdkin8
     name: trimloop
-  # Every release starts as a draft: check it on GitHub, then publish.
+  # Every release starts as a draft: check it on GitHub, then publish. A
+  # re-run (after a failed step) reuses the draft and replaces its files.
   draft: true
+  use_existing_draft: true
+  replace_existing_artifacts: true
   footer: |
     Verify a download: see "Checking a download" in the README.
     Licence: FSL-1.1-ALv2 (each version becomes Apache-2.0 two years after release).
