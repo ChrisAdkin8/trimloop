@@ -75,8 +75,8 @@ func ForMainModels(f detectors.MainModels, minSaving float64) []Recommendation {
 		out = append(out, Recommendation{
 			Pattern: "P13",
 			Title:   "Move to the newer model",
-			Finding: fmt.Sprintf("%d main-session turns ran on %s. Each has a newer version that costs less per "+
-				"token and counts tokens the same way.", f.NewerTurns, joinNames(unique(from))),
+			Finding: fmt.Sprintf("%s ran on %s. Each has a newer version that costs less per "+
+				"token and counts tokens the same way.", plural(f.NewerTurns, "main-session turn"), joinNames(unique(from))),
 			Saving:   f.Newer,
 			Examples: unique(from),
 			Primary: Fix{Advise,
@@ -96,8 +96,8 @@ func ForMainModels(f detectors.MainModels, minSaving float64) []Recommendation {
 		out = append(out, Recommendation{
 			Pattern: "P13",
 			Title:   fmt.Sprintf("Use %s for routine main-session work", joinNames(unique(to))),
-			Finding: fmt.Sprintf("%d main-session turns ran on %s. The same turns on %s would have cost less; whether "+
-				"it does the work as well is not known from the logs.", f.TierTurns, joinNames(unique(from)), joinNames(unique(to))),
+			Finding: fmt.Sprintf("%s ran on %s. The same turns on %s would have cost less; whether "+
+				"it does the work as well is not known from the logs.", plural(f.TierTurns, "main-session turn"), joinNames(unique(from)), joinNames(unique(to))),
 			Saving:   f.LowerTier,
 			Examples: unique(from),
 			Overlap:  "May share turns at the highest effort with the effort fix: do not add them",
@@ -122,12 +122,24 @@ func ForEffort(f detectors.Effort, minSaving float64) (Recommendation, bool) {
 	if back == "" || back == "xhigh" || back == "max" {
 		back = "high"
 	}
-	finding := fmt.Sprintf("%d turns ran at the highest effort levels (xhigh or max); most turns ran at %s. Had "+
-		"%d of them %s as much per turn, on average, as the same model's high-effort turns, they would have "+
-		"cost %s less.", f.Turns, f.Usual, f.Turns-f.Unmatched,
-		map[bool]string{true: "thought", false: "written"}[f.Thinking], dollars(f.Saving))
-	if f.Unmatched > 0 {
-		finding += fmt.Sprintf(" The other %d ran on a model with too few high-effort turns to compare with.", f.Unmatched)
+	compared := f.Turns - f.Unmatched
+	// Which turns the saving is for, and the pronoun that follows.
+	which, pronoun := thousandsInt(compared)+" of them", "they"
+	switch {
+	case f.Turns == 1:
+		which, pronoun = "it", "it"
+	case compared == 1:
+		which, pronoun = "one of them", "it"
+	}
+	finding := fmt.Sprintf("%s ran at the highest effort levels (xhigh or max); most turns ran at %s. Had "+
+		"%s %s as much per turn, on average, as the same model's high-effort turns, %s would have "+
+		"cost %s less.", plural(f.Turns, "turn"), f.Usual, which,
+		map[bool]string{true: "thought", false: "written"}[f.Thinking], pronoun, dollars(f.Saving))
+	switch {
+	case f.Unmatched == 1:
+		finding += " The other one ran on a model with too few high-effort turns to compare with."
+	case f.Unmatched > 1:
+		finding += fmt.Sprintf(" The other %s ran on a model with too few high-effort turns to compare with.", thousandsInt(f.Unmatched))
 	}
 	finding += " Harder work gets higher effort on purpose, so a lower level would save less than this."
 	how := fmt.Sprintf(`Effort can be set per model ("modelSettings" in ~/.claude/settings.json): if it is, lower it `+

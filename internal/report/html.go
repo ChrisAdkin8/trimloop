@@ -83,7 +83,7 @@ type view struct {
 
 	Sessions []sessionRow // P19 and P09's top sessions, each once
 
-	MaxProject, MaxBand, MaxTool, MaxAgent, MaxWeek, MaxPart float64
+	MaxProject, MaxTool, MaxWeek, MaxPart float64
 
 	ThisWeek string // the week the report was written in, which is not over
 
@@ -161,14 +161,8 @@ func newView(r Results) view {
 	for _, p := range r.Attribution.ByProject {
 		v.MaxProject = max(v.MaxProject, p.Cost)
 	}
-	for _, b := range r.Growth.Bands {
-		v.MaxBand = max(v.MaxBand, b.MeanCost())
-	}
 	for _, g := range r.Tools.ByTool {
 		v.MaxTool = max(v.MaxTool, g.Carried)
-	}
-	for _, g := range r.SubAgents.ByType {
-		v.MaxAgent = max(v.MaxAgent, g.Cost)
 	}
 	for _, w := range r.Weeks {
 		v.MaxWeek = max(v.MaxWeek, w.Spend)

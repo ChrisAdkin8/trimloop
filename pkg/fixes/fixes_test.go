@@ -1,6 +1,7 @@
 package fixes
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -303,5 +304,44 @@ func TestModelCardsNameEachModelOnce(t *testing.T) {
 				t.Errorf("P14: want %q, got %q", want, r.Primary.How)
 			}
 		})
+	}
+}
+
+// Card findings read right for a count of one: "1 main-session turn",
+// "1 turn ran", never "1 turns" or "the other 1".
+func TestCardsCountsOfOne(t *testing.T) {
+	bad := regexp.MustCompile(`\b1 (turns|main-session turns|times|sessions)\b|other 1\b|Had 1 of them`)
+	var findings []string
+	models := detectors.MainModels{Newer: 5, NewerTurns: 1, LowerTier: 5, TierTurns: 1, ByModel: []detectors.ModelSpend{
+		{Model: "claude-opus-5", Newer: "claude-opus-5-5", NewerSave: 5},
+		{Model: "claude-fable-5-1", Tier: "claude-opus-5-5", TierSave: 5},
+	}}
+	for _, r := range ForMainModels(models, 1) {
+		findings = append(findings, r.Finding)
+	}
+	for _, e := range []detectors.Effort{
+		{Saving: 5, Turns: 1, Usual: "high"},
+		{Saving: 5, Turns: 3, Unmatched: 2, Usual: "high"},
+		{Saving: 5, Turns: 3, Unmatched: 1, Usual: "high"},
+	} {
+		r, ok := ForEffort(e, 1)
+		if !ok {
+			t.Fatalf("no effort card for %+v", e)
+		}
+		findings = append(findings, r.Finding)
+	}
+	if len(findings) != 5 {
+		t.Fatalf("got %d findings, want 5", len(findings))
+	}
+	for _, f := range findings {
+		if m := bad.FindAllString(f, -1); len(m) > 0 {
+			t.Errorf("%q says %q", f, m)
+		}
+	}
+	if !strings.HasPrefix(findings[2], "1 turn ran at the highest effort") || !strings.Contains(findings[2], "Had it ") {
+		t.Errorf("one turn: got %q", findings[2])
+	}
+	if !strings.Contains(findings[3], "Had one of them") || !strings.Contains(findings[3], "The other 2 ran") {
+		t.Errorf("one compared: got %q", findings[3])
 	}
 }
