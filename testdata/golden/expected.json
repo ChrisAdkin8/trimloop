@@ -1,14 +1,14 @@
 {
  "compactions": {
-  "manual": 2,
-  "total": 4
+  "manual": 5,
+  "total": 8
  },
  "cost": {
-  "cache_read": 0.633607065,
-  "cache_write_1h": 14.05912,
-  "cache_write_5m": 1.061725,
-  "input_uncached": 0.0013686,
-  "output": 0.67519
+  "cache_read": 0.656885365,
+  "cache_write_1h": 14.37512,
+  "cache_write_5m": 1.246725,
+  "input_uncached": 0.0015346,
+  "output": 0.72269
  },
  "main_by_model": {
   "claude-fable-5": {
@@ -36,16 +36,16 @@
    "turns": 2
   },
   "claude-opus-5-5": {
-   "cost": 4.156744,
-   "turns": 17
+   "cost": 4.5043674,
+   "turns": 21
   },
   "claude-sonnet-5": {
-   "cost": 0.2516054,
-   "turns": 4
+   "cost": 0.4292796,
+   "turns": 10
   },
   "claude-sonnet-5-5": {
-   "cost": 0.2968298,
-   "turns": 8
+   "cost": 0.3434765,
+   "turns": 10
   }
  },
  "p19": {
@@ -102,6 +102,12 @@
    "cost": 0.0173174,
    "sub_agent_cost": 0.0173174,
    "turns": 1
+  },
+  "kappa": {
+   "conversations": 3,
+   "cost": 0.5719443,
+   "sub_agent_cost": 0.0,
+   "turns": 12
   },
   "sub": {
    "conversations": 1,
@@ -338,10 +344,10 @@
   }
  },
  "read": {
-  "bad_lines": 0,
-  "logs": 16,
-  "sessions": 15,
-  "turns": 78,
+  "bad_lines": 2,
+  "logs": 19,
+  "sessions": 18,
+  "turns": 90,
   "unpriced": 2
  },
  "reconciliation": {
@@ -352,8 +358,8 @@
   "ours": 4.97754779,
   "sessions": 4,
   "unpriced": 1,
-  "unrecorded": 4,
-  "unrecorded_cost": 1.1604057
+  "unrecorded": 7,
+  "unrecorded_cost": 1.73235
  },
  "sessions": {
   "alpha-1": {
@@ -404,6 +410,18 @@
    "cost": 0.0752625,
    "turns": 3
   },
+  "kappa-1": {
+   "cost": 0.1776742,
+   "turns": 6
+  },
+  "kappa-2": {
+   "cost": 0.3476234,
+   "turns": 4
+  },
+  "kappa-3": {
+   "cost": 0.0466467,
+   "turns": 2
+  },
   "theta-1/agent-t1orphan01": {
    "cost": 0.0536029,
    "turns": 3
@@ -449,18 +467,18 @@
   "turns": 21
  },
  "tokens": {
-  "cache_read": 3289744,
-  "cache_write_1h": 1035015,
-  "cache_write_5m": 909774,
-  "input_uncached": 456,
-  "output": 33070
+  "cache_read": 3411289,
+  "cache_write_1h": 1074515,
+  "cache_write_5m": 983774,
+  "input_uncached": 521,
+  "output": 36550
  },
- "total": 16.431010665,
+ "total": 17.002954965,
  "zones": {
   "America/Los_Angeles": {
    "period": {
     "days": 25,
-    "per_week": 4.600682986
+    "per_week": 4.76082739
    },
    "weeks": {
     "2026-10-12": {
@@ -469,17 +487,17 @@
      "turns": 28
     },
     "2026-10-19": {
-     "compactions": 1,
-     "spend": 1.28712929,
-     "turns": 26
+     "compactions": 2,
+     "spend": 1.51145019,
+     "turns": 34
     },
     "2026-10-26": {
-     "compactions": 0,
-     "spend": 0.1141798,
-     "turns": 6
+     "compactions": 2,
+     "spend": 0.4618032,
+     "turns": 10
     },
     "2026-11-02": {
-     "compactions": 1,
+     "compactions": 2,
      "spend": 1.4043383,
      "turns": 18
     }
@@ -488,7 +506,7 @@
   "Asia/Kolkata": {
    "period": {
     "days": 25,
-    "per_week": 4.600682986
+    "per_week": 4.76082739
    },
    "weeks": {
     "2026-10-12": {
@@ -498,16 +516,16 @@
     },
     "2026-10-19": {
      "compactions": 1,
-     "spend": 0.71699379,
-     "turns": 20
+     "spend": 0.88283169,
+     "turns": 26
     },
     "2026-10-26": {
-     "compactions": 0,
-     "spend": 0.6843153,
-     "turns": 12
+     "compactions": 3,
+     "spend": 1.0904217,
+     "turns": 18
     },
     "2026-11-02": {
-     "compactions": 1,
+     "compactions": 2,
      "spend": 1.4043383,
      "turns": 18
     }
@@ -516,7 +534,7 @@
   "Pacific/Auckland": {
    "period": {
     "days": 25,
-    "per_week": 4.600682986
+    "per_week": 4.76082739
    },
    "weeks": {
     "2026-10-12": {
@@ -526,25 +544,25 @@
     },
     "2026-10-19": {
      "compactions": 1,
-     "spend": 0.71699379,
-     "turns": 20
+     "spend": 0.76364049,
+     "turns": 22
     },
     "2026-10-26": {
-     "compactions": 0,
-     "spend": 0.6843153,
-     "turns": 12
+     "compactions": 2,
+     "spend": 1.0633017,
+     "turns": 20
     },
     "2026-11-02": {
-     "compactions": 1,
-     "spend": 1.4043383,
-     "turns": 18
+     "compactions": 3,
+     "spend": 1.5506495,
+     "turns": 20
     }
    }
   },
   "UTC": {
    "period": {
     "days": 25,
-    "per_week": 4.600682986
+    "per_week": 4.76082739
    },
    "weeks": {
     "2026-10-12": {
@@ -553,17 +571,17 @@
      "turns": 28
     },
     "2026-10-19": {
-     "compactions": 1,
-     "spend": 1.09536179,
-     "turns": 24
+     "compactions": 2,
+     "spend": 1.31968269,
+     "turns": 32
     },
     "2026-10-26": {
-     "compactions": 0,
-     "spend": 0.3059473,
-     "turns": 8
+     "compactions": 2,
+     "spend": 0.6535707,
+     "turns": 12
     },
     "2026-11-02": {
-     "compactions": 1,
+     "compactions": 2,
      "spend": 1.4043383,
      "turns": 18
     }

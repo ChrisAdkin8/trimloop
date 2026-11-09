@@ -137,6 +137,13 @@ def usage(
     return u
 
 
+class Raw:
+    """A line written as given rather than as JSON."""
+
+    def __init__(self, text, newline):
+        self.text, self.newline = text, newline
+
+
 class Log:
     """One log file being written."""
 
@@ -407,11 +414,24 @@ class Log:
             }
         self.lines.append(d)
 
+    def raw(self, text, newline=True):
+        """A line written as given, not as JSON: a malformed line, or (with
+        newline=False, last only) an unfinished last line."""
+        self.lines.append(Raw(text, newline))
+
+    def cut(self, d, keep, newline=True):
+        """A copy of line d cut short after `keep` characters."""
+        self.raw(
+            json.dumps(d, separators=(",", ":"), ensure_ascii=False)[:keep], newline
+        )
+
     def write(self):
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with open(self.path, "w", newline="\n") as f:
             f.writelines(
-                json.dumps(d, separators=(",", ":"), ensure_ascii=False) + "\n"
+                (d.text + ("\n" if d.newline else ""))
+                if isinstance(d, Raw)
+                else json.dumps(d, separators=(",", ":"), ensure_ascii=False) + "\n"
                 for d in self.lines
             )
         if self.meta:
@@ -892,6 +912,98 @@ def eta_1(root):
     a.write()
 
 
+KAPPA = "/home/dev/kappa"
+
+
+def kappa_1(root):
+    """A compaction just after a week boundary in Kolkata (Monday 00:00 IST
+    is Sunday 18:30 UTC), whose neighbouring turns before it fall on the
+    other side: the turn that triggered it is logged after the marker but
+    timed before it, so it stays before it, and the compaction counts in
+    the week of the first reply after it. Also a blank line and a line cut
+    short in the middle of the log (a bad line)."""
+    s = Log(root, KAPPA, "kappa-1", KAPPA)
+    s.life = "5m"
+    t = at("2026-10-25 17:50")
+    s.prompt(t)
+    t += timedelta(seconds=5)
+    s.grow(t, "claude-sonnet-5", 12_000, out=300)
+    t = at("2026-10-25 18:05")
+    d = s.prompt(t - timedelta(seconds=10))
+    s.cut(d, 140)  # cut short mid-write: not JSON
+    s.raw("")  # a blank line: skipped, not bad
+    s.grow(t, "claude-sonnet-5", 9_000, out=250)
+    t = at("2026-10-25 18:20")  # Kolkata Sunday 23:50
+    s.grow(t, "claude-sonnet-5", 8_000, out=280)
+    # Kolkata Monday 00:01: the marker, then the reply that triggered it,
+    # logged late with its own time (Sunday 23:57 in Kolkata).
+    trigger = at("2026-10-25 18:27")
+    s.compact(
+        at("2026-10-25 18:31"), "auto", s.ctx + 9_000, 14_000, 21_000, after_ctx=0
+    )
+    s.reply(trigger, "claude-sonnet-5", usage(read=29_300, w5=9_000, unc=4, out=320))
+    t = at("2026-10-25 18:31:40")
+    s.reply(t, "claude-sonnet-5", usage(w5=17_000, unc=5, out=300))
+    s.ctx = 17_305
+    t += timedelta(minutes=2)
+    s.grow(t, "claude-sonnet-5", 3_000, out=200)
+    s.write()
+
+
+def kappa_2(root):
+    """A manual compaction just before a week boundary in Auckland (Monday
+    00:00 NZDT is Sunday 11:00 UTC) and the reply after it just after: the
+    compaction counts in the reply's week. Just before it, an earlier
+    compaction with no reply between the two: never replied to, it counts
+    in its own week. Also a JSON line that is not an object (a bad line)."""
+    s = Log(root, KAPPA, "kappa-2", KAPPA)
+    t = at("2026-11-01 10:30")
+    s.prompt(t)
+    t += timedelta(seconds=5)
+    s.grow(t, "claude-opus-5-5", 16_000, out=400)
+    s.raw('["not", "a", "log", "record"]')  # JSON, but not an object
+    t = at("2026-11-01 10:40")  # Auckland Sunday 23:40
+    s.grow(t, "claude-opus-5-5", 7_000, out=300)
+    s.prompt(at("2026-11-01 10:44:55"), text="/compact")
+    s.compact(at("2026-11-01 10:45"), "manual", s.ctx, 9_000, 12_000, after_ctx=0)
+    s.prompt(at("2026-11-01 10:54:55"), text="/compact")
+    s.compact(at("2026-11-01 10:55"), "manual", 9_000, 8_000, 9_000, after_ctx=0)
+    t = at("2026-11-01 11:06")  # Auckland Monday 00:06
+    s.prompt(t - timedelta(seconds=10))
+    s.reply(t, "claude-opus-5-5", usage(w1=14_000, unc=6, out=350))
+    s.ctx = 14_356
+    t += timedelta(minutes=3)
+    s.grow(t, "claude-opus-5-5", 2_500, out=220)
+    s.write()
+
+
+def kappa_3(root):
+    """A manual compaction that no reply followed, eleven days after the
+    session's last reply and two weeks later in every zone: it counts in its
+    own week, not the last reply's. The log ends with an unfinished last
+    line (a reply cut short with no line ending), which is skipped, not
+    counted as bad."""
+    s = Log(root, KAPPA, "kappa-3", KAPPA)
+    s.life = "5m"
+    t = at("2026-10-23 14:00")
+    s.prompt(t)
+    t += timedelta(seconds=5)
+    s.grow(t, "claude-sonnet-5-5", 10_000, out=300)
+    t += timedelta(minutes=4)
+    s.grow(t, "claude-sonnet-5-5", 6_000, out=260)
+    t = at("2026-11-03 09:00")
+    s.prompt(t - timedelta(seconds=5), text="/compact")
+    s.compact(t, "manual", s.ctx, 7_000, 11_000, after_ctx=0)
+    n = len(s.lines)
+    s.reply(
+        t + timedelta(minutes=1), "claude-sonnet-5-5", usage(w5=8_000, unc=3, out=90)
+    )
+    first = s.lines[n]
+    del s.lines[n:]
+    s.cut(first, 200, newline=False)
+    s.write()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     here = os.path.dirname(os.path.abspath(__file__))
@@ -914,6 +1026,9 @@ def main():
         epsilon_2,
         theta_orphan,
         eta_1,
+        kappa_1,
+        kappa_2,
+        kappa_3,
     ):
         build(root)
     print("wrote", os.path.join(root, "projects"))

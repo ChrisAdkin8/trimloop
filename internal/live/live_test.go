@@ -820,3 +820,19 @@ func TestDecodeLimit(t *testing.T) {
 		})
 	}
 }
+
+// The hooks-only snippet has both hooks and no status line; a missing
+// settings folder is named in the error, not the temporary file.
+func TestHooksSnippetAndMissingFolder(t *testing.T) {
+	s := HooksSnippet("/bin/trimloop")
+	for want, ok := range map[string]bool{`"Stop"`: true, `"UserPromptSubmit"`: true, "hook prompt": true, `"statusLine"`: false} {
+		if strings.Contains(s, want) != ok {
+			t.Errorf("snippet has %q: %v, want %v\n%s", want, !ok, ok, s)
+		}
+	}
+	missing := filepath.Join(t.TempDir(), ".claude")
+	_, _, err := WriteSettings(filepath.Join(missing, "settings.json"), "/bin/trimloop", false)
+	if err == nil || !strings.Contains(err.Error(), "the folder "+missing+" does not exist") || strings.Contains(err.Error(), ".settings-") {
+		t.Errorf("got %v, want the missing folder named", err)
+	}
+}

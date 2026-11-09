@@ -429,7 +429,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 <footer>
   <p>Costs are estimates at list prices ({{.Prices}}); tool output and added text are sized at about 4 characters per token. Savings are estimates and overlap.</p>
-  <p>Written by trimloop{{with .Version}} {{.}}{{end}} on {{date .Generated}}, on this machine. The page loads nothing from the network. It shows project names and session titles, which summarise what you asked: check before sharing it.</p>
+  <p>Written by trimloop{{with .Version}} {{.}}{{end}} on {{date .Generated}}, on this machine. The page loads nothing from the network. {{if .HideIDs}}It shows project names; session titles and ids are left out (--no-titles). Check before sharing it.{{else}}It shows project names and session titles, which summarise what you asked: check before sharing it.{{end}}</p>
 </footer>
 
 </main>

@@ -191,7 +191,8 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	}
 	summary = min(summary, after)
 	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after, summary)
-	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, upTo, likely, after, s.MinFixSaving); ok {
+	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, mainSessionsOver(sessions, s.ContextThreshold),
+		upTo, likely, after, s.MinFixSaving); ok {
 		// The likely saving rests on the size after a compaction, measured
 		// on few compactions: show what its quartiles give.
 		if lo, hi := r.Growth.ResumeLow, r.Growth.ResumeHigh; lo > 0 && hi > lo {
@@ -383,4 +384,22 @@ func sortActions(r *Results) {
 		}
 		return a.Expected() > b.Expected()
 	})
+}
+
+// mainSessionsOver counts the main sessions with a turn over threshold
+// tokens of context: those the compaction card's replay can change.
+func mainSessionsOver(sessions []event.Session, threshold int) int {
+	n := 0
+	for _, s := range sessions {
+		if s.Kind != event.MainSession {
+			continue
+		}
+		for _, t := range s.Turns {
+			if t.Context() > threshold {
+				n++
+				break
+			}
+		}
+	}
+	return n
 }

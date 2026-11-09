@@ -62,18 +62,23 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 // ForCompaction recommends compacting earlier when sessions grew past the
 // limit without compacting (P19's fix, with P10's records; ADR 0031), or
 // returns false if compacting would save less than minCost. threshold is the context
-// size, in tokens, at which to compact; likely and upTo come from
-// detectors.LikelyCompactionSaving, and after is the size it assumed.
-func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
+// size, in tokens, at which to compact, and over the number of main sessions
+// that passed it; likely and upTo come from detectors.LikelyCompactionSaving,
+// and after is the size it assumed.
+func ForCompaction(g detectors.Growth, threshold, over int, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
 	if upTo < minCost {
 		return Recommendation{}, false
 	}
+	finding := fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
+		"%s passed %s tokens; Claude Code compacts on its own only near the limit.",
+		plural(over, "session"), thousandsInt(threshold))
+	if g.Uncompacted > 0 {
+		finding += fmt.Sprintf(" %s went past %s tokens without compacting at all.", plural(g.Uncompacted, "session"), thousandsInt(g.Limit))
+	}
 	return Recommendation{
-		Pattern: "P19",
-		Title:   "Compact long sessions earlier",
-		Finding: fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
-			"%d sessions passed %s tokens without compacting; Claude Code compacts on its own only near the limit.",
-			g.Uncompacted, thousandsInt(g.Limit)),
+		Pattern:   "P19",
+		Title:     "Compact long sessions earlier",
+		Finding:   finding,
 		Saving:    upTo,
 		Likely:    likely,
 		Estimated: true,

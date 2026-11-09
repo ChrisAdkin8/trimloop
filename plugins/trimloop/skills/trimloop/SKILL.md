@@ -23,8 +23,12 @@ re-sending it cheaper").
 
 ## 1. Make sure trimloop is installed
 
-Run `trimloop --version`. If the command is not found, stop and tell the
-user how to install it; do not install it yourself without their yes:
+Run `trimloop --version`. If the command is not found, try
+`~/.local/bin/trimloop --version`: if that works, trimloop is installed but
+that folder is not on their PATH; use the full path for the rest of this
+skill and tell them how to add the folder (README, "Install"). If neither
+works, stop and tell the user how to install it; do not install it
+yourself without their yes:
 
 - with Go 1.27.3 or later, from a clone of
   https://github.com/ChrisAdkin8/trimloop:
@@ -77,7 +81,11 @@ Read these fields from the JSON:
 
 Explain the top three actions: what the habit is, what it cost, the fix in
 one or two steps, and the likely saving next to the "up to" figure. Then
-offer the rest briefly.
+offer the rest briefly. If `actions` is empty or null (common with
+`--since` over a few days), say there is nothing worth changing in that
+period, give the spend and `period.per_week`, and, if they were checking
+whether a change worked, offer to compare with a run over the weeks
+before it.
 
 Always say, in plain words:
 
@@ -107,9 +115,11 @@ the user stopped early (`rm -r /tmp/tmp.Ab12Cd`, with its real path).
 
 ## 5. Live nudges (optional)
 
-trimloop can also show a status line in Claude Code (session size, cost,
-how long the cache has left, and usage-limit readings for Pro and Max)
-and nudge when a session gets large. Check with:
+trimloop can also show a status line in Claude Code (session size, cost
+and how long the cache has left), nudge when a session gets large, and,
+for Pro and Max, keep the usage-limit readings Claude Code gives the status
+line, so reports can show savings as a share of the weekly limit. It
+saves those readings; it does not show them in the status line. Check with:
 
 ```bash
 trimloop setup --check

@@ -65,6 +65,13 @@ func SetupSnippet(exe string) string {
 	return string(b)
 }
 
+// HooksSnippet is the JSON for trimloop's hooks alone, for settings that
+// keep another program's status line.
+func HooksSnippet(exe string) string {
+	b, _ := json.MarshalIndent(map[string]any{"hooks": claudeSettings(exe)["hooks"]}, "", "  ")
+	return string(b)
+}
+
 // ErrStatusLineTaken means the settings already have a different status line.
 var ErrStatusLineTaken = errors.New("the settings already have a status line; use --replace-statusline to replace it")
 
@@ -229,6 +236,11 @@ func WriteSettings(path, exe string, replace bool) (backup string, changed bool,
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		old = nil
+		// Name the missing folder, not the temporary file writeAtomic
+		// would fail to make in it.
+		if dir := filepath.Dir(path); !isDir(dir) {
+			return "", false, fmt.Errorf("cannot write %s: the folder %s does not exist (Claude Code makes it the first time it runs); nothing was written", path, dir)
+		}
 	case err != nil:
 		return "", false, err
 	default:
@@ -357,6 +369,12 @@ func CheckSettings(path, exe string) (Check, error) {
 		c.Hooks[event] = hookState(list, exe, arg)
 	}
 	return c, nil
+}
+
+// isDir reports whether path is a folder.
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 // writeBackup copies data to a new backup file next to path, never

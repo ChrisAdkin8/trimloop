@@ -238,7 +238,7 @@ class Log:
         self.conv = rel[1] if self.sub else stem
         self.id = f"{rel[1]}/{stem}" if self.sub else stem
         self.replies = {}  # message id -> reply, in first-seen order
-        self.compactions = []  # (line uuid, trigger, time)
+        self.compactions = []  # dicts: line id, trigger, time, reply time
         self.records = []  # (startTime, totalCostUSD, unknown, date of the last reply before it)
         self.first_cwd = None
         self.agent_type = None  # the harness's attributionAgent, else meta.json
@@ -249,80 +249,97 @@ class Log:
     def read(self):
         fixed = 0  # tokens in the latest prompt snapshot
         last_reply = None
-        with open(self.path, encoding="utf-8", errors="replace") as f:
-            for n, raw in enumerate(f):
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    o = json.loads(raw)
-                except ValueError:
-                    self.bad += 1
-                    continue
-                if not isinstance(o, dict):
-                    self.bad += 1
-                    continue
-                t = when(o.get("timestamp"))
-                if t:
-                    self.times.append(t)
-                if self.first_cwd is None and o.get("cwd"):
-                    self.first_cwd = o["cwd"]
-                kind = o.get("type")
+        pending = None  # the compaction no reply has followed yet
+        with open(self.path, "rb") as f:
+            data = f.read()
+        # measurements.md, "Bad lines": a last line with no line ending is
+        # unfinished (still being written) and skipped; blank lines are
+        # skipped; any other line that is not a JSON object is a bad line,
+        # counted and skipped.
+        lines = data.split(b"\n")[:-1]  # the piece after the last \n is unfinished
+        for n, raw in enumerate(lines):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                o = json.loads(raw.decode("utf-8", errors="replace"))
+            except ValueError:
+                self.bad += 1
+                continue
+            if not isinstance(o, dict):
+                self.bad += 1
+                continue
+            t = when(o.get("timestamp"))
+            if t:
+                self.times.append(t)
+            if self.first_cwd is None and o.get("cwd"):
+                self.first_cwd = o["cwd"]
+            kind = o.get("type")
+            if (
+                kind == "attachment"
+                and (o.get("attachment") or {}).get("type") == "prompt_snapshot"
+            ):
+                fixed = snapshot_tokens(o["attachment"])
+            elif kind == "system" and o.get("subtype") == "compact_boundary":
+                # A second marker before any reply: the first is never
+                # replied to (measurements.md, "Where a compaction falls").
+                pending = dict(
+                    id=o.get("uuid") or f"{self.path}:{n}",
+                    trigger=(o.get("compactMetadata") or {}).get("trigger"),
+                    time=t,
+                    replied=False,
+                    reply=None,  # the time of the reply it goes with
+                )
+                self.compactions.append(pending)
+            elif kind == "cost-state" and o.get("totalCostUSD") is not None:
+                self.records.append(
+                    (
+                        o.get("startTime"),
+                        float(o["totalCostUSD"]),
+                        bool(o.get("hasUnknownModelCost")),
+                        last_reply,
+                    )
+                )
+            elif kind == "assistant":
+                m = o.get("message") or {}
+                u = m.get("usage")
                 if (
-                    kind == "attachment"
-                    and (o.get("attachment") or {}).get("type") == "prompt_snapshot"
+                    not isinstance(u, dict)
+                    or m.get("model") == SYNTHETIC
+                    or o.get("isApiErrorMessage")
                 ):
-                    fixed = snapshot_tokens(o["attachment"])
-                elif kind == "system" and o.get("subtype") == "compact_boundary":
-                    self.compactions.append(
-                        (
-                            o.get("uuid") or f"{self.path}:{n}",
-                            (o.get("compactMetadata") or {}).get("trigger"),
-                            t,
-                        )
+                    continue  # not a request to the model: a made-up or error reply
+                mid = (
+                    m.get("id")
+                    or f"line:{o.get('uuid') or self.path + ':' + str(n)}"
+                )
+                tok = reply_tokens(u)
+                if self.agent_type is None and o.get("attributionAgent"):
+                    self.agent_type = o["attributionAgent"]
+                prev = self.replies.get(mid)
+                if prev is None and pending is not None:
+                    # The first reply after a compaction takes it, unless it
+                    # was logged after the marker but timed before it: then
+                    # it belongs before it (it triggered it).
+                    if not (t and pending["time"] and t < pending["time"]):
+                        pending["replied"], pending["reply"] = True, t
+                        pending = None
+                if prev is None:
+                    self.replies[mid] = dict(
+                        id=mid,
+                        model=m.get("model"),
+                        tok=tok,
+                        time=t,
+                        cwd=o.get("cwd"),
+                        fast=u.get("speed") == "fast",
+                        us=u.get("inference_geo") == "us",
+                        fixed=fixed,
+                        log=self,
                     )
-                elif kind == "cost-state" and o.get("totalCostUSD") is not None:
-                    self.records.append(
-                        (
-                            o.get("startTime"),
-                            float(o["totalCostUSD"]),
-                            bool(o.get("hasUnknownModelCost")),
-                            last_reply,
-                        )
-                    )
-                elif kind == "assistant":
-                    m = o.get("message") or {}
-                    u = m.get("usage")
-                    if (
-                        not isinstance(u, dict)
-                        or m.get("model") == SYNTHETIC
-                        or o.get("isApiErrorMessage")
-                    ):
-                        continue  # not a request to the model: a made-up or error reply
-                    mid = (
-                        m.get("id")
-                        or f"line:{o.get('uuid') or self.path + ':' + str(n)}"
-                    )
-                    tok = reply_tokens(u)
-                    if self.agent_type is None and o.get("attributionAgent"):
-                        self.agent_type = o["attributionAgent"]
-                    prev = self.replies.get(mid)
-                    if prev is None:
-                        self.replies[mid] = dict(
-                            id=mid,
-                            model=m.get("model"),
-                            tok=tok,
-                            time=t,
-                            cwd=o.get("cwd"),
-                            fast=u.get("speed") == "fast",
-                            us=u.get("inference_geo") == "us",
-                            fixed=fixed,
-                            log=self,
-                        )
-                    elif sum(tok) > sum(prev["tok"]):
-                        prev["tok"] = tok  # the fullest line of a streamed reply counts
-                    if t and (last_reply is None or t > last_reply):
-                        last_reply = t
+                elif sum(tok) > sum(prev["tok"]):
+                    prev["tok"] = tok  # the fullest line of a streamed reply counts
+                if t and (last_reply is None or t > last_reply):
+                    last_reply = t
         if self.sub and self.agent_type is None:
             try:
                 with open(self.path[: -len(".jsonl")] + ".meta.json") as f:
@@ -483,17 +500,23 @@ def recount(cfg, tz):
         "per_week": R["total"] / (days / 7) if days >= 7 else 0.0,
     }
 
-    # Compactions: each marker once by line id, wherever copied.
+    # Compactions: each marker once by line id, wherever copied (in the
+    # oldest log that has it, like replies).
     comp = {}
     for log in sorted(logs, key=age):
-        for line_id, trigger, t in log.compactions:
-            comp.setdefault(line_id, (trigger, t))
+        last = max((r["time"] for r in log.replies.values() if r["time"]), default=None)
+        for c in log.compactions:
+            comp.setdefault(c["id"], (c, last))
     R["compactions"] = {
         "total": len(comp),
-        "manual": sum(1 for tr, _ in comp.values() if tr == "manual"),
+        "manual": sum(1 for c, _ in comp.values() if c["trigger"] == "manual"),
     }
-    for _, t in comp.values():
-        if t:  # in the week it happened
+    # measurements.md, "Compactions by week": in the week of the reply it
+    # goes with; one no reply followed in its own week, or, with no time of
+    # its own, in the week of its session's last reply.
+    for c, last in comp.values():
+        t = c["reply"] if c["replied"] else c["time"] or last
+        if t:
             weeks[monday(t, tz)]["compactions"] += 1
 
     # P19: turns over 200k. Cost: their input cost. Saving: the tokens above

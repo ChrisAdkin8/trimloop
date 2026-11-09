@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -113,6 +115,52 @@ func TestShellArg(t *testing.T) {
 	} {
 		if got := shellArg(in); got != want {
 			t.Errorf("shellArg(%q) = %s, want %s", in, got, want)
+		}
+	}
+}
+
+// Mistakes on the command line are named in one line before any log is
+// read, with the valid choices.
+func TestCheckOptions(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	in := func(name string) string { return filepath.Join(dir, name) }
+	for _, c := range []struct {
+		name string
+		o    cliOptions
+		want string // "" for no error
+	}{
+		{"defaults", cliOptions{format: "summary"}, ""},
+		{"unknown command", cliOptions{args: []string{"report"}, first: true, format: "summary"},
+			`unknown command "report": run "trimloop" to analyse your logs, or "trimloop setup"`},
+		{"word after options", cliOptions{args: []string{"extra"}, format: "text"}, `unexpected "extra"`},
+		{"unknown format", cliOptions{format: "txt"}, `unknown format "txt": use summary, text, html or json`},
+		{"open needs html", cliOptions{format: "json", open: true}, "--open opens the web page, so it needs --format html"},
+		{"missing folder", cliOptions{format: "html", out: "nodir/x.html"}, "the folder nodir does not exist"},
+		{"folder is a file", cliOptions{format: "html", out: file + "/x.html"}, "is a file, not a folder"},
+		{"out is a folder", cliOptions{format: "html", out: dir}, "is a folder: give a file name"},
+		{"open writes html to .json", cliOptions{format: "html", open: true, out: in("x.json")},
+			"ends in .json, but the report would be written as html. Use a file name ending in .html, or leave out --open and add --format json"},
+		{"json to .html", cliOptions{format: "json", out: in("x.html")},
+			"ends in .html, but the report would be written as json. Use a file name ending in .json, or add --format html"},
+		{"summary to .json", cliOptions{format: "summary", out: in("x.json")}, "add --format json"},
+		{"text to .htm", cliOptions{format: "text", out: in("x.HTM")}, "add --format html"},
+		{"html to .html", cliOptions{format: "html", open: true, out: in("x.html")}, ""},
+		{"summary to .txt", cliOptions{format: "summary", out: in("x.txt")}, ""},
+		{"text to .txt", cliOptions{format: "text", out: in("x.txt")}, ""},
+		{"json to .json", cliOptions{format: "json", out: in("x.json")}, ""},
+		{"no extension", cliOptions{format: "json", out: in("report")}, ""},
+		{"other extension", cliOptions{format: "text", out: in("report.md")}, ""},
+	} {
+		err := checkOptions(c.o)
+		switch {
+		case c.want == "" && err != nil:
+			t.Errorf("%s: got %v, want no error", c.name, err)
+		case c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)):
+			t.Errorf("%s: got %v, want %q", c.name, err, c.want)
 		}
 	}
 }

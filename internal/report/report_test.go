@@ -598,6 +598,15 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 			t.Fatalf("titles %v: %v", titles, err)
 		}
 		page := out.String()
+		// The footer says what the page shows.
+		for footer, want := range map[string]bool{
+			"It shows project names and session titles": titles,
+			"session titles and ids are left out":       !titles,
+		} {
+			if strings.Contains(page, footer) != want {
+				t.Errorf("titles %v: footer %q shown %v, want %v", titles, footer, !want, want)
+			}
+		}
 		hasID := strings.Contains(page, "1a59c906") || strings.Contains(page, `title="Session m1"`)
 		if hasID == !titles || !strings.Contains(page, "unnamed connector") || !strings.Contains(page, "</html>") {
 			t.Errorf("titles %v: ids shown %v; page ends %q", titles, hasID, page[len(page)-40:])

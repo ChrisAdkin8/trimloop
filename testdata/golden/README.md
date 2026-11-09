@@ -43,7 +43,7 @@ other subtests do not run until the prices agree.
 
 ## What the logs cover
 
-16 logs (10 main sessions, 6 sub-agents, one log with no counted reply), 78
+19 logs (13 main sessions, 6 sub-agents, one log with no counted reply), 90
 turns over four calendar weeks (replies from 12 Oct to 5 Nov 2026, and a
 prompt on 7 Nov):
 
@@ -71,7 +71,7 @@ prompt on 7 Nov):
   pause that rebuilt the cache, where the fixed start (the
   `prompt_snapshot`) decides which removed tokens were read and which
   written; compaction markers with `compactMetadata` (automatic and manual,
-  one in a sub-agent, one no reply followed).
+  one in a sub-agent, some no reply followed).
 - **Projects**: a subfolder (`alpha/web`), an unrelated folder and its
   subfolder (`gamma`, `gamma/tools`), a worktree under `.claude/worktrees`
   (counts as `beta`), a git worktree elsewhere (`epsilon-worktrees/feat`,
@@ -88,6 +88,20 @@ prompt on 7 Nov):
   an unpriced turn, and conversations with no record.
 - **Weeks**: a session that crosses from Sunday to Monday in UTC, and
   sessions that fall in another week in Los Angeles, Kolkata or Auckland.
+- **Compactions by week** (`kappa-*`): a compaction counts in the week of
+  the reply it goes with, and one no reply followed in its own week. In
+  Kolkata, a compaction just after Monday 00:00 whose triggering reply is
+  logged after the marker but timed before it, on Sunday (it stays before
+  the compaction), and whose next reply is just after it; in Auckland, a
+  manual compaction just before Monday 00:00 whose next reply is just after
+  (it counts in the new week), with an earlier compaction and no reply
+  between the two (that one counts in its own week); in every zone, a
+  compaction no reply followed eleven days after its session's last reply
+  (its own week, not the last reply's).
+- **Bad lines**: a line cut short in the middle of `kappa-1` and a JSON list
+  in `kappa-2` (two bad lines, counted and skipped); a blank line, and a
+  reply cut short at the end of `kappa-3` with no line ending (an
+  unfinished last line), both skipped and not counted.
 - **Period**: a prompt two days after the last reply, the last line of all
   the logs; the period runs from the first counted reply to the last.
 
@@ -102,9 +116,11 @@ go test ./cmd/trimloop/ -run Golden -v
 ```
 
 `scripts/check.sh` checks that the committed files are what the scripts make
-now (skipped with a note when `python3` is missing): it writes the logs
-(`gen-golden.py --out`) and the answers into a scratch folder and fails if
-`projects/` or `expected.json` differ. Edit the scripts, not the files.
+now: it writes the logs (`gen-golden.py --out`) and the answers into a
+scratch folder and fails if any file here but this README differs, is
+missing or is extra, or if either script fails. Without `python3` it skips
+the step with a note, except in CI (`CI` set), where it fails. Edit the
+scripts, not the files.
 
 To compare the built CLI with the recount, figure by figure:
 

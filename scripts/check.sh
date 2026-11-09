@@ -6,7 +6,8 @@
 #   go vet         common mistakes
 #   golangci-lint  linters in .golangci.yml
 #   go test -race  tests, with the data-race detector
-#   golden drift   testdata/golden is what its scripts make (skipped without python3)
+#   golden drift   testdata/golden is what its scripts make (skipped without
+#                  python3, except in CI, where it fails)
 #   claude plugin validate  the marketplace and the plugin (skipped without claude)
 #   govulncheck    known vulnerabilities in dependencies (needs network)
 #
@@ -19,7 +20,7 @@ OFFLINE=0
 for arg in "$@"; do
   case "$arg" in
     --offline) OFFLINE=1 ;;
-    -h|--help) sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -75,26 +76,42 @@ check "go test -race" go test -race ./...
 
 # The end-to-end test's logs and expected answers must be what
 # scripts/gen-golden.py and scripts/recount.py make today: regenerate both
-# into a scratch folder and compare (testdata/golden/README.md).
-golden_fresh() {
+# into a scratch folder and compare every file but the README
+# (testdata/golden/README.md), so a stray or missing file fails too.
+# It runs in a subshell, so its EXIT trap removes the scratch folder however
+# it ends.
+golden_fresh() (
   local tmp status=0
+  local hint="  regenerate testdata/golden with its scripts (testdata/golden/README.md, \"Regenerating\")"
   tmp="$(mktemp -d)"
-  if python3 -I scripts/gen-golden.py --out "$tmp" >/dev/null \
-    && python3 -I scripts/recount.py "$tmp" --json "$tmp/expected.json"; then
-    if ! diff -rq testdata/golden/projects "$tmp/projects" \
-      || ! diff -q testdata/golden/expected.json "$tmp/expected.json"; then
-      echo "  testdata/golden differs from what its scripts make: regenerate it (testdata/golden/README.md)"
-      status=1
-    fi
-  else
+  trap 'rm -rf "$tmp"' EXIT
+  if ! python3 -I scripts/gen-golden.py --out "$tmp" >/dev/null; then
+    echo "  scripts/gen-golden.py failed"
+    echo "$hint"
+    return 1
+  fi
+  if ! python3 -I scripts/recount.py "$tmp" --json "$tmp/expected.json"; then
+    echo "  scripts/recount.py failed"
+    echo "$hint"
+    return 1
+  fi
+  if ! diff -r -x README.md testdata/golden "$tmp" >/dev/null; then
+    diff -rq -x README.md testdata/golden "$tmp" | sed 's/^/  /' || true
+    echo "  testdata/golden differs from what its scripts make"
+    echo "$hint"
     status=1
   fi
-  rm -rf "$tmp"
   return "$status"
-}
+)
 
 if command -v python3 >/dev/null 2>&1; then
   check "golden drift" golden_fresh
+elif [[ -n ${CI:-} ]]; then
+  # Without this, a runner image that dropped Python would drop the guard
+  # silently.
+  printf '%s==> golden drift%s\n' "$BOLD" "$RESET"
+  printf '  %s✗%s golden drift: python3 not found, and CI needs it for this step (install Python in the workflow)\n' "$RED" "$RESET"
+  failed+=("golden drift")
 else
   printf '%s==> golden drift%s\n  skipped (python3 not installed; CI runs it)\n' "$BOLD" "$RESET"
 fi

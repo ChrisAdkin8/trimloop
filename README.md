@@ -101,7 +101,17 @@ last option). Once releases are public, any one of these works:
   go build -o ~/.local/bin/trimloop ./cmd/trimloop
   ```
 
-Check it worked with `trimloop --version`.
+Check it worked with `trimloop --version`. If the shell says "command not
+found", the folder is not on your PATH (the list of folders the shell
+looks in for commands; on macOS `~/.local/bin` is not on it by default).
+Add it, then open a new terminal:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+```
+
+(Use `~/.bashrc` if your shell is bash.) Or run it as
+`~/.local/bin/trimloop` meanwhile.
 
 ## Use it
 
@@ -176,23 +186,30 @@ Trimloop can also nudge you while you work:
   session's size, its cost, and how long its cache has left;
 - a message when a session passes 200,000 and 500,000 tokens;
 - after a long break in a session over 500,000 tokens, a pause before your
-  first message, once, showing what sending it will cost.
+  first message, once, showing what sending it will cost. The pause stops
+  that message: it is not sent, and you send it again to go ahead (or
+  `/clear` first to start fresh). It also applies to scripted runs
+  (`claude -p`) of such a session.
 
 The messages come from *hooks*: commands Claude Code runs after each reply
 and before each message. With trimloop [installed](#install):
 
 ```bash
 trimloop setup                                      # print the settings to add, and the file
-trimloop setup --write ~/.claude/settings.json      # or add them for you
+trimloop setup --write <the file setup named>       # or add them for you
 trimloop setup --check                              # is everything set up and working?
 ```
 
 With `CLAUDE_CONFIG_DIR` set, Claude Code's settings file is
 `settings.json` in that folder: `trimloop setup` names the right one.
 
-`setup --write` saves a backup of your settings first, and leaves another
-status line alone unless you add `--replace-statusline`. `setup --check`
-changes nothing. New Claude Code sessions pick up the change. Details:
+`setup --write` saves a backup of your settings first and says how to put
+it back. If you already have another status line, it changes nothing at
+all, hooks included: add `--replace-statusline` to replace yours, or add
+the hooks by hand from what `trimloop setup` prints. `setup --check`
+changes nothing. New Claude Code sessions pick up the change. To undo,
+copy the backup back, or delete trimloop's `statusLine` and `hooks`
+entries. Details:
 [ADR 0034](docs/adr/0034-live-nudges.md).
 
 ## Files it writes

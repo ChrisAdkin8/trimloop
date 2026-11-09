@@ -83,15 +83,12 @@ func runNudge(cmd string, args []string, in io.Reader, out io.Writer, home strin
 // settings file with --write.
 func setup(args []string, home string) int {
 	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
+	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
+	defaultSettings := userSettings(home, cfgDir)
 	write := fs.String("write", "", "add the settings to this Claude Code settings file (a backup is made first), e.g. "+
-		filepath.Join(home, ".claude", "settings.json"))
+		shellArg(defaultSettings))
 	replace := fs.Bool("replace-statusline", false, "replace an existing status line")
 	check := fs.Bool("check", false, "say whether the status line, hooks and usage-limit readings are working; change nothing")
-	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
-	defaultSettings := filepath.Join(home, ".claude", "settings.json")
-	if cfgDir != "" {
-		defaultSettings = filepath.Join(cfgDir, "settings.json")
-	}
 	settingsFile := fs.String("settings", defaultSettings, "the Claude Code settings file --check reads and plain setup names")
 	if err := fs.Parse(args); err != nil {
 		return 2
@@ -116,13 +113,56 @@ func setup(args []string, home string) int {
 		fmt.Println(live.SetupSnippet(exe))
 		return 0
 	}
-	return writeSetup(os.Stdout, os.Stderr, *write, exe, *replace)
+	return writeSetup(os.Stdout, os.Stderr, *write, exe, *replace, home, cfgDir)
+}
+
+// userSettings is the user settings file Claude Code reads: in
+// CLAUDE_CONFIG_DIR when it is set, else in ~/.claude.
+func userSettings(home, cfgDir string) string {
+	if cfgDir != "" {
+		return filepath.Join(cfgDir, "settings.json")
+	}
+	return filepath.Join(home, ".claude", "settings.json")
+}
+
+// unreadSettings returns the settings file Claude Code reads instead of
+// path, when path is in ~/.claude but CLAUDE_CONFIG_DIR points Claude Code
+// at another folder; "" otherwise. A project's .claude/settings.json is
+// read wherever CLAUDE_CONFIG_DIR points, so it is not warned about.
+func unreadSettings(path, home, cfgDir string) string {
+	userDir := filepath.Join(home, ".claude")
+	if cfgDir == "" || !sameDir(filepath.Dir(path), userDir) || sameDir(cfgDir, userDir) {
+		return ""
+	}
+	return userSettings(home, cfgDir)
+}
+
+// sameDir reports whether a and b name the same folder, following links
+// when both exist.
+func sameDir(a, b string) bool {
+	ia, errA := os.Stat(a)
+	ib, errB := os.Stat(b)
+	if errA == nil && errB == nil {
+		return os.SameFile(ia, ib)
+	}
+	absA, errA := filepath.Abs(a)
+	absB, errB := filepath.Abs(b)
+	return errA == nil && errB == nil && absA == absB
 }
 
 // writeSetup adds the nudges to a settings file for 'trimloop setup --write'
-// and says what it did.
-func writeSetup(stdout, stderr io.Writer, path, exe string, replace bool) int {
+// and says what it did, and how to undo it.
+func writeSetup(stdout, stderr io.Writer, path, exe string, replace bool, home, cfgDir string) int {
+	if reads := unreadSettings(path, home, cfgDir); reads != "" {
+		fmt.Fprintf(stderr, "Warning: CLAUDE_CONFIG_DIR is set, so Claude Code reads %s, not %s.\n"+
+			"  To add the nudges where Claude Code will see them, run: trimloop setup --write %s\n", reads, path, shellArg(reads))
+	}
 	backup, changed, err := live.WriteSettings(path, exe, replace)
+	if errors.Is(err, live.ErrStatusLineTaken) {
+		fmt.Fprintf(stderr, "Nothing was written, hooks included: %s already has another program's status line.\n", path)
+		fmt.Fprint(stderr, otherStatusLineChoices(path, exe, false))
+		return 1
+	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -132,11 +172,30 @@ func writeSetup(stdout, stderr io.Writer, path, exe string, replace bool) int {
 		return 0
 	}
 	fmt.Fprintf(stdout, "Added trimloop's status line and hooks to %s.\n", path)
-	if backup != "" {
-		fmt.Fprintf(stdout, "The previous file is saved as %s.\n", backup)
-	}
 	fmt.Fprintln(stdout, "They take effect in new Claude Code sessions.")
+	if backup != "" {
+		fmt.Fprintf(stdout, "To undo this, put the previous file back: cp %s %s\n", shellArg(backup), shellArg(path))
+	} else {
+		fmt.Fprintf(stdout, "There was no settings file before; to undo this, delete %s (or its statusLine and hooks entries).\n", path)
+	}
 	return 0
+}
+
+// otherStatusLineChoices says what to do when a settings file already has
+// another program's status line, which 'setup --write' does not replace
+// unless asked: replace it, or keep it and add only the hooks by hand.
+// When the hooks are already in place (hooksDone), only the first choice
+// is left.
+func otherStatusLineChoices(path, exe string, hooksDone bool) string {
+	if hooksDone {
+		return fmt.Sprintf("trimloop's hooks are in place. To use trimloop's status line instead (a backup is made first), run:\n"+
+			"  trimloop setup --write %s --replace-statusline\n", shellArg(path))
+	}
+	return fmt.Sprintf("You can either:\n"+
+		"  - use trimloop's status line instead (a backup is made first):\n"+
+		"      trimloop setup --write %s --replace-statusline\n"+
+		"  - or keep your status line and add only trimloop's hooks, by merging this into %s:\n\n%s\n",
+		shellArg(path), path, live.HooksSnippet(exe))
 }
 
 // analyse reads every session log and writes the report.
@@ -170,12 +229,14 @@ func analyse() {
 	if *open && !formatSet {
 		*format = "html"
 	}
-	if flag.NArg() > 0 || !validFormat[*format] {
-		flag.Usage()
-		os.Exit(2)
-	}
-	if *open && *format != "html" {
-		fmt.Fprintln(os.Stderr, "--open opens the web page, so it needs --format html.")
+	if err := checkOptions(cliOptions{
+		args:   flag.Args(),
+		first:  flag.NArg() == len(os.Args)-1, // nothing came before the first word
+		format: *format,
+		open:   *open,
+		out:    *out,
+	}); err != nil {
+		fmt.Fprintf(os.Stderr, "%v.\nRun 'trimloop --help' to see every option.\n", err)
 		os.Exit(2)
 	}
 	var since time.Time
@@ -273,7 +334,8 @@ func analyse() {
 	}
 	path, err := write(r, *format, *out)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "Could not write the report: %v\n", err)
+		os.Exit(1)
 	}
 	if *open {
 		if err := openInBrowser(path); err != nil {

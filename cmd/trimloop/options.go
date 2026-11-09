@@ -1,11 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -165,6 +170,88 @@ func openInBrowser(path string) error {
 		return fmt.Errorf("could not open %s: %w", path, err)
 	}
 	return cmd.Process.Release()
+}
+
+// cliOptions is what checkOptions looks at on the analyse command line.
+type cliOptions struct {
+	args   []string // words left after the options
+	first  bool     // args[0] was the command line's first word
+	format string   // after --open has made html the default
+	open   bool
+	out    string
+}
+
+// formatFor is the format each --out extension promises, and the formats
+// that may be written to it.
+var formatFor = map[string][]string{
+	".json": {"json"},
+	".txt":  {"text", "summary"},
+	".html": {"html"},
+	".htm":  {"html"},
+}
+
+// checkOptions finds mistakes on the analyse command line before any log
+// is read, and says in plain words what is wrong and how to fix it.
+func checkOptions(o cliOptions) error {
+	if len(o.args) > 0 {
+		if o.first {
+			return fmt.Errorf(`unknown command %q: run "trimloop" to analyse your logs, or "trimloop setup" to add live nudges to Claude Code`, o.args[0])
+		}
+		return fmt.Errorf("unexpected %q: options go before it, and trimloop takes no other words", o.args[0])
+	}
+	if !validFormat[o.format] {
+		return fmt.Errorf("unknown format %q: use summary, text, html or json", o.format)
+	}
+	if o.open && o.format != "html" {
+		return errors.New("--open opens the web page, so it needs --format html")
+	}
+	if o.out == "" {
+		return nil
+	}
+	if err := checkOutFolder(o.out); err != nil {
+		return err
+	}
+	ext := strings.ToLower(filepath.Ext(o.out))
+	allowed, known := formatFor[ext]
+	if !known || slices.Contains(allowed, o.format) {
+		return nil
+	}
+	fix := fmt.Sprintf("add --format %s", allowed[0])
+	if o.open {
+		fix = fmt.Sprintf("leave out --open and add --format %s", allowed[0])
+	}
+	return fmt.Errorf("--out %s ends in %s, but the report would be written as %s. Use a file name ending in %s, or %s",
+		o.out, ext, o.format, extFor(o.format), fix)
+}
+
+// extFor is the file name ending that suits a format.
+func extFor(format string) string {
+	switch format {
+	case "html":
+		return ".html"
+	case "json":
+		return ".json"
+	}
+	return ".txt"
+}
+
+// checkOutFolder makes sure the report can go to path: its folder exists
+// and path is not itself a folder.
+func checkOutFolder(path string) error {
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return fmt.Errorf("--out %s is a folder: give a file name, such as %s", path, filepath.Join(path, defaultHTML))
+	}
+	dir := filepath.Dir(path)
+	info, err := os.Stat(dir)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("--out %s: the folder %s does not exist. Create it first, or choose another place", path, dir)
+	case err != nil:
+		return fmt.Errorf("--out %s: cannot use the folder %s: %w", path, dir, err)
+	case !info.IsDir():
+		return fmt.Errorf("--out %s: %s is a file, not a folder", path, dir)
+	}
+	return nil
 }
 
 // noLogsMessage explains an empty run.
