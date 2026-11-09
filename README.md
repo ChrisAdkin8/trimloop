@@ -4,10 +4,11 @@ Trimloop reads the session logs Claude Code keeps on your machine, works out
 where your tokens went, and tells you which changes to how you work would save
 the most money.
 
-**Status: early prototype** (milestone M0 in the [roadmap](ROADMAP.md)). Today it analyses Claude Code logs and gives live
-nudges inside Claude Code. It recommends; it does not change anything for
-you. The wider product (gateway plugin, team collector, automatic fixes) is
-design only: see [The plan](#the-plan).
+**Status: early prototype** (milestone M0 in the [roadmap](ROADMAP.md)).
+Today it analyses Claude Code logs and gives live nudges inside Claude
+Code. It recommends; it does not change anything for you. The wider
+product (gateway plugin, team collector, automatic fixes) is design only:
+see [The plan](#the-plan).
 
 ## What you get
 
@@ -47,12 +48,11 @@ code: download it ("Download raw file") and open it in a browser.
 - On a Pro or Max plan you pay a flat fee instead. The report says so and
   counts how often you hit a usage limit. Once trimloop's status line is set
   up ([Live nudges](#live-nudges-in-claude-code)), it also shows, in time,
-  each saving as a share of your weekly limit. Why it works this way is in
-  [ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md): ADRs
-  (*architecture decision records*) are the project's design decisions, in
-  [docs/adr/](docs/adr/README.md).
-- "Up to" is the most a change could save. "Likely" replays your logs as if
-  you had made the change.
+  each saving as a share of your weekly limit
+  ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md); ADRs are the
+  project's [decision records](#documents)).
+- "Up to" is the most a change could save. "Likely", where an action has
+  it, replays your logs as if you had made the change.
 - Savings overlap (the same tokens can be saved by several changes), so
   they are never added up.
 - Claude Code makes some requests its logs do not record. The report says
@@ -68,7 +68,7 @@ How each figure is worked out is in [docs/measurements.md](docs/measurements.md)
 |---|---|
 | Long sessions (P19) | Every turn re-sends the whole conversation, so big sessions get expensive. When to compact or start fresh. |
 | Long breaks (P09) | After an hour away the saved copy of the conversation (the *cache*) expires, and the whole session is paid for again. |
-| Short waits (P02) | Sessions whose cache lasts only 5 minutes (sub-agents, and Claude Code run from a program) losing it while waiting on a slow command. |
+| Short waits (P02) | Sessions whose cache lasts only 5 minutes (sub-agents, and Claude Code run from a program) losing it during a wait of 5 minutes to an hour, on a slow command for example. |
 | Tool output (P04) | Large command output and file reads that stay in the conversation and are re-sent on every turn. |
 | What every request carries (P07) | The system prompt, tool definitions, skill lists and memory files sent with each request. |
 | Model choice (P13) | Sub-agents and sessions on a more expensive model than the work needs, or on an older, dearer version. |
@@ -77,9 +77,9 @@ How each figure is worked out is in [docs/measurements.md](docs/measurements.md)
 | Replies cut off (P12) | Replies cut off when the computer slept (or the network failed), so the request was sent again. |
 
 It also checks its totals against Claude Code's own cost records. It shows
-spend by project, by skill and by MCP server (the add-on tools Claude Code
-connects to). And it keeps week-by-week figures, so you can see whether a
-change worked. The codes (P19 and so on) refer to
+spend by project, by skill, by plugin and by MCP server (the add-on tools
+Claude Code connects to). And it keeps week-by-week figures, so you can
+see whether a change worked. The codes (P19 and so on) refer to
 [docs/patterns.md](docs/patterns.md).
 
 ## Install
@@ -112,6 +112,30 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 (Use `~/.bashrc` if your shell is bash.) Or run it as
 `~/.local/bin/trimloop` meanwhile.
 
+### Checking a download
+
+Download `checksums.txt`, `checksums.txt.sigstore.json` and your archive
+into one folder. First check that the release workflow signed the
+checksums (put the release's tag in place of `v0.1.0`):
+
+```bash
+cosign verify-blob \
+  --certificate-identity 'https://github.com/ChrisAdkin8/trimloop/.github/workflows/release.yml@refs/tags/v0.1.0' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  --bundle checksums.txt.sigstore.json checksums.txt
+```
+
+Then check the archive against them:
+
+```bash
+shasum -a 256 --check --ignore-missing checksums.txt
+```
+
+The macOS binaries are not yet notarised by Apple, so macOS may refuse to
+open a downloaded one until you clear its quarantine flag
+(`xattr -d com.apple.quarantine ./trimloop`); do that only after both
+checks pass. The Homebrew cask does it for you.
+
 ## Use it
 
 ```bash
@@ -140,8 +164,9 @@ trimloop --since 7d               # sessions started in the last 7 days (2w: two
 The report then covers only sessions started from then on, with their
 sub-agents. Each run also keeps weekly figures (numbers only) in
 `~/.trimloop/history.json`, so you can compare weeks even after Claude Code
-has deleted old logs. A `--since` run leaves that file alone, so a partial
-view never replaces full weeks.
+has deleted old logs; with more than one Claude Code folder
+(`CLAUDE_CONFIG_DIR`), each gets its own history file. A `--since` run
+leaves that file alone, so a partial view never replaces full weeks.
 
 ### Before you share a report
 
@@ -162,8 +187,7 @@ cp testdata/sessions/tools.jsonl /tmp/trimloop-demo/projects/demo/
 CLAUDE_CONFIG_DIR=/tmp/trimloop-demo trimloop --no-history --format text
 ```
 
-`--no-history` keeps the demo out of your weekly figures. With more than
-one Claude Code folder, each gets its own history file.
+`--no-history` keeps the demo out of your weekly figures.
 
 ## Ask Claude about it (Claude Code plugin)
 
@@ -192,10 +216,9 @@ Trimloop can also nudge you while you work:
 - after a break long enough for the cache to expire (an hour, or 5
   minutes for a session on the 5-minute cache), in a session over 500,000
   tokens, a pause before your first message, once, showing what sending it
-  will cost. The pause stops
-  that message: it is not sent, and you send it again to go ahead (or
-  `/clear` first to start fresh). It also applies to scripted runs
-  (`claude -p`) of such a session.
+  will cost. The pause stops that message: it is not sent, and you send it
+  again to go ahead (or `/clear` first to start fresh). It also applies to
+  scripted runs (`claude -p`) of such a session.
 
 The messages come from *hooks*: commands Claude Code runs after each reply
 and before each message. With trimloop [installed](#install):
@@ -287,12 +310,14 @@ Debian/Ubuntu):
 
 ```bash
 scripts/bootstrap.sh --check                       # see what is missing; changes nothing
-scripts/bootstrap.sh --skip-node --skip-python     # enough for the prototype and its checks
+scripts/bootstrap.sh --skip-node --skip-python     # enough for the prototype and most checks
 scripts/bootstrap.sh                               # everything the planned stack needs
 ```
 
-The full install adds a C toolchain and the DuckDB CLI, `buf` and the
-protobuf plugins, `uv` with Python 3.12, and Node.js 22 or later;
+With Python and Node.js skipped, the golden-drift and plugin steps run only
+if `python3` and `claude` are already installed. The full install adds a C
+toolchain and the DuckDB CLI, `buf` and the protobuf plugins, `uv` with
+Python 3.12, and Node.js 22 or later;
 `--with-collector` also checks Docker. Re-running is safe.
 
 Before committing Go changes:
@@ -304,8 +329,10 @@ scripts/check.sh --offline   # the same without govulncheck, which needs the net
 
 It runs every check, lists the failures and exits 1 if there are any.
 *Golden drift* checks that the end-to-end test's logs and expected figures
-(`testdata/golden`) are what their scripts make today. The
-linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
+(`testdata/golden`) are what their scripts make today. The linters are set
+in [.golangci.yml](.golangci.yml).
+
+The code is laid out as:
 
 | Package | What it does |
 |---|---|
@@ -327,33 +354,6 @@ Pushing a version tag builds a draft GitHub release; how to cut one, and
 the steps for making the repository public, are in
 [docs/packaging.md](docs/packaging.md#cutting-a-release).
 
-#### Checking a download
-
-Download `checksums.txt`, `checksums.txt.sigstore.json` and your archive
-into one folder. Releases built while the repository was private have no
-`.sigstore.json` file and are not published
-([ADR 0051](docs/adr/0051-private-releases-and-going-public.md)). First check
-that the release workflow signed the checksums (put the release's tag in
-place of `v0.1.0`):
-
-```bash
-cosign verify-blob \
-  --certificate-identity 'https://github.com/ChrisAdkin8/trimloop/.github/workflows/release.yml@refs/tags/v0.1.0' \
-  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-  --bundle checksums.txt.sigstore.json checksums.txt
-```
-
-Then check the archive against them:
-
-```bash
-shasum -a 256 --check --ignore-missing checksums.txt
-```
-
-The macOS binaries are not yet notarised by Apple, so macOS may refuse to
-open a downloaded one until you clear its quarantine flag
-(`xattr -d com.apple.quarantine ./trimloop`); do that only after both
-checks pass. The Homebrew cask does it for you.
-
 ## Documents
 
 | Doc | What's in it |
@@ -368,7 +368,7 @@ checks pass. The Homebrew cask does it for you.
 | [docs/value.md](docs/value.md) | Value case: levers ranked by expected saving, validation plan |
 | [docs/data-model.md](docs/data-model.md) | Event model and storage |
 | [docs/packaging.md](docs/packaging.md) | Release artefacts and pipeline |
-| [docs/adr/](docs/adr/README.md) | Decision records, with an index of what is built |
+| [docs/adr/](docs/adr/README.md) | ADRs (*architecture decision records*): one per design decision, with an index of what is built |
 | [ROADMAP.md](ROADMAP.md) | Milestones from this prototype to automatic fixes |
 
 ## Licence and security
