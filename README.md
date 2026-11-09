@@ -4,7 +4,7 @@ Trimloop reads the session logs Claude Code keeps on your machine, works out
 where your tokens went, and tells you which changes to how you work would save
 the most money.
 
-**Status: M0 prototype.** Today it analyses Claude Code logs and gives live
+**Status: early prototype** (milestone M0 in the [roadmap](ROADMAP.md)). Today it analyses Claude Code logs and gives live
 nudges inside Claude Code. It recommends; it does not change anything for
 you. The wider product (gateway plugin, team collector, automatic fixes) is
 design only: see [The plan](#the-plan).
@@ -12,11 +12,12 @@ design only: see [The plan](#the-plan).
 ## What you get
 
 A run on one developer's 45 days of logs, shortened (the full output also
-covers their usage limits and Claude Code's own cost records):
+covers their usage limits):
 
 ```text
 Read 574 logs: 573 sessions, 18,601 turns.
 Spent $2,330 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $362 a week.
+Claude Code's own records show $202 (11%) more than its logs: requests the logs do not record.
 
 What to do first (these savings overlap, so do not add them):
   1. Compact long sessions earlier: likely about $581 ($557–$694), up to $896 (38%)
@@ -43,16 +44,19 @@ code: download it ("Download raw file") and open it in a browser.
 
 - Costs are at Anthropic's *list prices*: what the tokens would cost if you
   paid per token, not your bill.
-- On a Pro or Max plan you pay a flat fee instead. The report says so,
-  counts how often you hit a usage limit, and in time shows each saving as
-  a share of your weekly limit
-  ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md)).
+- On a Pro or Max plan you pay a flat fee instead. The report says so and
+  counts how often you hit a usage limit. Once trimloop's status line is set
+  up ([Live nudges](#live-nudges-in-claude-code)), it also shows, in time,
+  each saving as a share of your weekly limit. Why it works this way is in
+  [ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md): ADRs
+  (*architecture decision records*) are the project's design decisions, in
+  [docs/adr/](docs/adr/README.md).
 - "Up to" is the most a change could save. "Likely" replays your logs as if
   you had made the change.
 - Savings overlap (the same tokens can be saved by several changes), so
   they are never added up.
 - Claude Code makes some requests its logs do not record. The report says
-  how much: 13% in the run above.
+  how much: 11% in the run above.
 - Quality is not measured. Check a change marked "untested for quality" (a
   cheaper model, lower effort) after you make it.
 
@@ -80,26 +84,21 @@ change worked. The codes (P19 and so on) refer to
 
 ## Install
 
-No release is published yet, so for now build it **from source** (the
-last option). Once releases are public, any one of these works:
+No release is published yet, so for now build it from source, with Go
+1.27.3 or later: clone this repository, then from its folder run
 
-- **Homebrew** (macOS or Linux):
+```bash
+go build -o ~/.local/bin/trimloop ./cmd/trimloop
+```
 
-  ```bash
-  brew install --cask chrisadkin8/tap/trimloop
-  ```
+Once releases are public, either of these will work instead:
 
-- **Download**, once releases are public, the archive for your system
-  from the [releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
+- **Homebrew** (macOS or Linux): `brew install --cask chrisadkin8/tap/trimloop`
+- **Download** the archive for your system from the
+  [releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
   it, and put `trimloop` somewhere on your PATH (for example
   `~/.local/bin`). [Checking a download](#checking-a-download) says how to
   verify it, and what to do if macOS refuses to open it.
-- **From source**, with Go 1.27.3 or later: clone this repository, then
-  from its folder:
-
-  ```bash
-  go build -o ~/.local/bin/trimloop ./cmd/trimloop
-  ```
 
 Check it worked with `trimloop --version`. If the shell says "command not
 found", the folder is not on your PATH (the list of folders the shell
@@ -122,11 +121,12 @@ trimloop --format text            # the full report as text
 trimloop --format json --out ~/trimloop.json   # every figure, for scripts
 ```
 
-It reads the logs in `~/.claude/projects` and sends nothing anywhere. The
+It reads the logs in `~/.claude/projects` (or in `projects` under
+`CLAUDE_CONFIG_DIR`, if you set that) and sends nothing anywhere. The
 web page is saved as `trimloop-report.html` in the current folder;
 `--out` puts it elsewhere (`--out -` prints it instead). Writing replaces
 the file; a link at that path is replaced, not followed. `trimloop help`
-lists every option.
+lists every option (`trimloop setup --help` lists setup's).
 
 ### Did a change work?
 
@@ -148,7 +148,8 @@ view never replaces full weeks.
 Reports show the titles Claude Code gives your sessions, which summarise
 what you asked, and your project names. Check a report before sharing it.
 `--no-titles` removes the titles, and the web page then shows no session
-or connector identifiers either; project, skill and server names stay.
+ids, nor the ids of MCP connectors that have no name; project, skill and
+server names stay.
 
 ### Try it without your own logs
 
@@ -176,19 +177,22 @@ and explains the result in plain words. It needs trimloop
 /plugin install trimloop@trimloop
 ```
 
-With Claude Code 2.1.275 or later, one step does both:
-`/plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The plugin
-changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
+Or, from a terminal, in one step:
+`claude plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The
+plugin changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
 
 ## Live nudges in Claude Code
 
 Trimloop can also nudge you while you work:
 
 - a *status line* (the line Claude Code shows below your prompt) with the
-  session's size, its cost, and how long its cache has left;
+  session's size, its cost, how long its cache has left, and the effort
+  level when it is set to max or xhigh;
 - a message when a session passes 200,000 and 500,000 tokens;
-- after a long break in a session over 500,000 tokens, a pause before your
-  first message, once, showing what sending it will cost. The pause stops
+- after a break long enough for the cache to expire (an hour, or 5
+  minutes for a session on the 5-minute cache), in a session over 500,000
+  tokens, a pause before your first message, once, showing what sending it
+  will cost. The pause stops
   that message: it is not sent, and you send it again to go ahead (or
   `/clear` first to start fresh). It also applies to scripted runs
   (`claude -p`) of such a session.
@@ -207,10 +211,11 @@ With `CLAUDE_CONFIG_DIR` set, Claude Code's settings file is
 
 `setup --write` saves a backup of your settings in `~/.trimloop/backups`
 first and says how to put it back. If you already have another status
-line, it changes nothing at all, hooks included: add `--replace-statusline`
-to replace yours, or add just the hooks by hand from the snippet it (and
-`setup --check`) then prints, appending to any hooks you already have. `setup --check`
-changes nothing. New Claude Code sessions pick up the change. To undo,
+line, it changes nothing at all, hooks included. You can then add
+`--replace-statusline` to replace yours. Or keep yours and add only
+trimloop's hooks by hand: `setup --write` (and `setup --check`) prints them,
+to add alongside any hooks you already have. `setup --check` changes
+nothing. New Claude Code sessions pick up the change. To undo,
 copy the backup back, or delete trimloop's `statusLine` and `hooks`
 entries. Details:
 [ADR 0034](docs/adr/0034-live-nudges.md).
@@ -253,8 +258,9 @@ Principles it is designed around:
   ([ADR 0011](docs/adr/0011-keyed-fingerprints.md),
   [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
 - **Observe before acting.** Recommendations first; changes Trimloop would
-  make to requests itself will ship report-only, then in shadow, then to a
-  few, then to all, each measured and reversible.
+  make to requests itself will ship report-only, then in shadow mode
+  (worked out and logged, not applied), then to a few, then to all, each
+  measured and reversible.
 - **Quality is a constraint.** A saving that makes the agent worse is not a
   saving: Trimloop is to track outcome signals (tests, edits, errors) alongside
   cost.
@@ -273,8 +279,11 @@ built.
 ## Development
 
 To run the prototype you need only Go. To run its checks you also need
-`golangci-lint` and `govulncheck`. `scripts/bootstrap.sh` installs what is
-missing (macOS with Homebrew, or Debian/Ubuntu):
+`golangci-lint` and `govulncheck`, plus `python3` for the end-to-end test's
+files and `claude` (Claude Code) to validate the plugin; the checks skip
+those two steps on your machine without them, but CI runs them.
+`scripts/bootstrap.sh` installs what is missing (macOS with Homebrew, or
+Debian/Ubuntu):
 
 ```bash
 scripts/bootstrap.sh --check                       # see what is missing; changes nothing
@@ -289,11 +298,13 @@ protobuf plugins, `uv` with Python 3.12, and Node.js 22 or later;
 Before committing Go changes:
 
 ```bash
-scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, plugin validation, govulncheck
+scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, golden drift, plugin validation, govulncheck
 scripts/check.sh --offline   # the same without govulncheck, which needs the network
 ```
 
-It runs every check, lists the failures and exits 1 if there are any. The
+It runs every check, lists the failures and exits 1 if there are any.
+*Golden drift* checks that the end-to-end test's logs and expected figures
+(`testdata/golden`) are what their scripts make today. The
 linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
 
 | Package | What it does |
@@ -305,31 +316,16 @@ linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
 | `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price list, usage normalisation |
 | `pkg/detectors` | The findings, attribution, reconciliation and weekly figures |
 | `pkg/cmdshape` | Shell commands reduced to their shape, without values |
-| `pkg/fixes` | Recommendations, with the fix ladder of ADR 0030 |
+| `pkg/fixes` | Recommendations: for each finding, fixes ordered by kind, strongest first (the *fix ladder*, ADR 0030) |
 | `internal/report` | Results, rendered as summary, text, web page and JSON |
 | `internal/history` | Weekly figures kept between runs |
 | `internal/live` | Status line, hooks and `setup` for Claude Code |
 
 ### Releases
 
-Pushing a version tag (`git tag v0.1.0 && git push origin v0.1.0`) runs
-[.github/workflows/release.yml](.github/workflows/release.yml), which builds
-a draft GitHub release with [GoReleaser](.goreleaser.yaml): archives for
-macOS and Linux (Apple silicon, Intel and arm64), `.deb` and `.rpm`
-packages, signed checksums, a software bill of materials and build
-provenance. Check the draft, then publish it. While the repository is private,
-releases skip the signature and provenance (both would need it public or a
-paid plan) and stay drafts. **Going public**, in this order: decide whether
-to tidy the git history (it goes public too); make this repository public;
-delete the v0.1.0 draft and its tag, then tag the current commit and push
-the tag (re-running the old workflow would rebuild the old commit); check
-the new draft is signed and publish it; then make the tap public
-([ADR 0052](docs/adr/0052-third-review-corrections.md)). With a `HOMEBREW_TAP_TOKEN`
-secret the release also updates the `ChrisAdkin8/homebrew-tap` cask, for
-`brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
-release dry run ([ci.yml](.github/workflows/ci.yml)), on
-every push to `main` and every pull request.
-[ADR 0047](docs/adr/0047-first-release-pure-go.md) has the detail.
+Pushing a version tag builds a draft GitHub release; how to cut one, and
+the steps for making the repository public, are in
+[docs/packaging.md](docs/packaging.md#cutting-a-release).
 
 #### Checking a download
 
