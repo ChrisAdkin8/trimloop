@@ -1,0 +1,987 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<meta name="referrer" content="no-referrer">
+<title>Trimloop report</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #66665f; --line: #e4e3de;
+  --accent: #2f6f5e; --accent-soft: #d9ebe4; --warn: #9c4a22; --warn-soft: #f6e3d8;
+  --bar: #2f6f5e; --bar2: #9cc8b8; --bar3: #c98a5e; --bar4: #8d8c86; --bar5: #d6c27a; --code: #f1f0ec;
+  --size1: #0ca30c; --size2: #1baf7a; --size3: #eda100; --size4: #d03b3b;
+  --kind1: #2a78d6; --kind2: #eb6834; --kind3: #1baf7a; --kind4: #eda100;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161715; --panel: #1f201e; --text: #ecebe6; --muted: #a9a8a1; --line: #34352f;
+    --accent: #7cc4a9; --accent-soft: #24392f; --warn: #f0a07a; --warn-soft: #3d2a20;
+    --bar: #7cc4a9; --bar2: #3f6b5b; --bar3: #c98a5e; --bar4: #77766f; --bar5: #8a7a3a; --code: #2a2b27;
+    --size1: #0ca30c; --size2: #199e70; --size3: #c98500; --size4: #e66767;
+    --kind1: #3987e5; --kind2: #d95926; --kind3: #199e70; --kind4: #c98500;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1000px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { font-size: 26px; margin: 0 0 2px; }
+h2 { font-size: 20px; margin: 44px 0 6px; }
+h3 { font-size: 15px; margin: 22px 0 8px; }
+p { margin: 6px 0; max-width: 75ch; }
+.lead { color: var(--muted); margin-bottom: 14px; }
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 14px 0; }
+.tile .num { font-size: 24px; font-weight: 650; line-height: 1.2; }
+.tile .lbl { color: var(--muted); font-size: 13px; }
+.panel .tiles .tile { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.cards { display: grid; gap: 14px; }
+.card { border-left: 4px solid var(--accent); }
+.card h3 { margin: 0 0 6px; font-size: 18px; }
+.code { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; font-weight: 500; }
+.money { margin: 8px 0; }
+.money .likely { font-size: 20px; font-weight: 650; color: var(--accent); }
+.note { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 3px 8px; font-size: 13px; display: inline-block; margin: 4px 0; }
+.fix { margin-top: 12px; }
+.how { position: relative; background: var(--code); border-radius: 6px; padding: 10px 76px 10px 12px;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.copy { position: absolute; top: 6px; right: 6px; font-size: 12px; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+details { margin-top: 10px; }
+summary { cursor: pointer; color: var(--accent); font-size: 15px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 13px; color: var(--muted); font-weight: 600; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]::after { content: " ↕"; opacity: .4; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.name { word-break: break-word; }
+.id { display: block; font-size: 13px; color: var(--muted); }
+td.session { min-width: 16em; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.scroll { overflow-x: auto; }
+.barcell { width: 34%; min-width: 110px; }
+.bar { height: 12px; border-radius: 3px; background: var(--bar); position: relative; overflow: hidden; }
+.bar .part { position: absolute; right: 0; top: 0; bottom: 0; background: var(--bar2); }
+.legend { font-size: 14px; color: var(--muted); max-width: none; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 4px 0 10px; vertical-align: -1px; }
+.legend i:first-child { margin-left: 0; }
+.stack { display: flex; height: 18px; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+.stack span { display: block; height: 100%; }
+dl.glossary { display: grid; grid-template-columns: 11em 1fr; gap: 6px 16px; margin: 0; }
+dl.glossary dt { font-weight: 600; }
+dl.glossary dd { margin: 0; color: var(--muted); }
+a { color: var(--accent); }
+.summary h2 { margin: 0 0 2px; font-size: 20px; }
+.summary .row { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.summary .row b { width: 4.5em; font-size: 13px; font-weight: 600; color: var(--muted); }
+.strip { flex: 1; display: flex; gap: 2px; height: 22px; border-radius: 5px; overflow: hidden; }
+.strip span { display: block; height: 100%; min-width: 2px; }
+.summary .legend { margin: 8px 0 0; line-height: 1.9; }
+.summary .legend span { white-space: nowrap; margin-right: 14px; }
+.summary .legend i { margin-left: 0; }
+.summary + .summary { margin-top: 12px; }
+.size1 { background: var(--size1); } .size2 { background: var(--size2); }
+.size3 { background: var(--size3); } .size4 { background: var(--size4); }
+.kind1 { background: var(--kind1); } .kind2 { background: var(--kind2); }
+.kind3 { background: var(--kind3); } .kind4 { background: var(--kind4); }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 18px 0 0; font-size: 15px; }
+section.area h2 { margin-bottom: 4px; }
+section.area details > .panel { margin-top: 10px; }
+.card details { margin-top: 8px; }
+footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
+@media (max-width: 640px) { .barcell { display: none; } dl.glossary { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Where your Claude Code tokens went</h1>
+<p class="lead">
+25 Sep 2026 to 9 Nov 2026 (45 days) · $2,264 spent, about $352 a week · 570 sessions · list prices as of anthropic-list-2026-11-08
+
+
+
+
+</p>
+<p class="note">You are on the Max 5× plan, a flat fee: these figures are list prices, a measure of how much of your usage limits work takes, not money you would get back. Claude Code stopped 2 times because a usage limit was reached (1 at the 5-hour limit and 1 at the weekly limit), most recently on 10 Oct. Not enough status-line readings yet to show savings as a share of your weekly limit.</p>
+
+
+<section class="panel summary" aria-label="Spend by session size">
+  <h2>68% of your spend came from turns over 200k tokens</h2>
+  <p class="muted">A token is a word-piece of about four characters. Every turn sends the whole session so far, so turns get dearer as a session grows: only 44% of turns were this large, but each cost $0.15–$0.26, against $0.07 for smaller ones.</p>
+  <div class="row"><b>Spend</b><div class="strip" role="img" aria-label="Share of spend by session size"><span class="size1" style="width: 5.1%" title="Under 50k tokens: $115 (5% of spend)"></span><span class="size2" style="width: 27.3%" title="50k–200k tokens: $617 (27% of spend)"></span><span class="size3" style="width: 29.7%" title="200k–500k tokens: $672 (30% of spend)"></span><span class="size4" style="width: 38.0%" title="Over 500k tokens: $860 (38% of spend)"></span></div></div>
+  <div class="row"><b>Turns</b><div class="strip" role="img" aria-label="Share of turns by session size"><span class="size1" style="width: 9.2%" title="Under 50k tokens: 9% of turns"></span><span class="size2" style="width: 47.1%" title="50k–200k tokens: 47% of turns"></span><span class="size3" style="width: 25.5%" title="200k–500k tokens: 26% of turns"></span><span class="size4" style="width: 18.3%" title="Over 500k tokens: 18% of turns"></span></div></div>
+  <p class="legend"><span><i class="size1"></i>Under 50k tokens: $115, 5% of spend, 9% of turns</span><span><i class="size2"></i>50k–200k tokens: $617, 27% of spend, 47% of turns</span><span><i class="size3"></i>200k–500k tokens: $672, 30% of spend, 26% of turns</span><span><i class="size4"></i>Over 500k tokens: $860, 38% of spend, 18% of turns</span></p>
+</section>
+<section class="panel summary" aria-label="What filled the session">
+  <h2>$1,844 paid to send the session to Claude</h2>
+  <p class="muted">Claude's replies cost another $421. This is what was being sent.</p>
+  <div class="row"><div class="strip" role="img" aria-label="What filled the session, by cost"><span class="kind1" style="width: 66.5%" title="Your messages and Claude&#39;s replies, sent again each turn: $1,226"></span><span class="kind2" style="width: 18.8%" title="Tool output: $346"></span><span class="kind3" style="width: 8.3%" title="System prompt and tool definitions: $154"></span><span class="kind4" style="width: 6.4%" title="Text Claude Code added: $119"></span></div></div>
+  <p class="legend"><span><i class="kind1"></i>Your messages and Claude&#39;s replies, sent again each turn: $1,226 (66%)</span><span><i class="kind2"></i>Tool output: $346 (19%)</span><span><i class="kind3"></i>System prompt and tool definitions: $154 (8%)</span><span><i class="kind4"></i>Text Claude Code added: $119 (6%)</span></p>
+</section>
+
+
+<nav class="toc" aria-label="Sections">
+  <a href="#actions">What to do</a><a href="#money">Where the money went</a><a href="#weeks">Week by week</a><a href="#long">Long sessions</a><a href="#tools">Tool output</a><a href="#carried">What every request carries</a><a href="#subagents">Sub-agents</a><a href="#models">Models and effort</a><a href="#checks">Checking the totals</a><a href="#words">Words used</a>
+</nav>
+
+<h2 id="actions">What to do first</h2>
+<p class="lead">Largest possible saving first. Several of these target the same money, so their savings can't be added up.</p>
+
+<div class="cards">
+
+<div class="panel card">
+  <h3>Compact long sessions earlier</h3>
+  <p>Every turn sends the whole session again, so long sessions get dearer each turn. 6 sessions passed 500,000 tokens without compacting; Claude Code compacts on its own only near the limit.</p>
+  <p class="money"><span class="likely">likely about $565</span> <span class="muted">($541–$675)</span> <span class="muted">· up to $870</span></p>
+  <div class="fix">
+    <p><b>Compact when a session passes about 200,000 tokens, or between tasks.</b></p>
+    <div class="how">Run /compact yourself (/context shows the current size). Claude Code compacts on its own only near the context limit.<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    <p class="small">How "likely" was worked out: Replays each main session as if compacted to 94,169 tokens (what the first request after a compaction typically sends) whenever it passed 200,000, including the cost of each compaction, and assumes it then went on the same way. Re-reading files after a compaction would lower the saving. The size after a compaction varies (the middle half of 16 measured runs from 62k to 99k tokens): at 62k the likely saving is $675, at 99k it is $541.</p>
+    <p class="small">Shares money with the long-pause and tool-output fixes: do not add them.</p>
+    <p class="small muted">38% of spend at most · Trimloop pattern P19</p>
+    
+    <div class="fix">
+      <p><b>Or: Start a new session for each task.</b></p>
+      <div class="how">Use /clear between tasks, carrying over a short note of where things stand.<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Start fresh after a long break</h3>
+  <p>107 times, you carried on after more than an hour away. The saved copy of the session (the cache) had expired, so the next turn paid to store all of it again. Another 30 long waits were on a tool, a sub-agent, a timer or another agent, not on you; they are left out of this saving.</p>
+  <p class="money"><span class="likely">likely about $304</span> <span class="muted">· up to $315</span></p>
+  <div class="fix">
+    <p><b>After a break of over an hour, start a new session with a short note instead of carrying on.</b></p>
+    <div class="how">Before the break, ask Claude for a short note of where things stand; afterwards, /clear and paste it in.<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    <p class="small">How "likely" was worked out: As if each of those turns had started a new session of about 14,560 tokens.</p>
+    <p class="small">Shares money with the compaction fix: do not add them.</p>
+    <p class="small muted">14% of spend at most · Trimloop pattern P09</p>
+    
+    <div class="fix">
+      <p><b>Or: Compact before a long break, while the cache is still warm.</b></p>
+      <div class="how">Run /compact before stepping away; compacting after the break re-sends the whole session.<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Run sub-agents on a cheaper model</h3>
+  <p>Sub-agents (helpers Claude starts for side tasks) cost $588, and 98% of that was on a model with a cheaper choice. The saving assumes all of those moved to Sonnet 5.5.</p>
+  <p class="money"><span class="likely">up to $301</span> <span class="muted">· mostly general-purpose, Explore, Plan</span></p>
+  <div class="fix">
+    <p><b>Run sub-agents that search, read and summarise on Sonnet 5.5.</b></p>
+    <div class="how">Define the agents you use for searching, exploring and web research in .claude/agents/&lt;name&gt;.md with &#34;model: sonnet&#34; in the front matter, and use them instead of general-purpose.<button class="copy" type="button">Copy</button></div>
+  </div>
+  <p class="small"><b>Then check:</b> Untested for quality: after a week, compare the agent type&#39;s turns per run and tool errors with before, and switch back if they rose.</p>
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">13% of spend at most · Trimloop pattern P13</p>
+    
+    <div class="fix">
+      <p><b>Or: Ask for the cheaper model when starting a sub-agent.</b></p>
+      <div class="how">Add to CLAUDE.md: &#34;When starting a sub-agent to search, read or summarise, pass model: sonnet; keep the main model for design work and tricky changes.&#34;<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+</div>
+
+<details><summary>11 smaller changes</summary>
+<div class="cards" style="margin-top:12px">
+
+<div class="panel card">
+  <h3>Keep long waits out of sessions with a 5-minute cache</h3>
+  <p>83 times (81 in sub-agents), a session whose cache lasts 5 minutes waited longer, up to an hour, so its next turn paid to save its whole history again. In these logs 281 main sessions and 204 sub-agents used the 5-minute cache; 85 main sessions and 0 sub-agents kept theirs for an hour.</p>
+  <p class="money"><span class="likely">up to $101</span></p>
+  <div class="fix">
+    <p><b>Run long builds, test suites and other slow commands in a session that keeps its cache for an hour.</b></p>
+    <div class="how">A session on the 5-minute cache that waits on a slow command, or on its own background task, saves its whole history again when it carries on. In Claude Code that is usually the main session rather than a sub-agent; sessions run through the SDK may use the 5-minute cache too.<button class="copy" type="button">Copy</button></div>
+  </div>
+  <p class="small"><b>Then check:</b> After a week, the weekly &#34;short waits&#34; figure should fall.</p>
+  <details><summary>More</summary>
+    
+    <p class="small">Separate from the long-break fix (waits over an hour); shares sub-agent turns with the cheaper-model fix: do not add them.</p>
+    <p class="small muted">4% of spend at most · Trimloop pattern P02</p>
+    
+    <div class="fix">
+      <p><b>Or: Tell Claude not to give sub-agents work that waits on slow commands.</b></p>
+      <div class="how">Add to CLAUDE.md: &#34;Run slow builds and test suites yourself, in the background if they take minutes; don&#39;t hand them to a sub-agent.&#34;<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Use Opus 5.5 for routine main-session work</h3>
+  <p>334 main-session turns ran on Fable 5.1. The same turns on Opus 5.5 would have cost less; whether it does the work as well is not known from the logs.</p>
+  <p class="money"><span class="likely">up to $79</span> <span class="muted">· mostly Fable 5.1</span></p>
+  <div class="fix">
+    <p><b>Start sessions on Opus 5.5 and switch to Fable 5.1 for the hardest problems.</b></p>
+    <div class="how">Choose the model with /model at the start of a task, or set &#34;model&#34; in .claude/settings.json.<button class="copy" type="button">Copy</button></div>
+  </div>
+  <p class="small"><b>Then check:</b> Untested for quality: after a week, compare turns per task and tool errors with before, and switch back if they rose.</p>
+  <details><summary>More</summary>
+    
+    <p class="small">May share turns at the highest effort with the effort fix: do not add them.</p>
+    <p class="small muted">4% of spend at most · Trimloop pattern P13</p>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Read only the lines you need</h3>
+  <p>Output from viewing files stayed in the session and was sent again on every later turn: keeping it there cost $189. Results over 2,000 tokens account for the saving.</p>
+  <p class="money"><span class="likely">up to $57</span> <span class="muted">· mostly Read, sed -n, cat</span></p>
+  <div class="fix">
+    <p><b>Read only the lines needed, and don&#39;t re-read a file that hasn&#39;t changed.</b></p>
+    <div class="how">Add to CLAUDE.md: &#34;View files with the Read tool, using offset and limit for long files; don&#39;t use cat, sed -n, head or tail to view files. Don&#39;t re-read a file you have already read unless it has changed.&#34;<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">3% of spend at most · Trimloop pattern P04</p>
+    
+    <div class="fix">
+      <p><b>Or: Stop whole-file views through the shell.</b></p>
+      <div class="how">Add a PreToolUse hook on Bash that blocks cat, sed -n, head and tail on files, with the reason &#34;use Read with offset and limit&#34;.<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+    <div class="fix">
+      <p><b>Or: Survey many files in a sub-agent, which returns only a summary.</b></p>
+      <div class="how">Add to CLAUDE.md: &#34;To explore code across many files, use a sub-agent and bring back only file:line references and conclusions.&#34;<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Turn off skills and plugins you don&#39;t use</h3>
+  <p>Claude Code lists every available skill near the start of each session, and the list stays in the session; MCP servers that plugins bring send their tool definitions with each request: $49. Each plugin you install adds to both.</p>
+  <p class="money"><span class="likely">up to $49</span> <span class="muted">· mostly skill_listing, plugin:terraform:terraform (instructions), mcp__plugin_terraform_terraform</span></p>
+  <div class="fix">
+    <p><b>Disable plugins and remove skills you don&#39;t use.</b></p>
+    <div class="how">Run /plugin to disable plugins you don&#39;t use, and delete unused skills from ~/.claude/skills and the project&#39;s .claude/skills.<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">2% of spend at most · Trimloop pattern P07</p>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Save the highest effort for hard problems</h3>
+  <p>1689 turns ran at the highest effort levels (xhigh or max); most turns ran at medium. Had 1689 of them thought as much per turn, on average, as the same model&#39;s high-effort turns, they would have cost $42 less. Harder work gets higher effort on purpose, so a lower level would save less than this.</p>
+  <p class="money"><span class="likely">up to $42</span></p>
+  <div class="fix">
+    <p><b>Use xhigh and max effort only for hard problems, and come back to medium after.</b></p>
+    <div class="how">The xhigh and max turns ran on Opus 5.5 and Fable 5.1. Effort can be set per model (&#34;modelSettings&#34; in ~/.claude/settings.json): if it is, lower it there. Otherwise keep the default at medium with /effort medium (or &#34;effortLevel&#34; in .claude/settings.json), and raise it with /effort for a task that needs it.<button class="copy" type="button">Copy</button></div>
+  </div>
+  <p class="small"><b>Then check:</b> Untested for quality: after a week, compare turns per task and tool errors with before.</p>
+  <details><summary>More</summary>
+    
+    <p class="small">May share turns with the cheaper-model fixes: do not add them.</p>
+    <p class="small muted">2% of spend at most · Trimloop pattern P14</p>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Move to the newer model</h3>
+  <p>334 main-session turns ran on Opus 5 and Sonnet 5. Each has a newer version that costs less per token and counts tokens the same way.</p>
+  <p class="money"><span class="likely">up to $28</span> <span class="muted">· mostly Opus 5, Sonnet 5</span></p>
+  <div class="fix">
+    <p><b>Switch main sessions from Opus 5 to Opus 5.5 and from Sonnet 5 to Sonnet 5.5.</b></p>
+    <div class="how">Choose the model with /model, or set &#34;model&#34; in .claude/settings.json.<button class="copy" type="button">Copy</button></div>
+  </div>
+  <p class="small"><b>Then check:</b> Prompts tuned for the older model may need adjusting: compare turns per task for a week after switching.</p>
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">1% of spend at most · Trimloop pattern P13</p>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Trim memory files</h3>
+  <p>Memory files such as CLAUDE.md are added to every session and stay there: $6.</p>
+  <p class="money"><span class="likely">up to $6.08</span> <span class="muted">· mostly Project CLAUDE.md, User CLAUDE.md, AutoMem MEMORY.md</span></p>
+  <div class="fix">
+    <p><b>Keep memory files short; move instructions needed only sometimes into a skill.</b></p>
+    <div class="how">Trim CLAUDE.md to what every session needs. Put task-specific instructions in a skill (.claude/skills/&lt;name&gt;/SKILL.md), which loads only when it is used.<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">0% of spend at most · Trimloop pattern P07</p>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Keep long command output short</h3>
+  <p>Other command output stayed in the session and was sent again on every later turn: keeping it there cost $45. Results over 2,000 tokens account for the saving.</p>
+  <p class="money"><span class="likely">up to $5.96</span> <span class="muted">· mostly cat, awk, Artifact</span></p>
+  <div class="fix">
+    <p><b>Keep long command output short.</b></p>
+    <div class="how">Add to CLAUDE.md: &#34;Pipe long command output through tail -n 80 or a filter; don&#39;t print what you won&#39;t use.&#34;<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">0% of spend at most · Trimloop pattern P04</p>
+    
+    <div class="fix">
+      <p><b>Or: Limit how much shell output reaches the model.</b></p>
+      <div class="how">Set BASH_MAX_OUTPUT_LENGTH (characters) in the &#34;env&#34; section of .claude/settings.json. Claude Code cuts the middle of longer output, so the end, with errors and summaries, stays.<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Trim MCP tool results</h3>
+  <p>Output from MCP tools stayed in the session and was sent again on every later turn: keeping it there cost $9. Results over 2,000 tokens account for the saving.</p>
+  <p class="money"><span class="likely">up to $4.27</span> <span class="muted">· mostly mcp__Claude_Browser, mcp__visualize, mcp__plugin_terraform_terraform</span></p>
+  <div class="fix">
+    <p><b>Make MCP servers return less, and remove ones the project doesn&#39;t use.</b></p>
+    <div class="how">Remove unused servers with claude mcp remove &lt;name&gt;; for the rest, use their options for summaries, fewer fields or paged results.<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">0% of spend at most · Trimloop pattern P04</p>
+    
+    <div class="fix">
+      <p><b>Or: Limit the size of MCP results.</b></p>
+      <div class="how">Set MAX_MCP_OUTPUT_TOKENS in the &#34;env&#34; section of .claude/settings.json (default 25,000).<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+    <div class="fix">
+      <p><b>Or: Call noisy MCP tools from a sub-agent.</b></p>
+      <div class="how">Add to CLAUDE.md: &#34;Use a sub-agent for MCP tools that return large results, and bring back only what&#39;s needed.&#34;<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Remove MCP servers you don&#39;t use</h3>
+  <p>Every connected MCP server sends its tool definitions with each request and adds its instructions to the session: $3.</p>
+  <p class="money"><span class="likely">up to $3.35</span> <span class="muted">· mostly claude.ai Claude Docs (instructions), 1a59c906-04da-521d-bda7-7f71b9f9e01c, 1a59c906-04da-521d-bda7-7f71b9f9e01c (instructions)</span></p>
+  <div class="fix">
+    <p><b>Remove MCP servers this project doesn&#39;t use.</b></p>
+    <div class="how">claude mcp remove &lt;name&gt; for a server you added, or turn it off for this project in /mcp; a server named by a long id is a connector, turned off in Claude&#39;s connector settings.<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">0% of spend at most · Trimloop pattern P07</p>
+    
+    <div class="fix">
+      <p><b>Or: Limit what each MCP result can add.</b></p>
+      <div class="how">Set MAX_MCP_OUTPUT_TOKENS in the &#34;env&#34; section of .claude/settings.json.<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+<div class="panel card">
+  <h3>Filter data before printing it</h3>
+  <p>Data printed by scripts, APIs and diffs stayed in the session and was sent again on every later turn: keeping it there cost $38. Results over 2,000 tokens account for the saving.</p>
+  <p class="money"><span class="likely">up to $3.08</span> <span class="muted">· mostly python3 inline, python3 script, git diff</span></p>
+  <div class="fix">
+    <p><b>Filter data before printing it.</b></p>
+    <div class="how">Add to CLAUDE.md: &#34;Don&#39;t print whole data structures, API responses or diffs. Select fields (jq, gh --jq), limit rows, print counts or summaries; use git diff --stat before diffing files.&#34;<button class="copy" type="button">Copy</button></div>
+  </div>
+  
+  <details><summary>More</summary>
+    
+    
+    <p class="small muted">0% of spend at most · Trimloop pattern P04</p>
+    
+    <div class="fix">
+      <p><b>Or: Ask the source for less.</b></p>
+      <div class="how">Use the tools&#39; own filters: gh api --jq, kubectl -o name or -o jsonpath, SQL with LIMIT and only the needed columns.<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+    <div class="fix">
+      <p><b>Or: Explore data in a sub-agent, which reports only the answer.</b></p>
+      <div class="how">Add to CLAUDE.md: &#34;When exploring data or logs, use a sub-agent and bring back only the findings.&#34;<button class="copy" type="button">Copy</button></div>
+    </div>
+    
+  </details>
+</div>
+
+</div>
+</details>
+
+
+<section class="area">
+<h2 id="money">Where the money went</h2>
+<p class="lead">tf-analyze was the costliest project, at $665 (29%). The largest part of the spend (42%) paid for re-reading the session from the cache, Claude&#39;s cheaper saved copy of it.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  <h3 style="margin-top:0">What the money paid for</h3>
+  
+  <div class="stack" role="img" aria-label="Spend by kind of token">
+    <span style="width: 42.2%; background: var(--bar)" title="Re-reading the session from the cache"></span>
+    <span style="width: 25.6%; background: var(--bar2)" title="Saving the session to the cache, kept 1 hour"></span>
+    <span style="width: 13.7%; background: var(--bar3)" title="Saving the session to the cache, kept 5 minutes"></span>
+    <span style="width: 18.6%; background: var(--bar4)" title="Claude's replies"></span>
+    <span style="width: 0.5%; background: var(--bar5)" title="New input sent without the cache"></span>
+  </div>
+  <p class="legend"><i style="background:var(--bar)"></i>Re-reading from the cache $955 (42%)
+    <i style="background:var(--bar2)"></i>Saving to the cache, kept 1 hour $579 (26%)
+    <i style="background:var(--bar3)"></i>Saving to the cache, kept 5 minutes $310 (14%)
+    <i style="background:var(--bar4)"></i>Claude's replies $421 (19%)
+    <i style="background:var(--bar5)"></i>New input sent without the cache $0.26 (0%)</p>
+  
+
+  <h3>By project</h3>
+  <p class="legend">Bar length is spend; <i style="background:var(--bar2)"></i>the light part was spent by sub-agents.</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Project</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Sessions</th><th class="n" data-sort>By sub-agents</th><th class="barcell"></th></tr></thead>
+    <tbody>
+    <tr>
+      <td class="name">tf-analyze</td><td class="n" data-v="665.2707987999988">$665</td><td class="n" data-v="665.2707987999988">29.4%</td>
+      <td class="n" data-v="204">204</td>
+      <td class="n" data-v="328.32774580000006">49%</td>
+      <td class="barcell"><div class="bar" style="width: 100.0%"><div class="part" style="width: 49.4%"></div></div></td>
+    </tr><tr>
+      <td class="name">trimloop</td><td class="n" data-v="376.3897227450006">$376</td><td class="n" data-v="376.3897227450006">16.6%</td>
+      <td class="n" data-v="10">10</td>
+      <td class="n" data-v="69.75903589499994">19%</td>
+      <td class="barcell"><div class="bar" style="width: 56.6%"><div class="part" style="width: 18.5%"></div></div></td>
+    </tr><tr>
+      <td class="name">claude-skills</td><td class="n" data-v="269.29608645000025">$269</td><td class="n" data-v="269.29608645000025">11.9%</td>
+      <td class="n" data-v="7">7</td>
+      <td class="n" data-v="13.781288050000011">5%</td>
+      <td class="barcell"><div class="bar" style="width: 40.5%"><div class="part" style="width: 5.1%"></div></div></td>
+    </tr><tr>
+      <td class="name">slop-or-not</td><td class="n" data-v="242.52705659999955">$243</td><td class="n" data-v="242.52705659999955">10.7%</td>
+      <td class="n" data-v="2">2</td>
+      <td class="n" data-v="24.071499199999987">10%</td>
+      <td class="barcell"><div class="bar" style="width: 36.5%"><div class="part" style="width: 9.9%"></div></div></td>
+    </tr><tr>
+      <td class="name">harness</td><td class="n" data-v="219.33895640000011">$219</td><td class="n" data-v="219.33895640000011">9.7%</td>
+      <td class="n" data-v="1">1</td>
+      <td class="n" data-v="32.663997">15%</td>
+      <td class="barcell"><div class="bar" style="width: 33.0%"><div class="part" style="width: 14.9%"></div></div></td>
+    </tr><tr>
+      <td class="name">datadog-dojo</td><td class="n" data-v="88.92144161499999">$89</td><td class="n" data-v="88.92144161499999">3.9%</td>
+      <td class="n" data-v="9">9</td>
+      <td class="n" data-v="27.470285514999997">31%</td>
+      <td class="barcell"><div class="bar" style="width: 13.4%"><div class="part" style="width: 30.9%"></div></div></td>
+    </tr><tr>
+      <td class="name">rag-forge</td><td class="n" data-v="66.45194490000009">$66</td><td class="n" data-v="66.45194490000009">2.9%</td>
+      <td class="n" data-v="7">7</td>
+      <td class="n" data-v="0">0%</td>
+      <td class="barcell"><div class="bar" style="width: 10.0%"><div class="part" style="width: 0.5%"></div></div></td>
+    </tr><tr>
+      <td class="name">tf-sec-bench</td><td class="n" data-v="63.13338766000006">$63</td><td class="n" data-v="63.13338766000006">2.8%</td>
+      <td class="n" data-v="9">9</td>
+      <td class="n" data-v="45.37502806000002">72%</td>
+      <td class="barcell"><div class="bar" style="width: 9.5%"><div class="part" style="width: 71.9%"></div></div></td>
+    </tr><tr>
+      <td class="name">github.com</td><td class="n" data-v="61.212112395000005">$61</td><td class="n" data-v="61.212112395000005">2.7%</td>
+      <td class="n" data-v="8">8</td>
+      <td class="n" data-v="12.055432694999999">20%</td>
+      <td class="barcell"><div class="bar" style="width: 9.2%"><div class="part" style="width: 19.7%"></div></div></td>
+    </tr><tr>
+      <td class="name">understudy</td><td class="n" data-v="50.47490249999996">$50</td><td class="n" data-v="50.47490249999996">2.2%</td>
+      <td class="n" data-v="8">8</td>
+      <td class="n" data-v="21.89817240000001">43%</td>
+      <td class="barcell"><div class="bar" style="width: 7.6%"><div class="part" style="width: 43.4%"></div></div></td>
+    </tr>
+    </tbody>
+  </table></div>
+
+  
+  <h3>By skill, plugin and MCP server</h3>
+  <p class="muted small">Claude Code names a skill, plugin or MCP server (a connected tool provider) on some turns. The cost is those turns' cost, which can include work that followed the tool.</p>
+  
+<h3>Skill</h3>
+<div class="scroll"><table class="sortable">
+  <thead><tr><th data-sort>Name</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Sessions</th></tr></thead>
+  <tbody>
+  <tr><td class="name">checked-plans:spec</td><td class="n" data-v="40.19184100000002">$40</td><td class="n" data-v="40.19184100000002">1.8%</td>
+    <td class="n" data-v="95">95</td><td class="n" data-v="1">1</td></tr><tr><td class="name">checked-plans:cold-review</td><td class="n" data-v="8.798135799999999">$8.80</td><td class="n" data-v="8.798135799999999">0.4%</td>
+    <td class="n" data-v="14">14</td><td class="n" data-v="1">1</td></tr><tr><td class="name">claude-api</td><td class="n" data-v="7.932593799999999">$7.93</td><td class="n" data-v="7.932593799999999">0.4%</td>
+    <td class="n" data-v="102">102</td><td class="n" data-v="2">2</td></tr><tr><td class="name">checked-plans:implement</td><td class="n" data-v="4.217128199999999">$4.22</td><td class="n" data-v="4.217128199999999">0.2%</td>
+    <td class="n" data-v="21">21</td><td class="n" data-v="1">1</td></tr><tr><td class="name">newsletter:newsletter-ai</td><td class="n" data-v="4.124935399999998">$4.12</td><td class="n" data-v="4.124935399999998">0.2%</td>
+    <td class="n" data-v="91">91</td><td class="n" data-v="2">2</td></tr><tr><td class="name">simplify</td><td class="n" data-v="3.2202154000000003">$3.22</td><td class="n" data-v="3.2202154000000003">0.1%</td>
+    <td class="n" data-v="66">66</td><td class="n" data-v="4">4</td></tr><tr><td class="name">checked-plans:research</td><td class="n" data-v="2.3932303999999998">$2.39</td><td class="n" data-v="2.3932303999999998">0.1%</td>
+    <td class="n" data-v="24">24</td><td class="n" data-v="3">3</td></tr><tr><td class="name">code-review</td><td class="n" data-v="2.3850516000000006">$2.39</td><td class="n" data-v="2.3850516000000006">0.1%</td>
+    <td class="n" data-v="41">41</td><td class="n" data-v="4">4</td></tr><tr><td class="name">spec</td><td class="n" data-v="1.905222">$1.91</td><td class="n" data-v="1.905222">0.1%</td>
+    <td class="n" data-v="14">14</td><td class="n" data-v="1">1</td></tr><tr><td class="name">anthropic-skills:docs</td><td class="n" data-v="1.0756725999999999">$1.08</td><td class="n" data-v="1.0756725999999999">0.0%</td>
+    <td class="n" data-v="23">23</td><td class="n" data-v="2">2</td></tr>
+  </tbody>
+</table></div>
+
+  
+<h3>Plugin</h3>
+<div class="scroll"><table class="sortable">
+  <thead><tr><th data-sort>Name</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Sessions</th></tr></thead>
+  <tbody>
+  <tr><td class="name">checked-plans</td><td class="n" data-v="55.6003354">$56</td><td class="n" data-v="55.6003354">2.5%</td>
+    <td class="n" data-v="154">154</td><td class="n" data-v="4">4</td></tr><tr><td class="name">newsletter</td><td class="n" data-v="4.124935399999998">$4.12</td><td class="n" data-v="4.124935399999998">0.2%</td>
+    <td class="n" data-v="91">91</td><td class="n" data-v="2">2</td></tr><tr><td class="name">anthropic-skills</td><td class="n" data-v="1.9576749999999996">$1.96</td><td class="n" data-v="1.9576749999999996">0.1%</td>
+    <td class="n" data-v="30">30</td><td class="n" data-v="3">3</td></tr>
+  </tbody>
+</table></div>
+
+  
+<h3>MCP server</h3>
+<div class="scroll"><table class="sortable">
+  <thead><tr><th data-sort>Name</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Sessions</th></tr></thead>
+  <tbody>
+  <tr><td class="name">Claude app: task list and wrap-up</td><td class="n" data-v="77.1090312">$77</td><td class="n" data-v="77.1090312">3.4%</td>
+    <td class="n" data-v="537">537</td><td class="n" data-v="4">4</td></tr><tr><td class="name">Claude Browser</td><td class="n" data-v="12.933008800000007">$13</td><td class="n" data-v="12.933008800000007">0.6%</td>
+    <td class="n" data-v="75">75</td><td class="n" data-v="3">3</td></tr><tr><td class="name">visualize</td><td class="n" data-v="1.0918324000000001">$1.09</td><td class="n" data-v="1.0918324000000001">0.0%</td>
+    <td class="n" data-v="4">4</td><td class="n" data-v="1">1</td></tr><tr><td class="name">terraform (from plugin terraform)</td><td class="n" data-v="0.8877155999999999">$0.89</td><td class="n" data-v="0.8877155999999999">0.0%</td>
+    <td class="n" data-v="11">11</td><td class="n" data-v="2">2</td></tr><tr><td class="name">unnamed connector (1a59c906…)</td><td class="n" data-v="0.8759656">$0.88</td><td class="n" data-v="0.8759656">0.0%</td>
+    <td class="n" data-v="17">17</td><td class="n" data-v="2">2</td></tr><tr><td class="name">claude.ai Claude Docs</td><td class="n" data-v="0.7796386">$0.78</td><td class="n" data-v="0.7796386">0.0%</td>
+    <td class="n" data-v="10">10</td><td class="n" data-v="1">1</td></tr><tr><td class="name">Claude app: folder access</td><td class="n" data-v="0.18822730000000001">$0.19</td><td class="n" data-v="0.18822730000000001">0.0%</td>
+    <td class="n" data-v="4">4</td><td class="n" data-v="3">3</td></tr>
+  </tbody>
+</table></div>
+
+  
+</div>
+</details>
+</section>
+
+
+<section class="area">
+<h2 id="weeks">Week by week</h2>
+<p class="lead">The busiest week began 26 Oct 2026, at $773. Compare the weeks before and after a change to see whether it worked.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  <div class="scroll"><table>
+    <thead><tr><th>Week of</th><th class="n">Spent</th><th class="n">Turns</th><th class="n">In large turns</th><th class="n">By sub-agents</th><th class="n">Tool output</th><th class="n">Re-reads</th><th class="n">After breaks</th><th class="n">Compactions</th><th class="n">Short waits</th><th class="n">Top effort</th><th class="n">Cheaper choice</th><th class="n">Limit hits</th><th class="barcell"></th></tr></thead>
+    <tbody>
+    <tr>
+      <td style="white-space:nowrap">21 Sep 2026</td>
+      <td class="n">$31</td><td class="n">250</td>
+      <td class="n">57%</td><td class="n">0%</td>
+      <td class="n">$8.78</td><td class="n">24%</td><td class="n">$0</td><td class="n">0</td><td class="n">$0</td><td class="n">$0</td><td class="n">$28</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 4.0%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">28 Sep 2026</td>
+      <td class="n">$163</td><td class="n">1,168</td>
+      <td class="n">68%</td><td class="n">15%</td>
+      <td class="n">$24</td><td class="n">31%</td><td class="n">$20</td><td class="n">1</td><td class="n">$2.67</td><td class="n">$0</td><td class="n">$35</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 21.1%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">5 Oct 2026</td>
+      <td class="n">$602</td><td class="n">3,793</td>
+      <td class="n">77%</td><td class="n">8%</td>
+      <td class="n">$91</td><td class="n">23%</td><td class="n">$167</td><td class="n">6</td><td class="n">$2.58</td><td class="n">$31</td><td class="n">$0</td><td class="n">2</td>
+      <td class="barcell"><div class="bar" style="width: 77.9%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">12 Oct 2026</td>
+      <td class="n">$66</td><td class="n">595</td>
+      <td class="n">52%</td><td class="n">9%</td>
+      <td class="n">$7.24</td><td class="n">22%</td><td class="n">$20</td><td class="n">0</td><td class="n">$0.49</td><td class="n">$1.02</td><td class="n">$2.91</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 8.5%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">19 Oct 2026</td>
+      <td class="n">$84</td><td class="n">868</td>
+      <td class="n">45%</td><td class="n">8%</td>
+      <td class="n">$15</td><td class="n">25%</td><td class="n">$10</td><td class="n">1</td><td class="n">$0.33</td><td class="n">$1.85</td><td class="n">$6.87</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 10.9%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">26 Oct 2026</td>
+      <td class="n">$773</td><td class="n">7,313</td>
+      <td class="n">50%</td><td class="n">50%</td>
+      <td class="n">$134</td><td class="n">24%</td><td class="n">$28</td><td class="n">5</td><td class="n">$93</td><td class="n">$19</td><td class="n">$29</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 100.0%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">2 Nov 2026</td>
+      <td class="n">$532</td><td class="n">3,706</td>
+      <td class="n">51%</td><td class="n">22%</td>
+      <td class="n">$64</td><td class="n">19%</td><td class="n">$66</td><td class="n">7</td><td class="n">$1.83</td><td class="n">$58</td><td class="n">$108</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 68.9%"></div></td>
+    </tr><tr>
+      <td style="white-space:nowrap">9 Nov 2026 <span class="muted small">(so far)</span></td>
+      <td class="n">$14</td><td class="n">123</td>
+      <td class="n">75%</td><td class="n">0%</td>
+      <td class="n">$0.93</td><td class="n">13%</td><td class="n">$3.81</td><td class="n">0</td><td class="n">$0</td><td class="n">$0</td><td class="n">$1.21</td><td class="n">0</td>
+      <td class="barcell"><div class="bar" style="width: 1.8%"></div></td>
+    </tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">"In large turns": the week's spend sent in turns over 200k tokens. "Tool output": the cost of keeping that week's tool output in the session. "Re-reads": file views that re-read a file already seen, unchanged. "After breaks": saving the session to the cache again after breaks you took. "Short waits": what a 5-minute cache expiring after a wait of 5 minutes to an hour cost. Dashes: not measured for that week (stored by an earlier version). "Top effort": the output cost of xhigh and max turns. "Cheaper choice": main-session spend on a model with a newer, cheaper version or a cheaper tier. "Limit hits": requests Claude Code refused because a subscription usage limit was reached. "Kept": figures from earlier runs, after Claude Code deleted some or all of the week's logs. "Older method" or "older prices": worked out with an earlier analysis or price list, so they may not compare exactly.</p>
+</div>
+</details>
+</section>
+
+
+<section class="area">
+<h2 id="long">Long sessions and breaks</h2>
+<p class="lead">The 5 costliest sessions made 63% of spend. 6 grew past 500k tokens without ever compacting ($291). Coming back after more than 1 hour cost $375 in re-saving the cache.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  
+  <h3 style="margin-top:0">Costliest sessions</h3>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Session</th><th data-sort>Project</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Share</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Largest size (tokens)</th></tr></thead>
+    <tbody>
+    <tr>
+      <td class="name session"><span class="muted">Untitled session</span><span class="id" title="Session 024a1471-41b2-4bd6-ac15-874e7299a975">4 Oct 2026</span></td><td class="name">slop-or-not</td>
+      <td class="n" data-v="489.98141619999984">$490</td><td class="n" data-v="489.98141619999984">21.6%</td>
+      <td class="n" data-v="3549">3,549</td><td class="n" data-v="967437">967k</td></tr><tr>
+      <td class="name session"><span class="muted">Untitled session</span><span class="id" title="Session 25a0c4e0-ce10-44f1-bab3-b0de4c9ab7f4">5 Nov 2026</span></td><td class="name">trimloop</td>
+      <td class="n" data-v="365.4103408000003">$365</td><td class="n" data-v="365.4103408000003">16.1%</td>
+      <td class="n" data-v="2891">2,891</td><td class="n" data-v="966651">967k</td></tr><tr>
+      <td class="name session"><span class="muted">Untitled session</span><span class="id" title="Session 893bcedb-476c-4298-ac87-9b0fdad904d1">7 Oct 2026</span></td><td class="name">claude-skills</td>
+      <td class="n" data-v="265.0939258500004">$265</td><td class="n" data-v="265.0939258500004">11.7%</td>
+      <td class="n" data-v="1205">1,205</td><td class="n" data-v="966293">966k</td></tr><tr>
+      <td class="name session"><span class="muted">Untitled session</span><span class="id" title="Session 9f7dbee1-2b80-426d-8507-27c02ae040ac">30 Oct 2026</span></td><td class="name">tf-analyze</td>
+      <td class="n" data-v="204.96076040000003">$205</td><td class="n" data-v="204.96076040000003">9.1%</td>
+      <td class="n" data-v="930">930</td><td class="n" data-v="736112">736k</td></tr><tr>
+      <td class="name session"><span class="muted">Untitled session</span><span class="id" title="Session 75ddb5ee-44b8-440a-89db-da1dc9624e0f">26 Oct 2026</span></td><td class="name">tf-analyze</td>
+      <td class="n" data-v="110.41963500000004">$110</td><td class="n" data-v="110.41963500000004">4.9%</td>
+      <td class="n" data-v="996">996</td><td class="n" data-v="965903">966k</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">A typical session cost $0.15.</p>
+
+  <h3>Compaction</h3>
+  <p>Compacting replaces the session with a short summary. Claude Code did it 20 times (1 when asked), typically shrinking 967k tokens to a 23k summary; with the system prompt and re-attached files, the next request sent about 94k; the longest wait was 2m7s.</p>
+  
+
+  
+  <h3>Long breaks</h3>
+  <p>137 times in 29 sessions, work carried on after more than 1 hour away. The cache had expired, so the next turn paid to save the whole session again: $375 (17% of spend). 30 of these waits ($60) were not breaks you could restart from: Claude was waiting on a tool, a sub-agent, a timer or another agent. The other $315 followed breaks you took.</p>
+  
+  
+  <h3>Shorter waits</h3>
+  <p>In these logs 281 main sessions and 204 sub-agents kept their cache for 5 minutes; 85 main sessions and 0 sub-agents for an hour.</p>
+  <p>83 times (81 in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: $110, $101 more than with the cache still there. Putting every session on the 5-minute cache on the hour's would have cost $22 more: its writes are dearer.</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Session</th><th class="n" data-sort>Waits</th><th class="n" data-sort>Largest context</th><th class="n" data-sort>Cost of the expiry</th></tr></thead>
+    <tbody>
+    <tr><td class="name session"><span class="muted">Untitled session</span> <span class="muted small">(a sub-agent)</span><span class="id" title="Session 9f7dbee1-2b80-426d-8507-27c02ae040ac/agent-aa3df2a90d4e35b71">30 Oct 2026</span></td><td class="n" data-v="13">13</td><td class="n" data-v="612447">612k</td><td class="n" data-v="27.974472000000006">$28</td></tr><tr><td class="name session"><span class="muted">Untitled session</span> <span class="muted small">(a sub-agent)</span><span class="id" title="Session 9f7dbee1-2b80-426d-8507-27c02ae040ac/agent-ae9ec58e043174cdf">30 Oct 2026</span></td><td class="n" data-v="10">10</td><td class="n" data-v="733886">734k</td><td class="n" data-v="26.911248">$27</td></tr><tr><td class="name session"><span class="muted">Untitled session</span> <span class="muted small">(a sub-agent)</span><span class="id" title="Session 418f2fea-056e-4f5b-bf36-131fdf91caec/agent-a539a9a03377236c5">28 Oct 2026</span></td><td class="n" data-v="6">6</td><td class="n" data-v="206197">206k</td><td class="n" data-v="5.6070096">$5.61</td></tr><tr><td class="name session"><span class="muted">Untitled session</span> <span class="muted small">(a sub-agent)</span><span class="id" title="Session 9f7dbee1-2b80-426d-8507-27c02ae040ac/agent-a023fad6d6338a40b">30 Oct 2026</span></td><td class="n" data-v="5">5</td><td class="n" data-v="248419">248k</td><td class="n" data-v="5.5008528000000005">$5.50</td></tr><tr><td class="name session"><span class="muted">Untitled session</span> <span class="muted small">(a sub-agent)</span><span class="id" title="Session 9f7dbee1-2b80-426d-8507-27c02ae040ac/agent-af0ea7d7dab37c793">30 Oct 2026</span></td><td class="n" data-v="4">4</td><td class="n" data-v="278353">278k</td><td class="n" data-v="4.968408">$4.97</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">Keeping the cache for an hour cost $378 to $831 less than the 5-minute cache would have, in the sessions that used it: the hour pays for itself here. The first figure is if only waits over 10 minutes lost a 5-minute cache, the second if every wait over 5 minutes did. Neither is exact: the logged wait includes the next reply's own time, and requests the logs do not record can keep a cache alive, even past 10 minutes.</p>
+  
+</div>
+</details>
+</section>
+
+<section class="area">
+<h2 id="tools">Tool output</h2>
+
+<p class="lead">When Claude runs a command or reads a file, the output stays in the session and is sent again on every later turn. Keeping it there cost $346 (15% of spend), and 23% of file views re-read a file already seen.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  <h3 style="margin-top:0">By tool</h3>
+  <table>
+    <tbody>
+    <tr><td class="name" style="width:14em">Bash</td><td class="n" style="width:6em">$232</td>
+      <td class="n muted" style="width:8em">14,486 uses</td>
+      <td><div class="bar" style="width: 100.0%"></div></td></tr><tr><td class="name" style="width:14em">Read</td><td class="n" style="width:6em">$82</td>
+      <td class="n muted" style="width:8em">1,571 uses</td>
+      <td><div class="bar" style="width: 35.3%"></div></td></tr><tr><td class="name" style="width:14em">WebSearch</td><td class="n" style="width:6em">$6.56</td>
+      <td class="n muted" style="width:8em">422 uses</td>
+      <td><div class="bar" style="width: 2.8%"></div></td></tr><tr><td class="name" style="width:14em">WebFetch</td><td class="n" style="width:6em">$4.23</td>
+      <td class="n muted" style="width:8em">683 uses</td>
+      <td><div class="bar" style="width: 1.8%"></div></td></tr><tr><td class="name" style="width:14em">mcp__Claude_Browser</td><td class="n" style="width:6em">$2.79</td>
+      <td class="n muted" style="width:8em">150 uses</td>
+      <td><div class="bar" style="width: 1.2%"></div></td></tr><tr><td class="name" style="width:14em">mcp__visualize</td><td class="n" style="width:6em">$2.69</td>
+      <td class="n muted" style="width:8em">4 uses</td>
+      <td><div class="bar" style="width: 1.2%"></div></td></tr><tr><td class="name" style="width:14em">Artifact</td><td class="n" style="width:6em">$2.68</td>
+      <td class="n muted" style="width:8em">28 uses</td>
+      <td><div class="bar" style="width: 1.2%"></div></td></tr><tr><td class="name" style="width:14em">Agent</td><td class="n" style="width:6em">$2.49</td>
+      <td class="n muted" style="width:8em">201 uses</td>
+      <td><div class="bar" style="width: 1.1%"></div></td></tr><tr><td class="name" style="width:14em">Edit</td><td class="n" style="width:6em">$2.06</td>
+      <td class="n muted" style="width:8em">1,249 uses</td>
+      <td><div class="bar" style="width: 0.9%"></div></td></tr><tr><td class="name" style="width:14em">Write</td><td class="n" style="width:6em">$2.03</td>
+      <td class="n muted" style="width:8em">794 uses</td>
+      <td><div class="bar" style="width: 0.9%"></div></td></tr>
+    </tbody>
+  </table>
+
+  
+  <h3>Shell commands by type</h3>
+  <p class="muted small">Commands are grouped with file names and values removed, so <span class="mono">sed -n '1,50p' a.go</span> and <span class="mono">sed -n '9,20p' b.go</span> are one type. "Already filtered" is the share whose output was cut down, for example with head or grep.</p>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Command type</th><th class="n" data-sort>Cost to keep</th><th class="n" data-sort>Uses</th><th class="n" data-sort>Tokens</th><th class="n" data-sort>Already filtered</th></tr></thead>
+    <tbody>
+    <tr><td class="mono name">sed -n</td><td class="n" data-v="68.31628948500017">$68</td>
+      <td class="n" data-v="2125">2,125</td><td class="n" data-v="2178234">2,178,234</td>
+      <td class="n" data-v="255">12%</td></tr><tr><td class="mono name">cat</td><td class="n" data-v="28.29935688">$28</td>
+      <td class="n" data-v="1543">1,543</td><td class="n" data-v="1141259">1,141,259</td>
+      <td class="n" data-v="974">63%</td></tr><tr><td class="mono name">grep</td><td class="n" data-v="21.92562573">$22</td>
+      <td class="n" data-v="1485">1,485</td><td class="n" data-v="695520">695,520</td>
+      <td class="n" data-v="1093">74%</td></tr><tr><td class="mono name">python3 inline</td><td class="n" data-v="19.041592199999986">$19</td>
+      <td class="n" data-v="2024">2,024</td><td class="n" data-v="422674">422,674</td>
+      <td class="n" data-v="29">1%</td></tr><tr><td class="mono name">cat -n</td><td class="n" data-v="10.902445500000008">$11</td>
+      <td class="n" data-v="284">284</td><td class="n" data-v="828281">828,281</td>
+      <td class="n" data-v="76">27%</td></tr><tr><td class="mono name">grep -A</td><td class="n" data-v="7.788817509999999">$7.79</td>
+      <td class="n" data-v="379">379</td><td class="n" data-v="183938">183,938</td>
+      <td class="n" data-v="216">57%</td></tr><tr><td class="mono name">python3 script</td><td class="n" data-v="5.978347699999997">$5.98</td>
+      <td class="n" data-v="639">639</td><td class="n" data-v="150282">150,282</td>
+      <td class="n" data-v="304">48%</td></tr><tr><td class="mono name">grep -r</td><td class="n" data-v="5.6946319000000045">$5.69</td>
+      <td class="n" data-v="451">451</td><td class="n" data-v="211398">211,398</td>
+      <td class="n" data-v="422">94%</td></tr><tr><td class="mono name">ls</td><td class="n" data-v="3.341372550000004">$3.34</td>
+      <td class="n" data-v="288">288</td><td class="n" data-v="143792">143,792</td>
+      <td class="n" data-v="98">34%</td></tr><tr><td class="mono name">awk</td><td class="n" data-v="3.3016642000000003">$3.30</td>
+      <td class="n" data-v="74">74</td><td class="n" data-v="79715">79,715</td>
+      <td class="n" data-v="30">41%</td></tr>
+    </tbody>
+  </table></div>
+  
+</div>
+</details>
+
+</section>
+
+<section class="area">
+<h2 id="carried">What every request carries</h2>
+
+<p class="lead">Each request also sends Claude Code's own instructions (the system prompt), the definitions of every tool, and text Claude Code adds such as the skill list and CLAUDE.md. That cost $272 (12% of spend).</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  
+  <div class="scroll"><table>
+    <thead><tr><th>Source</th><th class="n">Cost</th><th class="n">Size</th><th>Who can change it</th><th class="barcell"></th></tr></thead>
+    <tbody>
+    <tr>
+      <td class="name">Built-in tool definitions</td><td class="n">$108</td><td class="n">21k tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 100.0%"></div></td>
+    </tr><tr>
+      <td class="name">List of available skills</td><td class="n">$48</td><td class="n">7k tokens</td>
+      <td class="muted small">you: skills and plugins</td>
+      <td class="barcell"><div class="bar" style="width: 44.7%"></div></td>
+    </tr><tr>
+      <td class="name">System prompt</td><td class="n">$20</td><td class="n">2k tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 19.0%"></div></td>
+    </tr><tr>
+      <td class="name">MCP server claude-artifacts: tool definitions</td><td class="n">$10.00</td><td class="n">6k tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 9.3%"></div></td>
+    </tr><tr>
+      <td class="name">Token-count reminders</td><td class="n">$9.67</td><td class="n">22 tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 9.0%"></div></td>
+    </tr><tr>
+      <td class="name">MCP server Claude_Browser: tool definitions</td><td class="n">$7.46</td><td class="n">7k tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 6.9%"></div></td>
+    </tr><tr>
+      <td class="name">Background-task notices and messages from other agents</td><td class="n">$7.41</td><td class="n">517 tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 6.9%"></div></td>
+    </tr><tr>
+      <td class="name">Notes on tools loaded when needed</td><td class="n">$6.74</td><td class="n">521 tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 6.3%"></div></td>
+    </tr><tr>
+      <td class="name">List of available sub-agents</td><td class="n">$5.75</td><td class="n">855 tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 5.3%"></div></td>
+    </tr><tr>
+      <td class="name">Skills that were used</td><td class="n">$4.72</td><td class="n">6k tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 4.4%"></div></td>
+    </tr><tr>
+      <td class="name">Environment details (folder, date, system)</td><td class="n">$4.66</td><td class="n">192 tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 4.3%"></div></td>
+    </tr><tr>
+      <td class="name">Files you attached</td><td class="n">$4.56</td><td class="n">930 tokens</td>
+      <td class="muted small">Claude Code (no setting)</td>
+      <td class="barcell"><div class="bar" style="width: 4.2%"></div></td>
+    </tr>
+    </tbody>
+  </table></div>
+</div>
+</details>
+
+</section>
+
+<section class="area">
+<h2 id="subagents">Sub-agents</h2>
+
+
+<p class="lead">Sub-agents are helpers Claude starts for side tasks. 204 runs cost $588 (26% of spend); 98% of that was on a model with a cheaper choice.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Agent type</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Runs</th><th class="n" data-sort>On a cheaper model, less by</th><th data-sort>Model</th><th data-sort>Suggested</th></tr></thead>
+    <tbody>
+    <tr><td class="name">general-purpose</td><td class="n" data-v="570.6450847">$571</td><td class="n" data-v="172">172</td>
+      <td class="n" data-v="298.73892609999876">$299</td>
+      <td>Opus 5.5</td><td>Sonnet 5.5</td></tr><tr><td class="name">fork</td><td class="n" data-v="11.970887600000001">$12</td><td class="n" data-v="3">3</td>
+      <td class="n" data-v="0">$0</td>
+      <td>Fable 5.1</td><td><span class="muted">—</span></td></tr><tr><td class="name">Explore</td><td class="n" data-v="1.9290753999999999">$1.93</td><td class="n" data-v="2">2</td>
+      <td class="n" data-v="0.9645376999999999">$0.96</td>
+      <td>Opus 5.5</td><td>Sonnet 5.5</td></tr><tr><td class="name">Plan</td><td class="n" data-v="1.6911322000000002">$1.69</td><td class="n" data-v="1">1</td>
+      <td class="n" data-v="0.8455661000000001">$0.85</td>
+      <td>Opus 5.5</td><td>Sonnet 5.5</td></tr><tr><td class="name">web-fetch</td><td class="n" data-v="0.9539599">$0.95</td><td class="n" data-v="21">21</td>
+      <td class="n" data-v="0">$0</td>
+      <td>Haiku 5.5</td><td><span class="muted">—</span></td></tr><tr><td class="name">claude-code-guide</td><td class="n" data-v="0.44346479999999994">$0.44</td><td class="n" data-v="5">5</td>
+      <td class="n" data-v="0">$0</td>
+      <td>Haiku 4.5</td><td><span class="muted">—</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">Each run starts with an empty session, so 48% of sub-agent spend goes on saving to the cache (36% in main sessions). No cheaper model is suggested for "fork" agents: they continue the main session and reuse its cache.</p>
+</div>
+</details>
+
+
+</section>
+
+<section class="area">
+<h2 id="models">Models and effort</h2>
+
+<p class="lead">Main sessions ran on 5 models. Moving to the newer version where there is one would have cost $28 less. Routine work one tier down would have cost up to $79 less, quality untested.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  <h3 style="margin-top:0">Main sessions by model</h3>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Model</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Turns</th><th data-sort>Newer version</th><th class="n" data-sort>Less by</th><th data-sort>Tier down</th><th class="n" data-sort>Less by</th></tr></thead>
+    <tbody>
+    <tr><td>Opus 5.5</td><td class="n" data-v="1466.1760208000003">$1,466</td><td class="n" data-v="10463">10,463</td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td></tr><tr><td>Fable 5.1</td><td class="n" data-v="143.20177074999995">$143</td><td class="n" data-v="334">334</td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td>
+      <td>Opus 5.5</td><td class="n" data-v="79.31573415000003">$79</td></tr><tr><td>Opus 5</td><td class="n" data-v="63.068101000000034">$63</td><td class="n" data-v="245">245</td>
+      <td>Opus 5.5</td><td class="n" data-v="26.56820460000001">$27</td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td></tr><tr><td>Sonnet 5</td><td class="n" data-v="4.124935399999998">$4.12</td><td class="n" data-v="91">91</td>
+      <td>Sonnet 5.5</td><td class="n" data-v="1.1313126999999996">$1.13</td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td></tr><tr><td>Sonnet 5.5</td><td class="n" data-v="0.28426250000000003">$0.28</td><td class="n" data-v="16">16</td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td>
+      <td><span class="muted">—</span></td><td class="n" data-v="0"></td></tr>
+    </tbody>
+  </table></div>
+  
+  
+  <h3>Effort level</h3>
+  <div class="scroll"><table class="sortable">
+    <thead><tr><th data-sort>Level</th><th class="n" data-sort>Turns</th><th class="n" data-sort>Spent</th><th class="n" data-sort>Output cost</th><th class="n" data-sort>Thinking a turn</th></tr></thead>
+    <tbody>
+    <tr><td><span class="muted">not logged</span></td><td class="n" data-v="23">23</td><td class="n" data-v="0.37663905">$0.38</td><td class="n" data-v="0.030675">$0.03</td><td class="n">330</td></tr><tr><td>medium</td><td class="n" data-v="12606">12,606</td><td class="n" data-v="1340.8236437500018">$1,341</td><td class="n" data-v="237.9739990000013">$238</td><td class="n">386</td></tr><tr><td>high</td><td class="n" data-v="3498">3,498</td><td class="n" data-v="478.9529091500001">$479</td><td class="n" data-v="73.03658999999993">$73</td><td class="n">369</td></tr><tr><td>xhigh</td><td class="n" data-v="374">374</td><td class="n" data-v="131.32437799999997">$131</td><td class="n" data-v="59.67080000000001">$60</td><td class="n">1,523</td></tr><tr><td>max</td><td class="n" data-v="1315">1,315</td><td class="n" data-v="313.01112509999996">$313</td><td class="n" data-v="50.027770000000004">$50</td><td class="n">1,205</td></tr>
+    </tbody>
+  </table></div>
+  <p class="muted small">Levels mix models, and each model thinks a different amount, so the saving compares each model's xhigh and max turns with its own high-effort turns: $42 less had they done the same on average. Harder work gets higher effort on purpose, so a lower level would save less.</p>
+  
+</div>
+</details>
+</section>
+
+
+<section class="area">
+<h2 id="checks">Checking the totals</h2>
+<p class="lead">Claude Code's own records show $200 (13%) more than its logs: requests the logs don't record, such as session titles, summaries after a break, compactions and web searches. 8 sessions (12% of spend) have no record to check against.</p>
+<details><summary>Show details</summary>
+<div class="panel">
+  <p>For 355 sessions with a record, Claude Code recorded $1,703 and the logs show $1,503. 300 web searches cost about $3.00 in search fees. 3 sessions went on after their record was last written and are left out.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Model</th><th class="n">Claude Code's record</th><th class="n">In the logs</th><th class="n">Difference</th></tr></thead>
+    <tbody>
+    <tr><td>Opus 5.5</td><td class="n">$1,471</td><td class="n">$1,323</td><td class="n">$147</td></tr><tr><td>Fable 5.1</td><td class="n">$225</td><td class="n">$178</td><td class="n">$47</td></tr><tr><td>Haiku 5.5</td><td class="n">$5.36</td><td class="n">$0.91</td><td class="n">$4.45</td></tr><tr><td>Haiku 4.5</td><td class="n">$1.39</td><td class="n">$0.38</td><td class="n">$1.02</td></tr><tr><td>Sonnet 5.5</td><td class="n">$0.40</td><td class="n">$0.35</td><td class="n">$0.05</td></tr>
+    </tbody>
+  </table></div>
+</div>
+</details>
+</section>
+
+
+<section class="area">
+<h2 id="words">Words used in this report</h2>
+<details><summary>Show the words</summary>
+<div class="panel">
+<dl class="glossary">
+  <dt>Token</dt><dd>The unit Claude is paid by: a word-piece of about four characters.</dd>
+  <dt>Turn</dt><dd>One request to Claude and its reply. One prompt from you can take many turns while Claude works.</dd>
+  <dt>Session</dt><dd>One Claude Code conversation, with any sub-agents it started. Every turn sends the whole session so far.</dd>
+  <dt>Session size</dt><dd>How many tokens a turn sends: everything said so far, including tool output.</dd>
+  <dt>Cache</dt><dd>A saved copy of the session that Claude can re-read cheaply. It expires after 5 minutes or 1 hour without use.</dd>
+  <dt>Effort level</dt><dd>How hard Claude is asked to think before answering: low, medium, high, xhigh or max. Higher levels write more output, which costs more, and suit hard problems.</dd>
+  <dt>Compact</dt><dd>Replace the session with a short summary (/compact in Claude Code).</dd>
+  <dt>Sub-agent</dt><dd>A helper Claude starts for a side task; only its final report returns to the main session.</dd>
+  <dt>MCP server</dt><dd>A connected tool provider, such as a browser or an issue tracker.</dd>
+  <dt>System prompt</dt><dd>Claude Code's own instructions to Claude, sent at the start of every request.</dd>
+  <dt>Memory file</dt><dd>A file such as CLAUDE.md whose instructions are added to every session.</dd>
+  <dt>Likely, up to</dt><dd>"Likely" is an estimate for one change; "up to" is the most it could save.</dd>
+</dl>
+</div>
+</details>
+</section>
+
+<footer>
+  <p>Costs are estimates at list prices (anthropic-list-2026-11-08); tool output and added text are sized at about 4 characters per token. Savings are estimates and overlap.</p>
+  <p>Written by trimloop dev on 9 November 2026, 09:16 UTC, on this machine. The page loads nothing from the network. It shows project names and session titles, which summarise what you asked: check before sharing it.</p>
+</footer>
+
+</main>
+
+
+
+
+
+
+
+<script>
+
+document.querySelectorAll('.copy').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var text = b.parentNode.firstChild.textContent.trim();
+    var done = function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); }
+  });
+});
+
+document.querySelectorAll('table.sortable').forEach(function (table) {
+  table.querySelectorAll('th[data-sort]').forEach(function (th, col) {
+    th.addEventListener('click', function () {
+      var body = table.tBodies[0];
+      var rows = Array.prototype.slice.call(body.rows);
+      var desc = th.dataset.dir !== 'desc';
+      th.dataset.dir = desc ? 'desc' : 'asc';
+      rows.sort(function (a, b) {
+        var x = a.cells[col], y = b.cells[col];
+        var xv = x.dataset.v !== undefined ? parseFloat(x.dataset.v) : x.textContent.trim().toLowerCase();
+        var yv = y.dataset.v !== undefined ? parseFloat(y.dataset.v) : y.textContent.trim().toLowerCase();
+        var c = xv < yv ? -1 : xv > yv ? 1 : 0;
+        return desc ? -c : c;
+      });
+      rows.forEach(function (r) { body.appendChild(r); });
+    });
+  });
+});
+</script>
+</body>
+</html>

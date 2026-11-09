@@ -11,40 +11,49 @@ design only: see [The plan](#the-plan).
 
 ## What you get
 
-A run on one developer's 44 days of logs:
+A run on one developer's 45 days of logs, shortened (the full output also
+covers their usage limits and Claude Code's own cost records):
 
 ```text
-Read 623 logs: 622 sessions, 18,109 turns.
-Spent $2,254 at list prices from 25 Sep to 8 Nov 2026 (44 days), about $359 a week.
-Claude Code's own records show $202 (13%) more than its logs: requests the logs do not record.
+Read 571 logs: 570 sessions, 17,816 turns.
+Spent $2,264 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $352 a week.
 
 What to do first (these savings overlap, so do not add them):
-  1. Compact long sessions earlier: likely about $555 ($533–$666), up to $851 (38%)
+  1. Compact long sessions earlier: likely about $565 ($541–$675), up to $870 (38%)
      Compact when a session passes about 200,000 tokens, or between tasks.
-  2. Start fresh after a long break: likely about $294, up to $306 (14%)
+  2. Start fresh after a long break: likely about $304, up to $315 (14%)
      After a break of over an hour, start a new session with a short note instead of carrying on.
-  3. Run sub-agents on a cheaper model: up to $299 (13%)
+  3. Run sub-agents on a cheaper model: up to $301 (13%)
      Run sub-agents that search, read and summarise on Sonnet 5.5.
 ```
 
-The full report (text or a web page) explains each finding, shows the
-sessions behind it, and gives the fix step by step.
+In plain words: every turn re-sends the whole conversation, so long
+sessions get expensive. *Compacting* (`/compact` in Claude Code) replaces
+the conversation so far with a short summary. *Sub-agents* are helpers
+Claude starts for side tasks, such as searching the code.
+
+The full report explains each finding, shows the sessions behind it, and
+gives the fix step by step. **See one:**
+[docs/examples/example-report.html](docs/examples/example-report.html) is the
+web page from the same run, with session titles left out. GitHub shows it as
+code: download it ("Download raw file") and open it in a browser.
 
 **How far to trust the figures.** They are estimates:
 
-- Costs are at Anthropic's list prices, not your bill. On a Pro or Max plan
-  you pay a flat fee, so the report says so, counts how often you hit a
-  usage limit, and, once trimloop's status line has watched your limits for
-  a while, shows each saving as a share of your weekly limit
+- Costs are at Anthropic's *list prices*: what the tokens would cost if you
+  paid per token, not your bill.
+- On a Pro or Max plan you pay a flat fee instead. The report says so,
+  counts how often you hit a usage limit, and in time shows each saving as
+  a share of your weekly limit
   ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md)).
-- "Up to" is the most a change could save; "likely" replays your logs as if
-  you had made it.
-- Savings overlap — the same tokens can be saved by several changes — so
+- "Up to" is the most a change could save. "Likely" replays your logs as if
+  you had made the change.
+- Savings overlap (the same tokens can be saved by several changes), so
   they are never added up.
-- Claude Code makes some requests its logs do not record; the report says how
-  much (13 % above).
-- Quality is not measured: a change marked "untested for quality" (a cheaper
-  model, lower effort) needs checking after you make it.
+- Claude Code makes some requests its logs do not record. The report says
+  how much: 13% in the run above.
+- Quality is not measured. Check a change marked "untested for quality" (a
+  cheaper model, lower effort) after you make it.
 
 How each figure is worked out is in [docs/measurements.md](docs/measurements.md).
 
@@ -53,72 +62,97 @@ How each figure is worked out is in [docs/measurements.md](docs/measurements.md)
 | Finding | What it means |
 |---|---|
 | Long sessions (P19) | Every turn re-sends the whole conversation, so big sessions get expensive. When to compact or start fresh. |
-| Long breaks (P09) | After an hour away the saved copy (the cache) expires and the whole session is paid for again. |
-| Short waits (P02) | Sessions whose cache lasts only 5 minutes (sub-agents, SDK runs) losing it while waiting on a slow command. |
+| Long breaks (P09) | After an hour away the saved copy of the conversation (the *cache*) expires, and the whole session is paid for again. |
+| Short waits (P02) | Sessions whose cache lasts only 5 minutes (sub-agents, and Claude Code run from a program) losing it while waiting on a slow command. |
 | Tool output (P04) | Large command output and file reads that stay in the conversation and are re-sent on every turn. |
 | What every request carries (P07) | The system prompt, tool definitions, skill lists and memory files sent with each request. |
 | Model choice (P13) | Sub-agents and sessions on a more expensive model than the work needs, or on an older, dearer version. |
 | Effort level (P14) | Turns at the highest effort levels that think far more than usual. |
 
-It also checks its totals against Claude Code's own cost records, shows spend
-by project, skill and MCP server, and keeps week-by-week figures so you can
-see whether a change worked. The pattern IDs (P19 and so on) refer to
+It also checks its totals against Claude Code's own cost records. It shows
+spend by project, by skill and by MCP server (the add-on tools Claude Code
+connects to). And it keeps week-by-week figures, so you can see whether a
+change worked. The codes (P19 and so on) refer to
 [docs/patterns.md](docs/patterns.md).
 
-## Running it
+## Install
 
-No release has been published yet ([Releases](#releases) says how they
-will work). Until then you need Go 1.27.3 or later. Clone this repository,
-then from its folder:
+Any one of these:
+
+- **Homebrew** (macOS or Linux), once releases are public:
+
+  ```bash
+  brew install --cask chrisadkin8/tap/trimloop
+  ```
+
+- **Download** the archive for your system from the
+  [releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
+  it, and put `trimloop` somewhere on your PATH (for example
+  `~/.local/bin`). [Checking a download](#checking-a-download) says how to
+  verify it, and what to do if macOS refuses to open it.
+- **From source**, with Go 1.27.3 or later: clone this repository, then
+  from its folder:
+
+  ```bash
+  go build -o ~/.local/bin/trimloop ./cmd/trimloop
+  ```
+
+Check it worked with `trimloop --version`.
+
+## Use it
 
 ```bash
-go run ./cmd/trimloop/                          # short summary, as above
-go run ./cmd/trimloop/ --format html            # web page in trimloop-report.html
-go run ./cmd/trimloop/ --format text            # the full report as text
-go run ./cmd/trimloop/ --format json --out ~/trimloop.json   # every figure, for scripts
-go run ./cmd/trimloop/ --open                   # write the web page and open it
-go run ./cmd/trimloop/ --since 2026-11-01       # only sessions started on or after a date
-go run ./cmd/trimloop/ --since 7d               # ... or in the last 7 days (2w for two weeks)
+trimloop                          # short summary, as above
+trimloop --open                   # the full report as a web page, opened in your browser
+trimloop --format text            # the full report as text
+trimloop --format json --out ~/trimloop.json   # every figure, for scripts
 ```
 
-It reads `~/.claude/projects` and sends nothing anywhere. `--version` says
-which build you have; each report names it too.
+It reads the logs in `~/.claude/projects` and sends nothing anywhere. The
+web page is saved as `trimloop-report.html` in the current folder;
+`--out` puts it elsewhere.
 
-**Did a change work?** Run with `--since` set to the day you made it: the
-report covers only sessions started from then on, with their sub-agents.
-Weekly figures (below) show the same week by week. A `--since` run neither
-reads nor updates the history file, since figures from part of the logs
-would replace fuller ones.
+### Did a change work?
 
-**Reports name your sessions and projects.** They use the titles Claude Code
-gives sessions, which summarise what you asked. Check a report before sharing
-it; `--no-titles` removes the titles (project, skill and server names stay).
-`.gitignore` keeps `trimloop-report.html` out of git, and `--out` can put a
-report anywhere. The web page is one file that loads nothing from the
-network.
+Add `--since` with the day you made the change:
 
-**No Claude Code logs on this machine?** Try the sample session.
-`CLAUDE_CONFIG_DIR` points trimloop at another folder laid out like
-`~/.claude`:
+```bash
+trimloop --since 2026-11-01       # sessions started on or after 1 November
+trimloop --since 7d               # sessions started in the last 7 days (2w: two weeks)
+```
+
+The report then covers only sessions started from then on, with their
+sub-agents. Each run also keeps weekly figures (numbers only) in
+`~/.trimloop/history.json`, so you can compare weeks even after Claude Code
+has deleted old logs. A `--since` run leaves that file alone, so a partial
+view never replaces full weeks.
+
+### Before you share a report
+
+Reports show the titles Claude Code gives your sessions, which summarise
+what you asked, and your project names. Check a report before sharing it.
+`--no-titles` removes the titles; project, skill and server names stay.
+
+### Try it without your own logs
+
+The repository has a sample session. `CLAUDE_CONFIG_DIR` tells trimloop to
+read another folder laid out like `~/.claude`:
 
 ```bash
 mkdir -p /tmp/trimloop-demo/projects/demo
 cp testdata/sessions/tools.jsonl /tmp/trimloop-demo/projects/demo/
-CLAUDE_CONFIG_DIR=/tmp/trimloop-demo go run ./cmd/trimloop/ --no-history --format text
+CLAUDE_CONFIG_DIR=/tmp/trimloop-demo trimloop --no-history --format text
 ```
 
-**Week by week.** Each run keeps weekly figures (numbers only) in
-`~/.trimloop/history.json` — one `history-<id>.json` per other
-`CLAUDE_CONFIG_DIR` folder — so you can compare before and after a change even
-once Claude Code has deleted old logs. `--history FILE` moves the file;
-`--no-history` neither reads nor writes it.
+`--no-history` keeps the demo out of your weekly figures. With more than
+one Claude Code folder, each gets its own history file.
 
-### Ask Claude about it (Claude Code plugin)
+## Ask Claude about it (Claude Code plugin)
 
-The trimloop plugin adds a skill to Claude Code: ask "where did my tokens
-go?" or "why do I keep hitting my usage limit?" and Claude runs trimloop
-and explains the result in plain words. It needs trimloop installed (see
-[Releases](#releases)). In Claude Code:
+The trimloop plugin adds a skill to Claude Code. Ask "where did my tokens
+go?" or "why do I keep hitting my usage limit?", and Claude runs trimloop
+and explains the result in plain words. It needs trimloop
+[installed](#install). In Claude Code:
 
 ```text
 /plugin marketplace add ChrisAdkin8/trimloop
@@ -127,38 +161,35 @@ and explains the result in plain words. It needs trimloop installed (see
 
 With Claude Code 2.1.275 or later, one step does both:
 `/plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The plugin
-adds no hooks and changes no settings; the live nudges below are set up
-with `trimloop setup` ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
+changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
 
-### Live nudges in Claude Code
+## Live nudges in Claude Code
 
 Trimloop can also nudge you while you work:
 
-- a status line with the session's size, its cost and how long its cache has
-  left;
+- a *status line* (the line Claude Code shows below your prompt) with the
+  session's size, its cost, and how long its cache has left;
 - a message when a session passes 200,000 and 500,000 tokens;
 - after a long break in a session over 500,000 tokens, a pause before your
   first message, once, showing what sending it will cost.
 
-Build the program, then add its settings to Claude Code:
+The messages come from *hooks*: commands Claude Code runs after each reply
+and before each message. With trimloop [installed](#install):
 
 ```bash
-go build -o ~/.local/bin/trimloop ./cmd/trimloop
-~/.local/bin/trimloop setup                                   # print the settings to add
-~/.local/bin/trimloop setup --write ~/.claude/settings.json   # or add them (a backup is made)
+trimloop setup                                      # print the settings to add
+trimloop setup --write ~/.claude/settings.json      # or add them for you
+trimloop setup --check                              # is everything set up and working?
 ```
 
-`trimloop setup --check` says whether the status line and both hooks run
-this trimloop and are up to date, and whether usage-limit readings are
-arriving; it changes nothing, and exits 1 if something needs doing.
-`setup --write` saves a backup first, follows a link to the real file, keeps
-its permissions, updates its own entries if the program moved, and leaves
-another status line alone unless you add `--replace-statusline`.
-[ADR 0034](docs/adr/0034-live-nudges.md) has the detail.
+`setup --write` saves a backup of your settings first, and leaves another
+status line alone unless you add `--replace-statusline`. `setup --check`
+changes nothing. New Claude Code sessions pick up the change. Details:
+[ADR 0034](docs/adr/0034-live-nudges.md).
 
-### Files it writes
+## Files it writes
 
-Everything stays on your machine, readable by you only (mode 0600):
+Everything stays on your machine, readable by you only:
 
 | File | What it holds |
 |---|---|
@@ -259,8 +290,9 @@ provenance. Check the draft, then publish it. While the repository is private,
 releases skip the signature and provenance (both would need it public or a
 paid plan). With a `HOMEBREW_TAP_TOKEN`
 secret the release also updates the `ChrisAdkin8/homebrew-tap` cask, for
-`brew install --cask chrisadkin8/tap/trimloop`. Every pull request runs
-the checks and a release dry run ([ci.yml](.github/workflows/ci.yml)).
+`brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
+release dry run ([ci.yml](.github/workflows/ci.yml)), on
+every push to `main` and every pull request.
 [ADR 0047](docs/adr/0047-first-release-pure-go.md) has the detail.
 
 #### Checking a download
@@ -292,6 +324,7 @@ checks pass. The Homebrew cask does it for you.
 | Doc | What's in it |
 |---|---|
 | [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today |
+| [docs/examples/example-report.html](docs/examples/example-report.html) | A full web-page report from real logs (download and open in a browser) |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/state-machines.md](docs/state-machines.md) | What the code remembers between steps, and the files it keeps |
 | [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain, and the measured figures (§8) |
