@@ -122,8 +122,8 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, startCost, minS
 		return Recommendation{}, false
 	}
 	gap := spanText(p.MinGap)
-	finding := fmt.Sprintf("%d times, you carried on after more than %s away. The saved copy of the "+
-		"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses-p.Unprompted, gap)
+	finding := fmt.Sprintf("%s, you carried on after more than %s away. The saved copy of the "+
+		"session (the cache) had expired, so the next turn paid to store all of it again.", plural(p.Pauses-p.Unprompted, "time"), gap)
 	if startCost > 0 {
 		finding += fmt.Sprintf(" Starting a new session instead costs about %s for its first turn.", cents(startCost))
 	}

@@ -70,7 +70,7 @@ Numbers only: no names, titles, paths or session ids.
 | `sub_agents` | number | Spend in sub-agents |
 | `pause_rewrite` | number | Cache re-writes after long breaks the user took, in main sessions (P09; analysis version 4; a stored week from an earlier version counted other waits too, and reports mark it as older) |
 | `tool_output` | number | Carried cost of tool output added that week (P04; since version 4, carried history on rebuilt-cache turns is priced as a write) |
-| `file_views` / `rereads` | int | File views, and those that re-read the same part of a file not changed since (analysis version 8; earlier versions counted any view of a file already viewed) |
+| `file_views` / `rereads` | int | File views, and those that re-read the same part of a file not changed since (analysis version 8; earlier versions counted any view of a file already viewed; version 9 follows a `cd` before a shell view and counts every file of a multi-file view) |
 | `short_waits` | number | What a 5-minute cache expiring after 5–60 minute waits cost, against the cache still there (P02; added in version 5, [ADR 0043](adr/0043-weekly-trend-for-new-findings.md); this meaning from version 6, [ADR 0045](adr/0045-m0-measurement-method.md)). A week stored before version 5 has none: reports show a dash |
 | `top_effort` | number | Output cost of xhigh and max turns: the spend the P14 card is about, not its saving (version 5) |
 | `older_models` | number | Main-session spend on a model with a newer, cheaper version or a cheaper tier, shown as "cheaper choice": the spend the P13 cards are about, not their saving (version 5) |

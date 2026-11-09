@@ -57,8 +57,9 @@ type Week struct {
 // short-wait, top-effort and older-model figures (ADR 0043); version 6
 // prices short waits against the cache still there (ADR 0044); version 7
 // adds limit hits (ADR 0048); version 8 counts a re-read only for the same
-// part of an unchanged file (ADR 0053).
-const AnalysisVersion = 8
+// part of an unchanged file (ADR 0053); version 9 follows a cd before a
+// shell view to the file it names, and counts every file a view names.
+const AnalysisVersion = 9
 
 // The analysis version in which each later weekly figure was first
 // measured. A week stored by an earlier version does not have it; reports

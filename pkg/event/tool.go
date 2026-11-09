@@ -25,6 +25,9 @@ type ToolCall struct {
 	// and is used in memory only. Empty if the call touched no single file.
 	File   string
 	FileOp FileOp
+	// Also identifies, like File, the further files a view showed after it
+	// ("cat a.go b.go"), each the same Part. Empty for one file.
+	Also []string
 	// Part identifies the part of File a view printed (a hash of, say, the
 	// Read tool's offset and limit, or sed's script); "" for the whole file.
 	// Views of different parts are not re-reads of each other.

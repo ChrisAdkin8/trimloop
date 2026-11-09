@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -311,5 +312,18 @@ func TestQuantile(t *testing.T) {
 	}
 	if quantile(nil, 0.5) != 0 || median(xs) != 30 {
 		t.Error("empty or median")
+	}
+}
+
+// The median conversation follows the rule every median here uses: the
+// upper middle for an even count.
+func TestFindGrowthMedianOfEvenCount(t *testing.T) {
+	var sessions []event.Session
+	for i, cost := range []float64{1, 2, 10, 20} {
+		sessions = append(sessions, event.Session{ID: fmt.Sprint(i), Kind: "main",
+			Turns: []event.Turn{{Usage: event.Usage{CacheRead: 1}, Cost: event.Cost{CacheRead: cost}, Priced: true}}})
+	}
+	if f := FindGrowth(sessions, 500_000, 1); !near(f.MedianCost, 10) || median([]float64{1, 2, 10, 20}) != 10 {
+		t.Errorf("median conversation: got $%v, want $10", f.MedianCost)
 	}
 }

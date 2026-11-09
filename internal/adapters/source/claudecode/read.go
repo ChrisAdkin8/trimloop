@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"iter"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -331,6 +332,14 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 				if s.Edit {
 					c.FileOp = event.FileEdit
 				}
+				for _, o := range s.Others {
+					k := fileKey(o, cwd)
+					if k == "" {
+						c.File, c.Also = "", nil // a variable or a glob among them: not known files
+						break
+					}
+					c.Also = append(c.Also, k)
+				}
 			}
 			c.WritesUnknown = s.WritesUnknown
 			for _, w := range s.Writes {
@@ -406,6 +415,15 @@ func toolResult(b block) source.Result {
 func fileKey(p, cwd string) string {
 	if p == "" || strings.ContainsAny(p, "$`*?") {
 		return "" // a variable or a glob: not one known file
+	}
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		// Under the home folder: the logs are read on the machine that wrote
+		// them, so it is this user's.
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		p = filepath.Join(home, strings.TrimPrefix(p, "~"))
 	}
 	if !filepath.IsAbs(p) && cwd != "" {
 		p = filepath.Join(cwd, p)

@@ -171,8 +171,8 @@ func TestParseLineToolCalls(t *testing.T) {
 	}
 	mainGo := fileKey("/repo/main.go", "")
 	want := []event.ToolCall{
-		// The shell's cd is not followed, so sed's file resolves against the session's cwd.
-		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: mainGo, FileOp: event.FileView, Part: partKey("1,9p"), InputBytes: 52},
+		// The shell's cd is followed: sed views sub/main.go, not the session folder's main.go.
+		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: fileKey("/repo/sub/main.go", ""), FileOp: event.FileView, Part: partKey("1,9p"), InputBytes: 52},
 		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView, Part: partKey("read offset= limit=20 pages="), InputBytes: 40},
 		{ID: "t3", Tool: "Edit", File: mainGo, FileOp: event.FileEdit, InputBytes: 23},
 		{ID: "t4", Tool: "mcp__github__get_issue", Noise: event.NoiseMCP, InputBytes: 32},
@@ -541,5 +541,17 @@ func TestReadParts(t *testing.T) {
 	}
 	if part(``) != "" || part(`,"offset":null`) != "" {
 		t.Error("a whole-file read has a part")
+	}
+}
+
+// A file written from the home folder (~/...) is the user's file there,
+// whatever folder the session was in.
+func TestFileKeyHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home folder:", err)
+	}
+	if got, want := fileKey("~/code/a.go", "/repo"), fileKey(filepath.Join(home, "code", "a.go"), ""); got != want || got == "" {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -165,5 +166,29 @@ func TestRatesWithoutCache(t *testing.T) {
 	}
 	if arrivalRate(event.Turn{}) != 0 || historyRate(event.Turn{}) != 0 {
 		t.Error("a turn with no input should have zero rates")
+	}
+}
+
+// A view of several files ("cat a b") re-reads only when it shows nothing
+// new, and it counts as a view of each file it shows.
+func TestRereadsSeveralFiles(t *testing.T) {
+	view := func(id, file string, also ...string) event.ToolCall {
+		return event.ToolCall{ID: id, Tool: "Bash", Noise: event.NoiseFileView, File: file, Also: also, FileOp: event.FileView, HasResult: true}
+	}
+	s := event.Session{Turns: []event.Turn{
+		priced(1, 1, view("ab", "a", "b")),
+		priced(1, 1, view("b", "b")),       // b was shown by "cat a b": a re-read
+		priced(1, 1, view("ac", "a", "c")), // c is new: not a re-read
+		priced(1, 1, view("ca", "c", "a")), // both seen: a re-read
+		priced(1, 1),
+	}}
+	var rereads []string
+	for _, cc := range carry(s) {
+		if cc.reread {
+			rereads = append(rereads, cc.call.ID)
+		}
+	}
+	if want := []string{"b", "ca"}; !slices.Equal(rereads, want) {
+		t.Errorf("re-reads: got %v, want %v", rereads, want)
 	}
 }

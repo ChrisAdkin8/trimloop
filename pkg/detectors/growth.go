@@ -1,6 +1,8 @@
 package detectors
 
 import (
+	"cmp"
+	"slices"
 	"sort"
 	"time"
 
@@ -174,7 +176,9 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 	sortBy(all, func(c ConversationStat) (float64, string) { return c.Cost, c.ID })
 	f.Conversations = len(all)
 	if len(all) > 0 {
-		f.MedianCost = all[len(all)/2].Cost
+		// all is largest first: the median rule (the upper middle) counts
+		// from the other end.
+		f.MedianCost = all[(len(all)-1)/2].Cost
 	}
 	for _, n := range []int{1, 5, 10} {
 		if n > len(all) || f.Cost == 0 {
@@ -194,13 +198,15 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 }
 
 // median returns the middle value of xs (the upper middle for an even
-// count), or 0 if xs is empty. It sorts a copy.
-func median(xs []int) int {
+// count), or 0 if xs is empty. It sorts a copy. Every median the findings
+// report uses this rule.
+func median[T cmp.Ordered](xs []T) T {
+	var zero T
 	if len(xs) == 0 {
-		return 0
+		return zero
 	}
-	s := append([]int(nil), xs...)
-	sort.Ints(s)
+	s := slices.Clone(xs)
+	slices.Sort(s)
 	return s[len(s)/2]
 }
 

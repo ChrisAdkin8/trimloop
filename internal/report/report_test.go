@@ -661,3 +661,26 @@ func TestCompactionCardCountsMainPricedSessions(t *testing.T) {
 		t.Errorf("growth: got %d never compacted, want 3 (every session)", r.Growth.Uncompacted)
 	}
 }
+
+// A conversation whose main log is gone is named after its first sub-agent
+// with a time; one with no time never counts as first.
+func TestLabelsFirstSubAgentHasATime(t *testing.T) {
+	timed := sample()[0]
+	timed.ID, timed.Kind, timed.ParentID, timed.Project = "gone/a", event.SubAgentSession, "gone", "api"
+	timed.Turns = append([]event.Turn(nil), timed.Turns...)
+	for i := range timed.Turns {
+		timed.Turns[i].Time = t0.Add(time.Duration(i) * time.Minute)
+	}
+	untimed := timed
+	untimed.ID, untimed.Project = "gone/b", "web"
+	untimed.Turns = append([]event.Turn(nil), timed.Turns...)
+	for i := range untimed.Turns {
+		untimed.Turns[i].Time = time.Time{}
+	}
+	for _, order := range [][]event.Session{{untimed, timed}, {timed, untimed}} {
+		r := Results{Growth: detectors.Growth{Top: []detectors.ConversationStat{{ID: "gone"}}}}
+		if l := labels(order, r, true)["gone"]; l.Project != "api" || l.Start.IsZero() {
+			t.Errorf("got %+v, want the timed sub-agent's project and start", l)
+		}
+	}
+}

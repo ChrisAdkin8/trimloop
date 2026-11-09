@@ -159,13 +159,21 @@ func carry(s event.Session) []callCost {
 			switch {
 			case c.File == "":
 			case c.FileOp == event.FileView:
-				// A call that also writes files may have changed this one
-				// before viewing it: its view is not counted as a re-read.
-				cc.reread = viewed[c.File][c.Part] && len(c.Writes) == 0 && !c.WritesUnknown
-				if viewed[c.File] == nil {
-					viewed[c.File] = map[string]bool{}
+				// A call that also writes files may have changed these
+				// before viewing them: its view is not counted as a re-read.
+				// A view of several files re-reads only if it shows nothing
+				// new: each of them was viewed already, the same part.
+				files := append([]string{c.File}, c.Also...)
+				cc.reread = len(c.Writes) == 0 && !c.WritesUnknown
+				for _, f := range files {
+					cc.reread = cc.reread && viewed[f][c.Part]
 				}
-				viewed[c.File][c.Part] = true
+				for _, f := range files {
+					if viewed[f] == nil {
+						viewed[f] = map[string]bool{}
+					}
+					viewed[f][c.Part] = true
+				}
 			case c.FileOp == event.FileEdit:
 				delete(viewed, c.File)
 			}

@@ -114,6 +114,9 @@ func TestForPauses(t *testing.T) {
 		!strings.Contains(r.Finding, "3 times") || !strings.Contains(r.Finding, "Another long wait was") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
+	if r, ok := ForPauses(detectors.LongPause{Pauses: 1, Saving: 15}, 15, 30_000, 0, 1); !ok || !strings.HasPrefix(r.Finding, "1 time, you carried on") {
+		t.Errorf("one break: got %q", r.Finding)
+	}
 	if _, ok := ForPauses(detectors.LongPause{Saving: 0.5}, 0, 0, 0, 1); ok {
 		t.Error("a saving under the minimum should give no recommendation")
 	}

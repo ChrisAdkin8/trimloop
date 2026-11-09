@@ -21,8 +21,8 @@ func ForCacheLife(f detectors.CacheLife, minSaving float64) (Recommendation, boo
 	r := Recommendation{
 		Pattern: "P02",
 		Title:   "Keep long waits out of sessions with a 5-minute cache",
-		Finding: fmt.Sprintf("%d times (%d in sub-agents), a session whose cache lasts 5 minutes waited longer, up to an "+
-			"hour, so its next turn paid to save its whole history again. %s", f.Waits, f.SubAgent, where),
+		Finding: fmt.Sprintf("%s (%d in sub-agents), a session whose cache lasts 5 minutes waited longer, up to an "+
+			"hour, so its next turn paid to save its whole history again. %s", plural(f.Waits, "time"), f.SubAgent, where),
 		Saving:  f.Saving,
 		Overlap: "Separate from the long-break fix (waits over an hour); shares sub-agent turns with the cheaper-model fix: do not add them",
 		Primary: Fix{Structure,

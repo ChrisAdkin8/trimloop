@@ -30,8 +30,16 @@ type Shape struct {
 	// printed.
 	Filtered bool
 
-	File string // the file a file-viewing or editing command names; "" if none
-	Edit bool   // the command edits File in place (sed -i)
+	// File is the file a file-viewing or editing command names; "" if none,
+	// or if which file it is cannot be told (after a cd to a folder that is
+	// not written out). A relative name is relative to the folder the
+	// command line started in: a cd earlier in it is applied ("cd web &&
+	// cat a.ts" views web/a.ts).
+	File string
+	// Others are the further files a view names after File ("cat a.go
+	// b.go"), relative in the same way; a view shows each the same way.
+	Others []string
+	Edit   bool // the command edits File in place (sed -i)
 	// Part is the part of File a view prints: sed's script, or head's or
 	// tail's program and count; "" for the whole file. Like File, it is not
 	// part of the shape and may hold values.
@@ -39,10 +47,12 @@ type Shape struct {
 	Noise event.NoiseKind
 
 	// Writes lists the files any command in cmd writes or changes: the
-	// targets of redirections and tee, and the files sed -i edits.
+	// targets of redirections and tee, and the files sed -i edits, relative
+	// like File.
 	Writes []string
 	// WritesUnknown is true when a command may change files it does not
-	// name: git checkout, mv, a formatter, perl -i.
+	// name (git checkout, mv, a formatter, perl -i), or writes a relative
+	// file after a cd that cannot be followed.
 	WritesUnknown bool
 }
 
@@ -61,40 +71,140 @@ func (s Shape) String() string {
 // and export: in "cd app && go test ./... | tail -5" it is "go test", filtered.
 func Parse(cmd string) Shape {
 	cmds := split(lex(cmd))
-	s := describe(cmds)
-	s.Writes, s.WritesUnknown = writes(cmds)
+	dirs := folders(cmds)
+	i, s := describe(cmds)
+	if s.File != "" {
+		files := append([]string{s.File}, s.Others...)
+		s.File, s.Others = "", nil
+		for k, f := range files {
+			f, ok := dirs[i].join(f)
+			if !ok {
+				s.File, s.Others = "", nil // which files is not known
+				break
+			}
+			if k == 0 {
+				s.File = f
+			} else {
+				s.Others = append(s.Others, f)
+			}
+		}
+	}
+	s.Writes, s.WritesUnknown = writes(cmds, dirs)
 	return s
 }
 
+// folder is the folder a command runs in, relative to the one the command
+// line started in: path "" is that folder; one under the home folder starts
+// with "~/". known is false after a cd the shape cannot follow (cd alone,
+// cd -, another user's ~user, a variable, popd).
+type folder struct {
+	path  string
+	known bool
+}
+
+// join names file as seen from the command line's starting folder, and
+// false when that cannot be told. An absolute file, or one under the home
+// folder (~/...), is itself.
+func (f folder) join(file string) (string, bool) {
+	switch {
+	case path.IsAbs(file) || inHome(file):
+		return file, true
+	case !f.known:
+		return "", false
+	}
+	return path.Join(f.path, file), true
+}
+
+// folders works out the folder each command in cmds runs in, following cd
+// and pushd from command to command. A subshell's cd ends with it; a cd
+// inside a group ({ }) does not.
+func folders(cmds [][]pipePart) []folder {
+	dirs := make([]folder, len(cmds))
+	cur := folder{known: true}
+	var outer []folder // the folder outside each open subshell
+	for i, c := range cmds {
+		dirs[i] = cur
+		if len(c) == 0 {
+			continue
+		}
+		switch c[0].mark {
+		case "(":
+			outer = append(outer, cur)
+			continue
+		case ")":
+			if n := len(outer); n > 0 {
+				cur, outer = outer[n-1], outer[:n-1]
+			}
+			continue
+		}
+		if len(c[0].words) == 0 {
+			continue
+		}
+		switch path.Base(c[0].words[0]) {
+		case "cd", "pushd":
+			cur = cd(cur, skipOptions(c[0].words[1:], nil))
+		case "popd":
+			cur = folder{}
+		}
+	}
+	return dirs
+}
+
+// inHome reports whether a path is written from the home folder: ~ or ~/...
+// (not ~user, another user's).
+func inHome(p string) bool { return p == "~" || strings.HasPrefix(p, "~/") }
+
+// cd is the folder after cd with args, from cur.
+func cd(cur folder, args []string) folder {
+	if len(args) != 1 || args[0] == "-" || strings.HasPrefix(args[0], "~") && !inHome(args[0]) ||
+		strings.ContainsAny(args[0], "$`*?") {
+		return folder{} // the previous folder, another user's, or one only the shell knows
+	}
+	to, ok := cur.join(args[0])
+	if !ok {
+		return folder{}
+	}
+	return folder{path: path.Clean(to), known: true}
+}
+
 // describe returns the shape of the first command in cmds that does real
-// work.
-func describe(cmds [][]pipePart) Shape {
-	var first []pipePart
-	for _, c := range cmds {
+// work, and its index.
+func describe(cmds [][]pipePart) (int, Shape) {
+	first := -1
+	for i, c := range cmds {
 		if len(c) == 0 || len(c[0].words) == 0 {
 			continue
 		}
-		if first == nil {
-			first = c
+		if first < 0 {
+			first = i
 		}
 		if !setup[path.Base(c[0].words[0])] {
-			return shapeOf(c)
+			return i, shapeOf(c)
 		}
 	}
-	if first == nil {
-		return Shape{}
+	if first < 0 {
+		return 0, Shape{}
 	}
-	return shapeOf(first)
+	return first, shapeOf(cmds[first])
 }
 
 // writes lists the files the commands write or change, and whether any
 // command may change files it does not name. Every command counts, not
 // only the one the shape describes: in "cat > a.go <<EOF ... EOF && go
 // build", the shape is go build's, but a.go has changed.
-func writes(cmds [][]pipePart) (files []string, unknown bool) {
-	for _, c := range cmds {
+func writes(cmds [][]pipePart, dirs []folder) (files []string, unknown bool) {
+	for i, c := range cmds {
+		add := func(names ...string) {
+			for _, n := range names {
+				if f, ok := dirs[i].join(n); ok {
+					files = append(files, f)
+				} else {
+					unknown = true // a file in a folder that is not known
+				}
+			}
+		}
 		for _, p := range c {
-			files = append(files, p.writes...)
+			add(p.writes...)
 			if len(p.words) == 0 {
 				continue
 			}
@@ -103,12 +213,12 @@ func writes(cmds [][]pipePart) (files []string, unknown bool) {
 			case prog == "tee":
 				for _, a := range args {
 					if !strings.HasPrefix(a, "-") {
-						files = append(files, a)
+						add(a)
 					}
 				}
 			case prog == "sed" && inPlace(args):
 				named, _ := fileArgs(prog, args)
-				files = append(files, named...)
+				add(named...)
 			case changesUnnamed(prog, args):
 				unknown = true
 			}
@@ -163,6 +273,7 @@ func changesUnnamed(prog string, args []string) bool {
 // pipePart is one command in a pipeline: its words, with prefixes such as
 // "sudo" and "FOO=bar" removed, and where its output goes.
 type pipePart struct {
+	mark     string // "(" or ")" for a subshell's start or end, which has no words
 	words    []string
 	toFile   bool     // stdout is redirected to a file (including /dev/null)
 	heredoc  bool     // stdin is a here-document or here-string
@@ -195,6 +306,9 @@ func split(toks []token) [][]pipePart {
 			endPart()
 		case "&&", "||", ";", ";;", "&":
 			endCmd()
+		case ";(", ";)":
+			endCmd()
+			cmds = append(cmds, []pipePart{{mark: t.op[1:]}})
 		default: // a redirection; its target is the next word
 			target := ""
 			if i+1 < len(toks) && toks[i+1].op == "" {
@@ -320,6 +434,9 @@ func shapeOf(pipe []pipePart) Shape {
 		if !p.toFile || prog == "sed" { // cat > file <<EOF writes a file
 			if files, part := fileArgs(prog, args); len(files) > 0 {
 				s.File = files[0]
+				if !s.Edit {
+					s.Others = files[1:]
+				}
 				if !s.Edit {
 					s.Part = part
 				}
@@ -492,6 +609,9 @@ func fileArgs(prog string, args []string) (files []string, part string) {
 				scripts = append(scripts, args[i+1])
 			}
 			i++
+		case strings.HasPrefix(a, "--expression="):
+			script = false
+			scripts = append(scripts, strings.TrimPrefix(a, "--expression="))
 		case counted && (a == "-n" || a == "-c"):
 			if i+1 < len(args) {
 				count = a + " " + args[i+1]

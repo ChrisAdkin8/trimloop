@@ -117,7 +117,10 @@ func TestParseWrites(t *testing.T) {
 		{cmd: `go test ./... > out.log 2> err.log`, writes: []string{"out.log", "err.log"}},
 		{cmd: `go test ./... &> all.log`, writes: []string{"all.log"}},
 		{cmd: `go test ./... 2>&1 | tee run.log`, writes: []string{"run.log"}},
-		{cmd: `cd x && printf y | tee -a a b`, writes: []string{"a", "b"}},
+		{cmd: `cd x && printf y | tee -a a b`, writes: []string{"x/a", "x/b"}}, // written in x, after the cd
+		{cmd: `cd ~ && echo y > a`, writes: []string{"~/a"}},
+		{cmd: `cd "$D" && echo y > a`, unknown: true}, // a folder only the shell knows
+		{cmd: `(cd x && echo y > a); echo z > b`, writes: []string{"x/a", "b"}},
 		{cmd: `go build ./... && sed -i 's/a/b/' x.go y.go`, writes: []string{"x.go", "y.go"}},
 		{cmd: `go test ./... > /dev/null 2>&1`},
 		{cmd: `ls >&2`},
@@ -167,4 +170,38 @@ func FuzzParse(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(_ *testing.T, cmd string) { _ = Parse(cmd) })
+}
+
+// A file a view names is relative to the folder the command line started
+// in: a cd before it is applied, and one the shape cannot follow leaves the
+// file unknown. A view of several files names them all.
+func TestParseFolders(t *testing.T) {
+	tests := []struct {
+		cmd, file string
+		others    []string
+	}{
+		{cmd: `cat a.go`, file: "a.go"},
+		{cmd: `cd web && cat index.ts`, file: "web/index.ts"},
+		{cmd: `cd web; cd src && head -n 5 main.ts`, file: "web/src/main.ts"},
+		{cmd: `cd web/.. && cat a.go`, file: "a.go"},
+		{cmd: `cd /srv && cat a.go`, file: "/srv/a.go"},
+		{cmd: `cd web && cat /etc/hosts`, file: "/etc/hosts"},
+		{cmd: `cd && cat a.go`, file: ""},
+		{cmd: `cd ~/code/app && cat a.go`, file: "~/code/app/a.go"},
+		{cmd: `cd ~bob && cat a.go`, file: ""},
+		{cmd: `cd - && cat a.go`, file: ""},
+		{cmd: `cd "$DIR" && cat a.go`, file: ""},
+		{cmd: `(cd web); cat a.go`, file: "a.go"},
+		{cmd: `{ cd web; }; cat a.go`, file: "web/a.go"},
+		{cmd: `cat a.go b.go`, file: "a.go", others: []string{"b.go"}},
+		{cmd: `cd web && head -n 5 a.ts b.ts`, file: "web/a.ts", others: []string{"web/b.ts"}},
+		{cmd: `sed -i 's/a/b/' x.go y.go`, file: "x.go"}, // an edit: the others are in Writes
+		{cmd: `sed --expression=s/i/x/ a.go`, file: "a.go"},
+	}
+	for _, tt := range tests {
+		s := Parse(tt.cmd)
+		if s.File != tt.file || !slices.Equal(s.Others, tt.others) {
+			t.Errorf("%q: got file %q, others %q; want %q, %q", tt.cmd, s.File, s.Others, tt.file, tt.others)
+		}
+	}
 }

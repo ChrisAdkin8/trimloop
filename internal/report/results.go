@@ -311,7 +311,7 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 	child := map[string]event.Session{} // a conversation's first sub-agent, for one whose main log is gone
 	for _, s := range sessions {
 		byID[s.ID] = s
-		if c, ok := child[s.ParentID]; s.ParentID != "" && (!ok || s.Start().Before(c.Start())) {
+		if c, ok := child[s.ParentID]; s.ParentID != "" && (!ok || earlier(s.Start(), c.Start())) {
 			child[s.ParentID] = s
 		}
 	}
@@ -340,6 +340,12 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 		out[id] = l
 	}
 	return out
+}
+
+// earlier reports whether a is before b, a time not known (zero) coming
+// after every known one.
+func earlier(a, b time.Time) bool {
+	return !a.IsZero() && (b.IsZero() || a.Before(b))
 }
 
 // Retention is how long Claude Code keeps session logs (ADR 0050): its
