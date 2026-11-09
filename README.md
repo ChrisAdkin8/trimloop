@@ -85,9 +85,11 @@ see whether a change worked. The codes (P19 and so on) refer to
 ## Install
 
 No release is published yet, so for now build it from source, with Go
-1.27.3 or later: clone this repository, then from its folder run
+1.27.3 or later:
 
 ```bash
+git clone https://github.com/ChrisAdkin8/trimloop.git
+cd trimloop
 go build -o ~/.local/bin/trimloop ./cmd/trimloop
 ```
 
@@ -163,10 +165,11 @@ trimloop --since 7d               # sessions started since midnight 7 days ago (
 
 The report then covers only sessions started from then on, with their
 sub-agents. Each run also keeps weekly figures (numbers only) in
-`~/.trimloop/history.json`, so you can compare weeks even after Claude Code
-has deleted old logs; with more than one Claude Code folder
-(`CLAUDE_CONFIG_DIR`), each gets its own history file. A `--since` run
-leaves that file alone, so a partial view never replaces full weeks.
+`~/.trimloop/history.json` and shows them in the full report's "Week by
+week" section, so you can compare weeks even after Claude Code has deleted
+old logs; with more than one Claude Code folder (`CLAUDE_CONFIG_DIR`), each
+gets its own history file. A `--since` run leaves that file alone, so a
+partial view never replaces full weeks.
 
 ### Before you share a report
 
@@ -210,8 +213,9 @@ plugin changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
 Trimloop can also nudge you while you work:
 
 - a *status line* (the line Claude Code shows below your prompt) with the
-  session's size, its cost, how long its cache has left, and the effort
-  level when it is set to max or xhigh;
+  session's size, its cost, and the effort level when it is set to max or
+  xhigh; in the cache's last 10 minutes it also counts down to the expiry,
+  and after it shows what the next message will cost;
 - a message when a session passes 200,000 and 500,000 tokens;
 - after a break long enough for the cache to expire (an hour, or 5
   minutes for a session on the 5-minute cache), in a session over 500,000
