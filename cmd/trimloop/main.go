@@ -363,9 +363,6 @@ func analyse() {
 	}
 
 	// 2. Run the findings and write the report.
-	settings := report.DefaultSettings()
-	settings.Titles = !o.noTitles
-	r := report.Analyse(all, read, settings, time.Now())
 	// What the report needs from outside the logs: this build, the plan,
 	// the status line's usage-limit readings (ADR 0048) and how long Claude
 	// Code keeps logs (ADR 0050).
@@ -375,12 +372,15 @@ func analyse() {
 	}
 	plan := claude.Plan()
 	days, set := claude.Retention()
-	report.AddLocal(&r, all, report.Local{
+	local := report.Local{
 		Version:   version(),
 		Plan:      report.Plan{Name: plan.Name, Subscription: plan.Subscription},
 		Readings:  readings,
 		Retention: report.Retention{Days: days, Set: set},
-	})
+	}
+	settings := report.DefaultSettings()
+	settings.Titles = !o.noTitles
+	r := report.Analyse(all, read, local, settings, time.Now())
 	if !o.noHistory {
 		path := o.history
 		if path == "" {

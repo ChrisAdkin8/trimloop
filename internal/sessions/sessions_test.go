@@ -271,7 +271,7 @@ func TestToolFixture(t *testing.T) {
 	var buf bytes.Buffer
 	settings := report.DefaultSettings()
 	settings.ResultTarget, settings.MinFixSaving = 500, 0
-	r := report.Analyse([]event.Session{s}, report.Read{Logs: 1}, settings, t0)
+	r := report.Analyse([]event.Session{s}, report.Read{Logs: 1}, report.Local{}, settings, t0)
 	if err := report.WriteText(&buf, r); err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestFullReportOnFixture(t *testing.T) {
 	}
 	settings := report.DefaultSettings()
 	settings.UncompactedLimit, settings.ContextThreshold, settings.MinFixSaving = 5_000, 2_000, 0
-	r := report.Analyse([]event.Session{s}, report.Read{Logs: 1}, settings, t0)
+	r := report.Analyse([]event.Session{s}, report.Read{Logs: 1}, report.Local{}, settings, t0)
 	var buf bytes.Buffer
 	if err := report.WriteText(&buf, r); err != nil {
 		t.Fatal(err)

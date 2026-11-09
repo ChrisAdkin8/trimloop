@@ -27,7 +27,7 @@ func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 		{At: t0.Add(time.Minute), SevenDay: &detectors.LimitWindow{Used: 10, ResetsAt: reset}},
 		{At: t0.Add(50*time.Hour + time.Minute), SevenDay: &detectors.LimitWindow{Used: 20, ResetsAt: reset}}, // +10 points for $50
 	}
-	AddLimits(&r, []event.Session{{ID: "s", Kind: "main", Turns: turns}}, Plan{Name: "Max 5×", Subscription: true}, readings)
+	addLimits(&r, []event.Session{{ID: "s", Kind: "main", Turns: turns}}, Plan{Name: "Max 5×", Subscription: true}, readings)
 	if got := r.Actions[0].WeeklyLimit; got != 6 { // $30 a week at 0.2 points a dollar
 		t.Errorf("share for a: got %v, want 6", got)
 	}
@@ -55,7 +55,7 @@ func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 
 func TestLimitsOnlyForSubscribers(t *testing.T) {
 	r := Results{Actions: []fixes.Recommendation{{Title: "a", Saving: 10}}}
-	AddLimits(&r, sample(), Plan{}, nil)
+	addLimits(&r, sample(), Plan{}, nil)
 	var out bytes.Buffer
 	if err := WriteSummary(&out, r, "", 3); err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestLimitsOnlyForSubscribers(t *testing.T) {
 	// Limit hits alone mark a subscriber, even with no account file.
 	s := sample()
 	s[0].LimitHits = []event.LimitHit{{At: time.Date(2026, 10, 9, 21, 0, 0, 0, time.UTC), Limit: "session"}}
-	AddLimits(&r, s, Plan{}, nil)
+	addLimits(&r, s, Plan{}, nil)
 	if !r.Subscriber() || r.LimitHitsText() != "Claude Code stopped 1 time because a usage limit was reached, most recently on 9 Oct." {
 		t.Errorf("hits: subscriber %v, %q", r.Subscriber(), r.LimitHitsText())
 	}
@@ -75,9 +75,8 @@ func TestLimitsOnlyForSubscribers(t *testing.T) {
 	}
 }
 
-func TestAddLocalSetsEverythingFromOutsideTheLogs(t *testing.T) {
-	var r Results
-	AddLocal(&r, sample(), Local{Version: "v1.2.3", Plan: Plan{Name: "Pro", Subscription: true}, Retention: Retention{Days: 365, Set: true}})
+func TestAnalyseSetsEverythingFromOutsideTheLogs(t *testing.T) {
+	r := Analyse(sample(), Read{}, Local{Version: "v1.2.3", Plan: Plan{Name: "Pro", Subscription: true}, Retention: Retention{Days: 365, Set: true}}, DefaultSettings(), time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC))
 	if r.Version != "v1.2.3" || r.Plan.Name != "Pro" || !r.Subscriber() || r.Retention.Days != 365 || r.ShortRetention() {
 		t.Errorf("got version %q, plan %+v, retention %+v", r.Version, r.Plan, r.Retention)
 	}

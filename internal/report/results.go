@@ -152,9 +152,11 @@ func DefaultSettings() Settings {
 	}
 }
 
-// Analyse runs every finding over sessions. read gives the log counts; the
-// session and turn counts are filled in here.
-func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Results {
+// Analyse runs every finding over sessions and returns the whole report.
+// read gives the log counts; the session and turn counts are filled in here.
+// local is what comes from outside the logs (the build, the plan, usage-limit
+// readings, how long logs are kept); the zero Local leaves those out.
+func Analyse(sessions []event.Session, read Read, local Local, s Settings, now time.Time) Results {
 	r := Results{Format: FormatVersion, Generated: now.UTC(), Prices: price.Version, Read: read}
 	r.Read.Sessions = len(sessions)
 	r.Read.Turns, r.Read.Unpriced = 0, 0
@@ -166,7 +168,6 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 			}
 		}
 	}
-	r.Limits = detectors.FindLimits(sessions, nil, minLimitSpend, minLimitRise) // AddLimits adds readings
 	r.Cost = detectors.TotalCost(sessions)
 	r.Total = r.Cost.Total()
 
@@ -265,6 +266,7 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	r.Period = period(sessions, r.Total)
 	r.Labels = labels(sessions, r, s.Titles)
 	r.HideIDs = !s.Titles
+	addLocal(&r, sessions, local) // the limits, which need the period, and everything else from outside the logs
 	return r
 }
 

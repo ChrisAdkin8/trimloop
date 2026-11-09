@@ -16,7 +16,7 @@ var t0 = time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
 
 // write sends HTML to a file and prints a summary; an unwritable path fails.
 func TestWrite(t *testing.T) {
-	r := report.Analyse(nil, report.Read{Logs: 1}, report.DefaultSettings(), t0)
+	r := report.Analyse(nil, report.Read{Logs: 1}, report.Local{}, report.DefaultSettings(), t0)
 	path := filepath.Join(t.TempDir(), "r.html")
 	if got, err := write(r, "html", path); err != nil || got != path {
 		t.Fatalf("write: got %q, %v; want %q", got, err, path)
@@ -38,7 +38,7 @@ func TestWriteMakesExistingReportPrivate(t *testing.T) {
 	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r := report.Analyse(nil, report.Read{}, report.DefaultSettings(), t0)
+	r := report.Analyse(nil, report.Read{}, report.Local{}, report.DefaultSettings(), t0)
 	if _, err := write(r, "json", path); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestWriteReplacesLinks(t *testing.T) {
 	if err := os.Symlink(victim, path); err != nil {
 		t.Skip("no symlinks here:", err)
 	}
-	r := report.Analyse(nil, report.Read{}, report.DefaultSettings(), t0)
+	r := report.Analyse(nil, report.Read{}, report.Local{}, report.DefaultSettings(), t0)
 	if _, err := write(r, "json", path); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestWriteRefusesOtherThings(t *testing.T) {
 	if err := os.Mkdir(path, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	r := report.Analyse(nil, report.Read{}, report.DefaultSettings(), t0)
+	r := report.Analyse(nil, report.Read{}, report.Local{}, report.DefaultSettings(), t0)
 	if _, err := write(r, "json", path); err == nil || !strings.Contains(err.Error(), "is not a file") {
 		t.Errorf("got %v, want a refusal", err)
 	}
@@ -102,7 +102,7 @@ func TestWriteRefusesOtherThings(t *testing.T) {
 // /dev/null throws the report away; none of them makes a file.
 func TestWriteSpecialNames(t *testing.T) {
 	t.Chdir(t.TempDir())
-	r := report.Analyse(nil, report.Read{}, report.DefaultSettings(), t0)
+	r := report.Analyse(nil, report.Read{}, report.Local{}, report.DefaultSettings(), t0)
 	for _, path := range []string{"-", "/dev/stdout", "/dev/null"} {
 		out := captureStdout(t, func() {
 			if got, err := write(r, "json", path); err != nil || got != "" {

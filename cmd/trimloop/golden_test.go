@@ -263,7 +263,7 @@ func compareReport(t *testing.T, want golden, zone zoneFigures, loc *time.Locati
 	settings := report.DefaultSettings()
 	settings.Location = loc   // weeks are calendar weeks in this zone, as in the recount
 	settings.TopGroups = 1000 // every project, not only the largest ten
-	r := report.Analyse(sessions, read, settings, time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC))
+	r := report.Analyse(sessions, read, report.Local{}, settings, time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC))
 	f := figures{t}
 
 	f.count("read.logs", r.Read.Logs, want.ReadRaw["logs"])

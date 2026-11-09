@@ -39,7 +39,7 @@ func TestDuration(t *testing.T) {
 
 func TestReportRuns(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteText(&buf, Analyse(nil, Read{Logs: 1}, DefaultSettings(), t0)); err != nil {
+	if err := WriteText(&buf, Analyse(nil, Read{Logs: 1}, Local{}, DefaultSettings(), t0)); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"COST BY TOKEN CLASS", "WHERE THE SPEND WENT", "P19 ", "P10)", "P09 ", "P04 ", "P13 "} {
@@ -55,7 +55,7 @@ type failingWriter struct{}
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
 
 func TestReportReturnsWriteError(t *testing.T) {
-	err := WriteText(failingWriter{}, Analyse(nil, Read{Logs: 1}, DefaultSettings(), t0))
+	err := WriteText(failingWriter{}, Analyse(nil, Read{Logs: 1}, Local{}, DefaultSettings(), t0))
 	if err == nil {
 		t.Fatal("got no error from a writer that always fails")
 	}
@@ -90,7 +90,7 @@ func sample() []event.Session {
 }
 
 func TestJSON(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 2}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 2}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteJSON(&buf, r); err != nil {
 		t.Fatal(err)
@@ -111,7 +111,7 @@ func TestJSON(t *testing.T) {
 }
 
 func TestAnalyseOrdersActions(t *testing.T) {
-	r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0)
 	if r.Read.Sessions != 2 || r.Read.Turns != 3 {
 		t.Errorf("read: got %+v", r.Read)
 	}
@@ -123,7 +123,7 @@ func TestAnalyseOrdersActions(t *testing.T) {
 }
 
 func TestHTML(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 2}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 2}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteHTML(&buf, r); err != nil {
 		t.Fatal(err)
@@ -148,7 +148,7 @@ func TestHTML(t *testing.T) {
 
 func TestHTMLWithNoSessions(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteHTML(&buf, Analyse(nil, Read{}, DefaultSettings(), t0)); err != nil {
+	if err := WriteHTML(&buf, Analyse(nil, Read{}, Local{}, DefaultSettings(), t0)); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), "Nothing found was worth changing") {
@@ -157,7 +157,7 @@ func TestHTMLWithNoSessions(t *testing.T) {
 }
 
 func TestSummary(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 2}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 2}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteSummary(&buf, r, "out.html", 1); err != nil {
 		t.Fatal(err)
@@ -201,13 +201,13 @@ func TestNames(t *testing.T) {
 func TestLabels(t *testing.T) {
 	sessions := sample()
 	sessions[0].Title = "Fix the scoring"
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	if l := r.Labels["m1"]; l.Title != "Fix the scoring" || l.SubAgent {
 		t.Errorf("main: got %+v", l)
 	}
 	settings := DefaultSettings()
 	settings.Titles = false
-	if l := Analyse(sessions, Read{}, settings, t0).Labels["m1"]; l.Title != "" {
+	if l := Analyse(sessions, Read{}, Local{}, settings, t0).Labels["m1"]; l.Title != "" {
 		t.Errorf("titles off: got %+v", l)
 	}
 	var buf bytes.Buffer
@@ -221,7 +221,7 @@ func TestLabels(t *testing.T) {
 
 func TestPeriod(t *testing.T) {
 	s := []event.Session{{Turns: []event.Turn{{Time: t0, Cost: event.Cost{Output: 7}}, {Time: t0.Add(13 * 24 * time.Hour)}}}}
-	p := Analyse(s, Read{}, DefaultSettings(), t0).Period
+	p := Analyse(s, Read{}, Local{}, DefaultSettings(), t0).Period
 	if p.Days != 14 || !p.From.Equal(t0) || p.PerWeek != 3.5 {
 		t.Errorf("got %+v, want 14 days at $3.50 a week", p)
 	}
@@ -229,7 +229,7 @@ func TestPeriod(t *testing.T) {
 
 func TestSummaryWithoutFile(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteSummary(&buf, Analyse(sample(), Read{}, DefaultSettings(), t0), "", 3); err != nil {
+	if err := WriteSummary(&buf, Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0), "", 3); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), "--format html") {
@@ -249,7 +249,7 @@ func TestTextHasNewSections(t *testing.T) {
 	sessions := sample()
 	sessions[0].Harness = &event.HarnessRecord{Cost: 105, ByModel: map[string]event.ModelRecord{"claude-opus-5-5": {Cost: 105}}}
 	sessions[0].Turns[0].Time = t0
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteText(&buf, r); err != nil {
 		t.Fatal(err)
@@ -292,7 +292,7 @@ func TestLargeShareMatchesP19(t *testing.T) {
 	}
 	s := []event.Session{{ID: "m", Kind: "main", Turns: []event.Turn{
 		turn(10_000, 0), turn(300_000, 4), turn(300_000, 4), turn(200_000, 0)}}}
-	r := Analyse(s, Read{}, DefaultSettings(), t0)
+	r := Analyse(s, Read{}, Local{}, DefaultSettings(), t0)
 	v := newSummary(r)
 	if want := pct(0.6, r.Total); !near(v.LargeSpendShare, want) || !near(v.LargeTurnShare, 50) {
 		t.Errorf("got %v%% of spend, %v%% of turns; want %v%%, 50%%", v.LargeSpendShare, v.LargeTurnShare, want)
@@ -312,7 +312,7 @@ func TestLargeTurnShareCountsAllTurns(t *testing.T) {
 	small := event.Turn{Model: "claude-opus-5-5", Time: t0, Usage: event.Usage{CacheRead: 10_000}, Cost: event.Cost{CacheRead: 0.01}, Priced: true}
 	large := event.Turn{Model: "mystery", Time: t0, Usage: event.Usage{CacheRead: 300_000}}
 	s := []event.Session{{ID: "m", Kind: "main", Turns: []event.Turn{small, small, large, large}}}
-	v := newSummary(Analyse(s, Read{}, DefaultSettings(), t0))
+	v := newSummary(Analyse(s, Read{}, Local{}, DefaultSettings(), t0))
 	bars := 0.0
 	for _, b := range v.Bands[2:] {
 		bars += b.TurnShare
@@ -325,7 +325,7 @@ func TestLargeTurnShareCountsAllTurns(t *testing.T) {
 // The summary at the top shows spend against turns by conversation size, and
 // what filled the conversation.
 func TestHTMLSummary(t *testing.T) {
-	r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0)
 	v := newSummary(r)
 	if len(v.Bands) != 4 || v.Bands[0].Label != "Up to 50k" || v.Bands[3].Label != "Over 500k" {
 		t.Fatalf("bands: got %+v", v.Bands)
@@ -390,7 +390,7 @@ func TestReconcileSectionGivesReasons(t *testing.T) {
 	// The web page says the same, in the singular and the plural.
 	for n, want := range map[int]string{1: "1 session has a record that does not cover all of it (it began",
 		2: "2 sessions have a record that does not cover all of them (they began"} {
-		r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+		r := Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0)
 		r.Reconciliation.Sessions, r.Reconciliation.Behind = 1, n
 		var page bytes.Buffer
 		if err := WriteHTML(&page, r); err != nil {
@@ -444,7 +444,7 @@ func TestCompactionLikelyRange(t *testing.T) {
 	}
 	sessions = append(sessions, event.Session{ID: "long", Kind: "main", Turns: long})
 
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	f := r.CompactFix
 	if f == nil {
 		t.Fatal("no compaction card")
@@ -486,7 +486,7 @@ func TestCompactionLikelyRangeCapped(t *testing.T) {
 	}
 	sessions = append(sessions, event.Session{ID: "long", Kind: "main", Turns: long})
 
-	f := Analyse(sessions, Read{}, DefaultSettings(), t0).CompactFix
+	f := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0).CompactFix
 	if f == nil {
 		t.Fatal("no compaction card")
 	}
@@ -506,7 +506,7 @@ func TestCompactionSummaryWhenNoneMeasured(t *testing.T) {
 	sessions := []event.Session{{ID: "long", Kind: "main", Turns: long}}
 	whole := DefaultSettings()
 	whole.SummaryTo = whole.CompactTo // the old assumption: the summary is the whole 80k
-	a, b := Analyse(sessions, Read{}, DefaultSettings(), t0).CompactFix, Analyse(sessions, Read{}, whole, t0).CompactFix
+	a, b := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0).CompactFix, Analyse(sessions, Read{}, Local{}, whole, t0).CompactFix
 	if a == nil || b == nil || a.Likely <= b.Likely {
 		t.Errorf("likely with a typical summary %+v should exceed likely with an 80k summary %+v", a, b)
 	}
@@ -531,7 +531,7 @@ func TestOlderReason(t *testing.T) {
 }
 
 func TestTextShowsGapSections(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 1}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 1}, Local{}, DefaultSettings(), t0)
 	r.Retention = Retention{Days: 30}
 	r.Failures = detectors.Failures{Sleep: 4, Resent: 2}
 	var out bytes.Buffer
@@ -576,7 +576,7 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 	for _, titles := range []bool{true, false} {
 		s := DefaultSettings()
 		s.Titles = titles
-		r := Analyse(sample(), Read{Logs: 1}, s, t0)
+		r := Analyse(sample(), Read{Logs: 1}, Local{}, s, t0)
 		const id = "1a59c906-04da-521d-bda7-7f71b9f9e01c"
 		r.Attribution.ByMCPServer = []detectors.Spend{{Name: id, Cost: 3, Turns: 1}}
 		// Every other place a connector's name reaches the page or the text.
@@ -647,7 +647,7 @@ func TestCompactionCardCountsMainPricedSessions(t *testing.T) {
 		{ID: "long/agent", Kind: event.SubAgentSession, Turns: grow(900_000, true)}, // a sub-agent
 		{ID: "unpriced", Kind: event.MainSession, Turns: grow(900_000, false)},      // no price
 	}
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	if r.CompactFix == nil {
 		t.Fatal("no compaction card")
 	}

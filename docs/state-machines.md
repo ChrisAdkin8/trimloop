@@ -242,10 +242,12 @@ function call changes the last digits.
 
 ## The results' lifecycle
 
-`report.Analyse` works from the logs alone. `report.AddLocal` then adds
-what comes from outside them: the build's version, the plan, the status
-line's usage-limit readings and the log retention. Every field not from the
-logs is set there, in one call from `main`.
+`report.Analyse` builds the whole report in one call from `main`. It runs
+the findings over the logs first, then, last, adds what comes from outside
+them (`report.Local`: the build's version, the plan, the status line's
+usage-limit readings and the log retention), so the limits can use the
+period the logs cover. Every field not from the logs is set in one place,
+`addLocal`; the zero `Local` gives a report from the logs alone.
 
 ## 10. Which card text applies (decision tables)
 

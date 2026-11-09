@@ -30,7 +30,7 @@ func TestPrintableFormatCharacters(t *testing.T) {
 // report prints it: tool names in the tool-input line, model names in P13
 // and the reconciliation, and effort levels.
 func TestTextGuardsLogText(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 1}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 1}, Local{}, DefaultSettings(), t0)
 	r.ToolInputs = detectors.ToolInputs{Carried: 5, ByTool: []detectors.Group{{Name: "tool" + guardDirty, Carried: 5}}}
 	r.MainModels.ByModel = []detectors.ModelSpend{{Model: "model" + guardDirty, Turns: 1, Cost: 1}}
 	r.Effort.ByLevel = []detectors.EffortLevel{{Level: "effort" + guardDirty, Turns: 1}}
