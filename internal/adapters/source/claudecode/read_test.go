@@ -173,7 +173,7 @@ func TestParseLineToolCalls(t *testing.T) {
 	want := []event.ToolCall{
 		// The shell's cd is not followed, so sed's file resolves against the session's cwd.
 		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: mainGo, FileOp: event.FileView, Part: partKey("1,9p"), InputBytes: 52},
-		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView, Part: partKey("read 20"), InputBytes: 40},
+		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView, Part: partKey("read offset= limit=20 pages="), InputBytes: 40},
 		{ID: "t3", Tool: "Edit", File: mainGo, FileOp: event.FileEdit, InputBytes: 23},
 		{ID: "t4", Tool: "mcp__github__get_issue", Noise: event.NoiseMCP, InputBytes: 32},
 		{ID: "t5", Tool: "Grep", Noise: event.NoiseSearch, InputBytes: 15},
@@ -517,5 +517,28 @@ func TestParseLineRateLimitIsNotAUsageLimit(t *testing.T) {
 		if err != nil || !ok || m.Kind != c.kind || got != c.detail {
 			t.Errorf("%s %q: got kind %v %q, want %v %q", c.errField, c.text, m.Kind, got, c.kind, c.detail)
 		}
+	}
+}
+
+// The Read tool's offset and limit are told apart, and a number written as
+// a string is the same part as the number.
+func TestReadParts(t *testing.T) {
+	part := func(in string) string {
+		line := `{"type":"assistant","cwd":"/r","message":{"id":"m","usage":{"output_tokens":1},"content":[` +
+			`{"type":"tool_use","id":"t","name":"Read","input":{"file_path":"/r/a.go"` + in + `}}]}}`
+		m, _, err := parseLine([]byte(line))
+		if err != nil || len(m.ToolCalls) != 1 {
+			t.Fatalf("%s: got %+v, %v", in, m, err)
+		}
+		return m.ToolCalls[0].Part
+	}
+	if part(`,"offset":100`) == part(`,"limit":100`) {
+		t.Error("offset 100 and limit 100 are the same part")
+	}
+	if part(`,"offset":100`) != part(`,"offset":"100"`) {
+		t.Error(`offset "100" and 100 are different parts`)
+	}
+	if part(``) != "" || part(`,"offset":null`) != "" {
+		t.Error("a whole-file read has a part")
 	}
 }

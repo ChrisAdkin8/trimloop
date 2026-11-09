@@ -42,18 +42,41 @@ func runLive(cmd string, args []string) int {
 	if err != nil {
 		return 0 // the nudges must never get in the way
 	}
+	if cmd == "setup" {
+		return setup(args, home)
+	}
+	runNudge(cmd, args, os.Stdin, os.Stdout, home)
+	return 0
+}
+
+// The status line and the hooks, swapped by tests.
+var (
+	statusLine = live.StatusLine
+	hook       = live.Hook
+)
+
+// runNudge runs the status line or a hook. They must never get in the way,
+// so a panic is swallowed and prints nothing: Go would exit with code 2,
+// which for a UserPromptSubmit hook blocks the user's prompt and shows the
+// error. The output is held until the command finishes, so a panic part way
+// leaves none.
+func runNudge(cmd string, args []string, in io.Reader, out io.Writer, home string) {
+	var buf strings.Builder
+	defer func() {
+		if recover() != nil {
+			return
+		}
+		_, _ = io.WriteString(out, buf.String())
+	}()
 	env := live.DefaultEnv(home)
 	switch cmd {
 	case "statusline":
-		live.StatusLine(os.Stdin, os.Stdout, env)
+		statusLine(in, &buf, env)
 	case "hook":
 		if len(args) == 1 {
-			live.Hook(args[0], os.Stdin, os.Stdout, env)
+			hook(args[0], in, &buf, env)
 		}
-	case "setup":
-		return setup(args, home)
 	}
-	return 0
 }
 
 // setup prints the Claude Code settings for the nudges, or adds them to a
@@ -703,7 +726,10 @@ func nameProjects(sessions []event.Session) {
 }
 
 // shortNames gives each folder the fewest trailing path elements that no
-// other folder in dirs shares.
+// other folder in dirs shares. A folder with no parent left to add keeps
+// the name it has ("/app" stays "app" beside "/Users/c/app", which becomes
+// "c/app"); names of different lengths cannot clash. The result does not
+// depend on map order.
 func shortNames(dirs map[string]bool) map[string]string {
 	names := map[string]string{"": ""}
 	for depth := 1; len(dirs) > 0; depth++ {
@@ -712,8 +738,8 @@ func shortNames(dirs map[string]bool) map[string]string {
 			byName[tail(d, depth)] = append(byName[tail(d, depth)], d)
 		}
 		for name, ds := range byName {
-			if len(ds) == 1 || tail(ds[0], depth+1) == name { // unique, or nothing left to add
-				for _, d := range ds {
+			for _, d := range ds {
+				if len(ds) == 1 || tail(d, depth+1) == name { // unique, or nothing left to add
 					names[d] = name
 					delete(dirs, d)
 				}
@@ -723,10 +749,10 @@ func shortNames(dirs map[string]bool) map[string]string {
 	return names
 }
 
-// tail returns the last n elements of a slash- or separator-separated path,
-// joined with "/".
+// tail returns the last n elements of a path, split at either slash, joined
+// with "/".
 func tail(path string, n int) string {
-	parts := strings.FieldsFunc(filepath.ToSlash(path), func(r rune) bool { return r == '/' })
+	parts := strings.FieldsFunc(path, func(r rune) bool { return r == '/' || r == '\\' })
 	if len(parts) == 0 {
 		return path
 	}

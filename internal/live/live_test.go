@@ -696,3 +696,75 @@ func TestStateBeforeSendPausesOncePerBreak(t *testing.T) {
 		t.Error("a new break: pause again")
 	}
 }
+
+// TestInputIsLenient checks that a field sent with an unexpected shape loses
+// only that field: the hooks still see the session, and no zero or
+// half-read usage-limit reading is kept.
+func TestInputIsLenient(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	line := fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"id":"m1","model":"claude-opus-5-5",`+
+		`"usage":{"cache_read_input_tokens":249000,"cache_creation":{"ephemeral_1h_input_tokens":1000},"output_tokens":10}}}`+"\n",
+		t0.Format(time.RFC3339))
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base := fmt.Sprintf(`"session_id":"s1","transcript_path":%q,"cost":{"total_cost_usd":4.1}`, path)
+	five := func(v string) string { return `{` + base + `,"rate_limits":{"five_hour":` + v + `}}` }
+	for _, c := range []struct {
+		name, in  string
+		hooks     bool  // the hooks still see the session
+		size      bool  // the status line still shows the context size
+		cost      bool  // the status line still shows the cost
+		resetsAt  int64 // the five-hour reading kept; 0 for none
+		effortHas string
+	}{
+		{name: "effort as a string", in: `{` + base + `,"effort":"max"}`, hooks: true, size: true, cost: true},
+		{name: "effort as a struct", in: `{` + base + `,"effort":{"level":"max"}}`, hooks: true, size: true, cost: true, effortHas: "max effort"},
+		{name: "unknown fields", in: `{` + base + `,"new_thing":{"a":[1,2]},"workspace":7}`, hooks: true, size: true, cost: true},
+		{name: "cost as a string", in: fmt.Sprintf(`{"session_id":"s1","transcript_path":%q,"cost":"4.10"}`, path), hooks: true, size: true},
+		{name: "resets_at as RFC 3339", in: five(`{"used_percentage":12,"resets_at":"2026-11-09T18:00:00Z"}`),
+			hooks: true, size: true, cost: true, resetsAt: time.Date(2026, 11, 9, 18, 0, 0, 0, time.UTC).Unix()},
+		{name: "resets_at as a number", in: five(`{"used_percentage":12,"resets_at":1800000000}`), hooks: true, size: true, cost: true, resetsAt: 1_800_000_000},
+		{name: "resets_at not a time", in: five(`{"used_percentage":12,"resets_at":"soon"}`), hooks: true, size: true, cost: true},
+		{name: "resets_at missing", in: five(`{"used_percentage":12}`), hooks: true, size: true, cost: true},
+		{name: "resets_at zero", in: five(`{"used_percentage":12,"resets_at":0}`), hooks: true, size: true, cost: true},
+		{name: "used_percentage a string", in: five(`{"used_percentage":"12","resets_at":1800000000}`), hooks: true, size: true, cost: true},
+		{name: "rate_limits a list", in: `{` + base + `,"rate_limits":[1]}`, hooks: true, size: true, cost: true},
+		{name: "session_id a number", in: fmt.Sprintf(`{"session_id":1,"transcript_path":%q}`, path), size: true},
+		{name: "not JSON", in: `not json`},
+		{name: "a JSON list", in: `[1,2]`},
+		{name: "empty", in: ``},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := env(t, t0.Add(2*time.Hour))
+			e.Limits = filepath.Join(t.TempDir(), "limits.jsonl")
+			var out bytes.Buffer
+			StatusLine(strings.NewReader(c.in), &out, e)
+			line := out.String()
+			if c.size != strings.Contains(line, "250k tokens") {
+				t.Errorf("status line %q: size shown %v, want %v", line, !c.size, c.size)
+			}
+			if c.cost != strings.Contains(line, "$4.10") {
+				t.Errorf("status line %q: cost shown %v, want %v", line, !c.cost, c.cost)
+			}
+			if c.effortHas != "" && !strings.Contains(line, c.effortHas) {
+				t.Errorf("status line %q: want effort %q", line, c.effortHas)
+			}
+			if !c.size && !c.cost && line != "" {
+				t.Errorf("status line %q, want nothing", line)
+			}
+			b, err := os.ReadFile(e.Limits)
+			switch {
+			case c.resetsAt == 0 && err == nil:
+				t.Errorf("limit reading kept: %s", b)
+			case c.resetsAt != 0 && !strings.Contains(string(b), fmt.Sprintf(`"used":12,"resets_at":%d`, c.resetsAt)):
+				t.Errorf("limit reading: %s (%v), want resets_at %d", b, err, c.resetsAt)
+			}
+			out.Reset()
+			Hook("stop", strings.NewReader(c.in), &out, e)
+			if got := strings.Contains(out.String(), "200k"); got != c.hooks {
+				t.Errorf("stop hook: got %q, want a nudge %v", out.String(), c.hooks)
+			}
+		})
+	}
+}

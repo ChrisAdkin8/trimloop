@@ -117,7 +117,7 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 			if t.Project != "" {
 				projects[id][t.Project] += t.Cost.Total()
 			}
-			b := &f.Bands[sort.SearchInts(bandEdges, ctx+1)]
+			b := &f.Bands[sort.SearchInts(bandEdges, ctx)] // exactly 200k is not over 200k
 			b.Turns++
 			b.Cost += t.Cost.Total()
 			if t.CompactedBefore {

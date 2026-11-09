@@ -7,7 +7,7 @@ package report
 // summaryView is what the page's summary section shows.
 type summaryView struct {
 	Threshold       int     // the "large" size, P19's threshold
-	LargeSpendShare float64 // share of spend in turns over Threshold, 0 to 100
+	LargeSpendShare float64 // the input cost of turns over Threshold as a share of spend, 0 to 100 (P19's figure)
 	LargeTurnShare  float64 // share of turns over Threshold, 0 to 100
 	SmallCost       string  // cost per turn of turns under Threshold, e.g. "$0.06–$0.08"
 	LargeCost       string  // cost per turn of turns over it, e.g. "$0.15–$0.28"
@@ -62,14 +62,16 @@ func newSummary(r Results) summaryView {
 			continue
 		}
 		if b.Min >= s.Threshold {
-			s.LargeSpendShare += bs.SpendShare
-			s.LargeTurnShare += bs.TurnShare
 			large = append(large, b.MeanCost())
 		} else {
 			small = append(small, b.MeanCost())
 		}
 	}
 	s.SmallCost, s.LargeCost = costRange(small), costRange(large)
+	// The same figures as the text report's P19 section and the weekly
+	// table: the input cost of turns strictly over the threshold.
+	s.LargeSpendShare = pct(r.Context.Cost, r.Total)
+	s.LargeTurnShare = pct(float64(r.Context.Turns), float64(turns))
 
 	tools := r.Tools.Carried
 	inputs := r.ToolInputs.Carried

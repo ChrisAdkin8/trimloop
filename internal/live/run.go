@@ -14,29 +14,31 @@ import (
 )
 
 // Input is the JSON Claude Code passes on standard input to a status-line
-// command or a hook. Fields a version does not send stay empty.
+// command or a hook. Fields a version does not send stay empty, and so does
+// a field sent with an unexpected shape (decodeInput).
 type Input struct {
-	SessionID      string `json:"session_id"`
-	TranscriptPath string `json:"transcript_path"`
-	HookEventName  string `json:"hook_event_name"`
+	SessionID      string
+	TranscriptPath string
+	HookEventName  string
 	Cost           *struct {
 		TotalCostUSD float64 `json:"total_cost_usd"`
-	} `json:"cost"`
+	}
 	Effort *struct {
 		Level string `json:"level"`
-	} `json:"effort"`
+	}
 	// RateLimits is sent to the status line for Pro and Max subscribers,
-	// after the session's first reply; either limit may be missing.
+	// after the session's first reply; either limit may be missing. It is
+	// nil unless at least one limit decoded and is plausible (rateLimit).
 	RateLimits *struct {
-		FiveHour *rateLimit `json:"five_hour"`
-		SevenDay *rateLimit `json:"seven_day"`
-	} `json:"rate_limits"`
+		FiveHour *rateLimit
+		SevenDay *rateLimit
+	}
 }
 
 // rateLimit is one usage limit as Claude Code reports it.
 type rateLimit struct {
-	UsedPercentage float64 `json:"used_percentage"`
-	ResetsAt       float64 `json:"resets_at"` // Unix seconds
+	UsedPercentage float64
+	ResetsAt       float64 // Unix seconds
 }
 
 func (r *rateLimit) window() *detectors.LimitWindow {
@@ -44,6 +46,78 @@ func (r *rateLimit) window() *detectors.LimitWindow {
 		return nil
 	}
 	return &detectors.LimitWindow{Used: r.UsedPercentage, ResetsAt: int64(r.ResetsAt)}
+}
+
+// decodeInput reads the input one field at a time, so a field sent with a
+// shape this version does not expect (Claude Code changes its input between
+// releases) loses only that field. Only input that is not a JSON object at
+// all is an error.
+func decodeInput(in io.Reader) (Input, error) {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(in).Decode(&raw); err != nil {
+		return Input{}, err
+	}
+	var inp Input
+	field(raw, "session_id", &inp.SessionID)
+	field(raw, "transcript_path", &inp.TranscriptPath)
+	field(raw, "hook_event_name", &inp.HookEventName)
+	field(raw, "cost", &inp.Cost)
+	field(raw, "effort", &inp.Effort)
+	var limits map[string]json.RawMessage
+	if field(raw, "rate_limits", &limits) {
+		five, seven := decodeLimit(limits["five_hour"]), decodeLimit(limits["seven_day"])
+		if five != nil || seven != nil {
+			inp.RateLimits = &struct {
+				FiveHour *rateLimit
+				SevenDay *rateLimit
+			}{five, seven}
+		}
+	}
+	return inp, nil
+}
+
+// field decodes raw[key] into v, leaving v as it was if the key is missing
+// or does not fit, and says whether it decoded.
+func field[T any](raw map[string]json.RawMessage, key string, v *T) bool {
+	b, ok := raw[key]
+	if !ok {
+		return false
+	}
+	var x T
+	if json.Unmarshal(b, &x) != nil {
+		return false
+	}
+	*v = x
+	return true
+}
+
+// decodeLimit decodes one usage limit, or returns nil when it is missing,
+// does not fit, or is not plausible: a reading needs a use (not negative)
+// and a reset time. resets_at is Unix seconds (ADR 0048); an RFC 3339
+// time is accepted too.
+func decodeLimit(b json.RawMessage) *rateLimit {
+	var raw map[string]json.RawMessage
+	if b == nil || json.Unmarshal(b, &raw) != nil {
+		return nil
+	}
+	var r rateLimit
+	if !field(raw, "used_percentage", &r.UsedPercentage) || r.UsedPercentage < 0 {
+		return nil
+	}
+	var at string
+	switch {
+	case field(raw, "resets_at", &r.ResetsAt):
+	case field(raw, "resets_at", &at):
+		t, err := time.Parse(time.RFC3339, at)
+		if err != nil {
+			return nil
+		}
+		r.ResetsAt = float64(t.Unix())
+	}
+	if r.ResetsAt < 1 {
+		return nil
+	}
+	return &r
 }
 
 // Env is what the commands need besides their input.
@@ -69,8 +143,8 @@ func DefaultEnv(home string) Env {
 
 // readInput decodes the input and the session's latest reply.
 func readInput(in io.Reader) (Input, Reply, error) {
-	var inp Input
-	if err := json.NewDecoder(in).Decode(&inp); err != nil {
+	inp, err := decodeInput(in)
+	if err != nil {
 		return inp, Reply{}, err
 	}
 	t, err := claudecode.ReadTail(inp.TranscriptPath)

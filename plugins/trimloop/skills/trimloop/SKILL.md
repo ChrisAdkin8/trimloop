@@ -67,7 +67,7 @@ Read these fields from the JSON:
 | `actions` | recommendations, largest "up to" saving first |
 | `actions[].title`, `.finding` | the change, and what was found |
 | `actions[].saving` | "up to": the most the change could save |
-| `actions[].likely`, `.likely_low`, `.likely_high` | a likelier saving, replayed on their logs (0 if not worked out) |
+| `actions[].likely`, `.likely_low`, `.likely_high`, `.estimated` | a likelier saving, replayed on their logs; only when `estimated` is true, and then even 0 is the estimate (the fix costs about what it saves) |
 | `actions[].weekly_limit_share` | for Pro and Max: the saving as a percentage of a week's usage limit, once measured |
 | `actions[].primary.what`, `.how` | the fix, and exactly how to make it in Claude Code |
 | `actions[].alternatives` | other ways to make the same saving |

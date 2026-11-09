@@ -13,8 +13,9 @@ import (
 
 func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 	r := Results{Period: Period{Days: 14}, Actions: []fixes.Recommendation{
-		{Title: "a", Saving: 100, Likely: 60}, // $30 a week likely
-		{Title: "b", Saving: 2},               // $1 a week at most
+		{Title: "a", Saving: 100, Likely: 60, Estimated: true}, // $30 a week likely
+		{Title: "b", Saving: 2},                                // $1 a week at most
+		{Title: "c", Saving: 100, Estimated: true},             // replayed: saves nothing
 	}}
 	t0 := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
 	var turns []event.Turn
@@ -32,6 +33,13 @@ func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 	}
 	if got := limitText(r.Actions[1]); got != "; under 1% of your weekly limit each week" {
 		t.Errorf("small share: got %q", got)
+	}
+	// An estimate of nothing is not replaced by the upper bound.
+	if got := r.Actions[2].WeeklyLimit; got != 0 {
+		t.Errorf("share for c, estimated to save nothing: got %v, want 0", got)
+	}
+	if got := savingText(r.Actions[2], 1000); !strings.HasPrefix(got, "likely nothing") {
+		t.Errorf("c: got %q, want it to say the likely saving is nothing", got)
 	}
 	var out bytes.Buffer
 	if err := WriteSummary(&out, r, "", 3); err != nil {

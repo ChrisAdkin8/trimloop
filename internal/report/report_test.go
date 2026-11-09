@@ -282,6 +282,30 @@ func TestContextName(t *testing.T) {
 	}
 }
 
+// The web page's headline share of large turns is the text report's P19
+// figure and the weekly table's: input only, and only turns strictly over
+// the threshold.
+func TestLargeShareMatchesP19(t *testing.T) {
+	turn := func(ctx int, output float64) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Time: t0, Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: float64(ctx) / 1e6, Output: output}, Priced: true}
+	}
+	s := []event.Session{{ID: "m", Kind: "main", Turns: []event.Turn{
+		turn(10_000, 0), turn(300_000, 4), turn(300_000, 4), turn(200_000, 0)}}}
+	r := Analyse(s, Read{}, DefaultSettings(), t0)
+	v := newSummary(r)
+	if want := pct(0.6, r.Total); !near(v.LargeSpendShare, want) || !near(v.LargeTurnShare, 50) {
+		t.Errorf("got %v%% of spend, %v%% of turns; want %v%%, 50%%", v.LargeSpendShare, v.LargeTurnShare, want)
+	}
+	var large float64
+	for _, w := range r.Weeks {
+		large += w.LargeContext
+	}
+	if !near(large, r.Context.Cost) {
+		t.Errorf("weekly large-turn cost %v, P19 %v", large, r.Context.Cost)
+	}
+}
+
 // The summary at the top shows spend against turns by conversation size, and
 // what filled the conversation.
 func TestHTMLSummary(t *testing.T) {
@@ -311,7 +335,7 @@ func TestHTMLSummary(t *testing.T) {
 	if strings.Contains(buf.String(), "ZgotmplZ") {
 		t.Error("the template blanked a value it considered unsafe")
 	}
-	for _, want := range []string{"91% of your spend came from turns over 200k tokens", "paid to send the session to Claude",
+	for _, want := range []string{"91% of your spend went on sending turns over 200k tokens", "paid to send the session to Claude",
 		"Tool output", `class="size4"`, `class="kind2"`} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("page has no %q", want)
@@ -400,6 +424,56 @@ func TestCompactionLikelyRange(t *testing.T) {
 	// The smaller size pairs with the larger saving.
 	if want := "at 60k the likely saving is " + money(f.LikelyHigh); !strings.Contains(f.LikelyNote, want) {
 		t.Errorf("note %q has no %q", f.LikelyNote, want)
+	}
+	if !f.Estimated || f.LikelyHigh > f.Saving {
+		t.Errorf("got estimated=%v, high %v above up to %v", f.Estimated, f.LikelyHigh, f.Saving)
+	}
+}
+
+// The likely range never passes "up to", even when the replay at the low
+// quartile of the size after a compaction would.
+func TestCompactionLikelyRangeCapped(t *testing.T) {
+	turn := func(ctx int) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: true}
+	}
+	var sessions []event.Session
+	for i, after := range []int{20_000, 40_000, 60_000, 80_000} {
+		resumed := turn(after)
+		resumed.CompactedBefore = true
+		resumed.Compaction = event.Compaction{Before: 400_000, After: 10_000}
+		sessions = append(sessions, event.Session{ID: fmt.Sprint("c", i), Kind: "main",
+			Turns: []event.Turn{turn(390_000), resumed}})
+	}
+	long := []event.Turn{turn(199_000)}
+	for range 600 {
+		long = append(long, turn(201_000))
+	}
+	sessions = append(sessions, event.Session{ID: "long", Kind: "main", Turns: long})
+
+	f := Analyse(sessions, Read{}, DefaultSettings(), t0).CompactFix
+	if f == nil {
+		t.Fatal("no compaction card")
+	}
+	if f.LikelyHigh > f.Saving || f.Likely > f.Saving {
+		t.Errorf("likely %v (%v–%v) passes up to %v", f.Likely, f.LikelyLow, f.LikelyHigh, f.Saving)
+	}
+}
+
+// With no compaction in the logs, the summary request is priced at the
+// measured typical summary, not at the whole size after a compaction.
+func TestCompactionSummaryWhenNoneMeasured(t *testing.T) {
+	var long []event.Turn
+	for ctx := 100_000; ctx <= 900_000; ctx += 50_000 {
+		long = append(long, event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: true})
+	}
+	sessions := []event.Session{{ID: "long", Kind: "main", Turns: long}}
+	whole := DefaultSettings()
+	whole.SummaryTo = whole.CompactTo // the old assumption: the summary is the whole 80k
+	a, b := Analyse(sessions, Read{}, DefaultSettings(), t0).CompactFix, Analyse(sessions, Read{}, whole, t0).CompactFix
+	if a == nil || b == nil || a.Likely <= b.Likely {
+		t.Errorf("likely with a typical summary %+v should exceed likely with an 80k summary %+v", a, b)
 	}
 }
 

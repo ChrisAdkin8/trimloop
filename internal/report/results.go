@@ -129,6 +129,7 @@ type Settings struct {
 	TopFixes         int            // kinds of tool noise with fixes
 	MinFixSaving     float64        // dollars; smaller savings get no recommendation
 	CompactTo        int            // context after a compaction, when the logs show none
+	SummaryTo        int            // tokens a compaction's summary writes, when the logs show none
 	Titles           bool           // show session titles, which summarise conversations
 	Location         *time.Location // for week boundaries
 }
@@ -145,6 +146,7 @@ func DefaultSettings() Settings {
 		TopFixes:         4,
 		MinFixSaving:     1.0,
 		CompactTo:        80_000,
+		SummaryTo:        25_000, // the measured median is 22-29k (docs/log-signals.md section 8)
 		Titles:           true,
 		Location:         time.Local,
 	}
@@ -184,9 +186,10 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	if after == 0 {
 		after = s.CompactTo
 	}
-	if summary == 0 || summary > after {
-		summary = after
+	if summary == 0 {
+		summary = s.SummaryTo // not the whole size after: the summary is only part of it
 	}
+	summary = min(summary, after)
 	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after, summary)
 	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, upTo, likely, after, s.MinFixSaving); ok {
 		// The likely saving rests on the size after a compaction, measured
@@ -194,7 +197,9 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 		if lo, hi := r.Growth.ResumeLow, r.Growth.ResumeHigh; lo > 0 && hi > lo {
 			high, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, lo, min(summary, lo))
 			low, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, hi, min(summary, hi))
-			f.LikelyLow, f.LikelyHigh = min(low, likely), max(high, likely)
+			// The range is capped at "up to", which is the replay with every
+			// compaction free: at the low quartile the replay can pass it.
+			f.LikelyLow, f.LikelyHigh = min(low, likely), min(max(high, likely), upTo)
 			f.LikelyNote += fmt.Sprintf(" The size after a compaction varies (the middle half of %d measured "+
 				"runs from %s to %s tokens): at %s the likely saving is %s, at %s it is %s.",
 				r.Growth.Resumes, approx(lo), approx(hi), approx(lo), money(high), approx(hi), money(low))

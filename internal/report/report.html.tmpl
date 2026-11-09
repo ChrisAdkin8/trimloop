@@ -114,7 +114,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 {{with .Summary}}{{if .Bands}}
 <section class="panel summary" aria-label="Spend by session size">
-  <h2>{{p0 .LargeSpendShare}} of your spend came from turns over {{short .Threshold}} tokens</h2>
+  <h2>{{p0 .LargeSpendShare}} of your spend went on sending turns over {{short .Threshold}} tokens</h2>
   <p class="muted">A token is a word-piece of about four characters. Every turn sends the whole session so far, so turns get dearer as a session grows: only {{p0 .LargeTurnShare}} of turns were this large{{if and .LargeCost .SmallCost}}, but each cost {{.LargeCost}}, against {{.SmallCost}} for smaller ones{{end}}.</p>
   <div class="row"><b>Spend</b><div class="strip" role="img" aria-label="Share of spend by session size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .SpendShare}}%" title="{{.Label}} tokens: {{dollars .Cost}} ({{p0 .SpendShare}} of spend)"></span>{{end}}</div></div>
   <div class="row"><b>Turns</b><div class="strip" role="img" aria-label="Share of turns by session size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .TurnShare}}%" title="{{.Label}} tokens: {{p0 .TurnShare}} of turns"></span>{{end}}</div></div>
@@ -440,7 +440,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <div class="panel card">
   <h3>{{$a.Title}}</h3>
   {{if $a.Finding}}<p>{{$a.Finding}}</p>{{end}}
-  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join (toolLabels $a.Examples $hide) ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
+  <p class="money">{{if and $a.Estimated (not $a.Likely)}}<span class="likely">likely nothing</span> <span class="muted">(replaying the logs, it costs about what it saves) · up to {{dollars $a.Saving}}</span>{{else if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join (toolLabels $a.Examples $hide) ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
   <div class="fix">
     <p><b>{{$a.Primary.What}}</b></p>
     <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>

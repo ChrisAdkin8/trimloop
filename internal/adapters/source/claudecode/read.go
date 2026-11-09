@@ -327,8 +327,8 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 		case b.Name == "Read" || b.Name == "NotebookRead":
 			c.Noise = event.NoiseFileView
 			c.File, c.FileOp = fileKey(firstOf(in.FilePath, in.NotebookPath), cwd), event.FileView
-			if part := strings.TrimSpace(rawArg(in.Offset) + " " + rawArg(in.Limit) + " " + in.Pages); part != "" {
-				c.Part = partKey("read " + part)
+			if o, l := rawArg(in.Offset), rawArg(in.Limit); o != "" || l != "" || in.Pages != "" {
+				c.Part = partKey("read offset=" + o + " limit=" + l + " pages=" + in.Pages)
 			}
 		case b.Name == "Edit" || b.Name == "MultiEdit" || b.Name == "Write" || b.Name == "NotebookEdit":
 			c.File, c.FileOp = fileKey(firstOf(in.FilePath, in.NotebookPath), cwd), event.FileEdit
@@ -408,8 +408,13 @@ func partKey(part string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
-// rawArg is an argument as logged, "" if absent or null.
+// rawArg is an argument as logged, "" if absent or null. A number written
+// as a string ("100") reads the same as the number (100).
 func rawArg(r json.RawMessage) string {
+	var s string
+	if json.Unmarshal(r, &s) == nil {
+		return strings.TrimSpace(s)
+	}
 	if string(r) == "null" {
 		return ""
 	}

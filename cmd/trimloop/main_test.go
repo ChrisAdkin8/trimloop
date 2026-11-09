@@ -688,6 +688,28 @@ func TestNameProjects(t *testing.T) {
 	}
 }
 
+// A folder whose path is the end of another's keeps its short name, the
+// others gain parents until they differ, and the names do not depend on
+// map order.
+func TestShortNamesStable(t *testing.T) {
+	want := map[string]string{"": "", "/app": "app", "/Users/c/app": "Users/c/app", "/x/c/app": "x/c/app", "/c/web/app": "web/app",
+		"/work/api": "work/api", "/home/api": "home/api", `C:\code\web`: "web"}
+	for range 200 {
+		dirs := map[string]bool{}
+		for d := range want {
+			if d != "" {
+				dirs[d] = true
+			}
+		}
+		got := shortNames(dirs)
+		for d, name := range want {
+			if got[d] != name {
+				t.Fatalf("%q: got %q, want %q (all: %q)", d, got[d], name, got)
+			}
+		}
+	}
+}
+
 // A session that moves into a subfolder stays one project; the reader's
 // folders become short names only after all sessions are read.
 func TestSessionProjectAcrossSubfolders(t *testing.T) {

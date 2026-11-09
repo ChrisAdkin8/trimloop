@@ -88,7 +88,7 @@ func TestFindGrowth(t *testing.T) {
 	if len(f.TopShares) != 1 || f.TopShares[0].N != 1 || !near(f.TopShares[0].Share, 0.7) {
 		t.Errorf("shares: got %+v (only N <= conversations)", f.TopShares)
 	}
-	wantBands := []int{3, 1, 0, 3} // <50k, 50k-200k, 200k-500k, over 500k
+	wantBands := []int{4, 0, 0, 3} // up to 50k (the 50,000 one too), 50k-200k, 200k-500k, over 500k
 	for i, b := range f.Bands {
 		if b.Turns != wantBands[i] {
 			t.Errorf("band %d: got %d turns, want %d", i, b.Turns, wantBands[i])

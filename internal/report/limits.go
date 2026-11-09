@@ -53,9 +53,9 @@ func AddLimits(r *Results, sessions []event.Session, plan Plan, readings []detec
 		a := &r.Actions[i]
 		a.WeeklyLimit = 0
 		if rate > 0 {
-			saving := a.Likely
-			if saving == 0 {
-				saving = a.Saving
+			saving := a.Saving
+			if a.Estimated {
+				saving = a.Likely // even 0: the upper bound would overstate it
 			}
 			a.WeeklyLimit = min(saving/weeks*rate, 100)
 		}

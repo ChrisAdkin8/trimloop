@@ -41,8 +41,12 @@ type Recommendation struct {
 	Finding    string          `json:"finding"` // what was found, in a sentence
 	Noise      event.NoiseKind `json:"noise"`
 	Saving     float64         `json:"saving"`                // the finding's estimated saving, an upper bound
-	Likely     float64         `json:"likely"`                // a likelier saving for this fix; 0 if not estimated
+	Likely     float64         `json:"likely"`                // a likelier saving for this fix; see Estimated
 	LikelyNote string          `json:"likely_note,omitempty"` // how Likely was estimated
+	// Estimated is true when Likely was worked out. Likely is then the
+	// estimate even when it is 0: replaying the logs, the fix would cost
+	// about what it saves. When false, only Saving is known.
+	Estimated bool `json:"estimated,omitempty"`
 	// LikelyLow and LikelyHigh bound Likely when it rests on a measured
 	// quantity that varies (the size after a compaction); 0 if not given.
 	LikelyLow  float64 `json:"likely_low,omitempty"`

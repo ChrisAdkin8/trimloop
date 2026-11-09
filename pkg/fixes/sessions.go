@@ -74,8 +74,9 @@ func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, afte
 		Finding: fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
 			"%d sessions passed %s tokens without compacting; Claude Code compacts on its own only near the limit.",
 			g.Uncompacted, thousandsInt(g.Limit)),
-		Saving: upTo,
-		Likely: likely,
+		Saving:    upTo,
+		Likely:    likely,
+		Estimated: true,
 		LikelyNote: fmt.Sprintf("Replays each main session as if compacted to %s tokens (what the first request "+
 			"after a compaction typically sends) whenever it passed %s, "+
 			"including the cost of each compaction, and assumes it then went on the same way. "+
@@ -124,6 +125,7 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, startCost, minS
 		Finding:    finding,
 		Saving:     saving,
 		Likely:     likely,
+		Estimated:  true,
 		LikelyNote: fmt.Sprintf("As if each of those turns had started a new session of about %s tokens.", thousandsInt(fresh)),
 		Overlap:    "Shares money with the compaction fix: do not add them",
 		Primary: Fix{Advise,

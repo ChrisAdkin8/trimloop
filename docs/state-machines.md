@@ -127,11 +127,15 @@ seconds; anything not ahead is dropped, so the file grows by at most one
 line per percentage point per window. Two reset times within a minute of
 each other are the same window (`SameWindow`), both when keeping readings
 and when measuring the rate (ADR 0048).
+A limit is read only when it has a use (not negative) and a reset time
+(Unix seconds, or an RFC 3339 time); one sent in another shape, or with no
+reset time, is left out, so a malformed input never writes a zero reading.
 
 Tests: `TestAppendAndLoadLimits`, `TestLoadLimitsSurvivesALongDamagedLine`,
-`TestFindLimits*`, `TestStatusLineKeepsLimitReadings`. Known edge: two
-status lines writing at the same instant can both append; the measure uses
-each window's first and last reading, so a duplicate changes nothing.
+`TestFindLimits*`, `TestStatusLineKeepsLimitReadings`,
+`TestInputIsLenient`. Known edge: two status lines writing at the same
+instant can both append; the measure uses each window's first and last
+reading, so a duplicate changes nothing.
 
 ## 6. Weekly history (explicit)
 
@@ -166,7 +170,13 @@ latest reply. The status line is then in one of three phases: no reply yet
 until the next reply: "compacted"). A compaction logged before the latest
 reply counts as after it only when both have times and the compaction's is
 later (the triggering reply can be logged late). The scan's two flags are
-local to one function and read clearly, so they stay. Known edge: a final
+local to one function and read clearly, so they stay. The input from Claude
+Code is read one field at a time (`decodeInput`): a field sent in a shape
+this version does not expect is dropped, and the rest still work, for the
+hooks too. A panic in the status line or a hook is swallowed with no output
+and exit code 0 (`runNudge` in `cmd/trimloop`), since exit code 2 would
+block the user's prompt. Tests: `TestInputIsLenient`,
+`TestRunNudgeSwallowsPanics`, `TestRunNudgeBadInput`. Known edge: a final
 line over 1 MB shows the cost only.
 
 ## 8. Log reading offset (implicit; not saved yet)
