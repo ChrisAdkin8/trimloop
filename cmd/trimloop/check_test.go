@@ -305,6 +305,19 @@ func TestUnreadSettingsFollowsLinks(t *testing.T) {
 	if got := unreadSettings(path, home, cfg); got != "" {
 		t.Errorf("relative link: got %q, want no warning", got)
 	}
+	// A link to a link to the file not made yet: setup --write writes the
+	// file Claude Code reads, so there is nothing to warn about.
+	if err := os.Remove(reads); err != nil {
+		t.Fatal(err)
+	}
+	middle := filepath.Join(other, "middle.json")
+	if err := os.Symlink(reads, middle); err != nil {
+		t.Fatal(err)
+	}
+	link(middle)
+	if got := unreadSettings(path, home, cfg); got != "" {
+		t.Errorf("link to a link to a file not made yet: got %q, want no warning", got)
+	}
 	link(filepath.Join(other, "settings.json"))
 	if got := unreadSettings(path, home, cfg); got != reads {
 		t.Errorf("link elsewhere: got %q, want %q", got, reads)

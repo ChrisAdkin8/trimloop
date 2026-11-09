@@ -243,7 +243,7 @@ func DisplayName(model string) string {
 		return model
 	}
 	parts := strings.Split(rest, "-")
-	if len(parts) < 2 {
+	if len(parts) < 2 || parts[0] == "" { // "claude--5": no family to name
 		return model
 	}
 	var version []string

@@ -97,7 +97,7 @@ func ReadTail(path string) (Tail, error) {
 			t.Compaction = &m
 			continue
 		}
-		if m.Kind != source.KindTurn || m.Model == synthetic {
+		if m.Kind != source.KindTurn || m.Synthetic {
 			continue
 		}
 		wrote := m.Usage.CacheWrite5m+m.Usage.CacheWrite1h > 0

@@ -35,7 +35,8 @@ func TestStatus(t *testing.T) {
 		eff     string
 	}{
 		{"small, fresh cache", reply(50_000, t0), t0.Add(time.Minute), "medium", "50k tokens", Small, "", ""},
-		{"large, cache ending", reply(312_000, t0), t0.Add(52 * time.Minute), "", "312k tokens", Large, "cache ends in 9 min", ""},
+		{"large, cache ending", reply(312_000, t0), t0.Add(52 * time.Minute), "", "312k tokens", Large, "cache ends in 8 min", ""},
+		{"large, cache ending part way through a minute", reply(312_000, t0), t0.Add(51*time.Minute + 30*time.Second), "", "312k tokens", Large, "cache ends in 9 min", ""},
 		{"very large, expired", reply(610_000, t0), t0.Add(2 * time.Hour), "max", "610k tokens", VeryLarge, "cache expired · next message ≈ $4.88", "max effort"},
 	}
 	for _, tt := range tests {
@@ -832,7 +833,7 @@ func TestHooksSnippetAndMissingFolder(t *testing.T) {
 	}
 	missing := filepath.Join(t.TempDir(), ".claude")
 	_, _, err := WriteSettings(filepath.Join(missing, "settings.json"), "/bin/trimloop", false)
-	if err == nil || !strings.Contains(err.Error(), "the folder "+missing+" does not exist") || strings.Contains(err.Error(), ".settings-") {
+	if err == nil || !strings.Contains(err.Error(), "the folder "+missing+" does not exist") || strings.Contains(err.Error(), ".tmp") {
 		t.Errorf("got %v, want the missing folder named", err)
 	}
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/ChrisAdkin8/trimloop/internal/history"
 	"github.com/ChrisAdkin8/trimloop/internal/live"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
+	"github.com/ChrisAdkin8/trimloop/internal/safefile"
 	"github.com/ChrisAdkin8/trimloop/internal/sessions"
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 )
@@ -145,19 +146,12 @@ func unreadSettings(path, home, cfgDir string) string {
 	return reads
 }
 
-// resolved is the file path names once every link is followed. For a file
-// not made yet (or a link to one), it follows the links to its folder; when
-// that folder is missing too, it is the cleaned absolute path.
+// resolved is the file path names once every link is followed, the same
+// way setup --write follows them (live.LinkTarget), even to a file not made
+// yet; then the links to its folder. When that folder is missing too, it is
+// the cleaned absolute path.
 func resolved(path string) string {
-	if r, err := filepath.EvalSymlinks(path); err == nil {
-		return r
-	}
-	if target, err := os.Readlink(path); err == nil { // a link to a file not made yet
-		if !filepath.IsAbs(target) {
-			target = filepath.Join(filepath.Dir(path), target)
-		}
-		path = target
-	}
+	path = live.LinkTarget(path)
 	if dir, err := filepath.EvalSymlinks(filepath.Dir(path)); err == nil {
 		return filepath.Join(dir, filepath.Base(path))
 	}
@@ -349,7 +343,7 @@ func analyse() {
 		fmt.Fprintln(os.Stderr, noLogsMessage(claude.Projects()))
 		os.Exit(1)
 	}
-	read := report.Read{Logs: st.Logs, Failed: st.Failed, BadLines: st.BadLines}
+	read := report.Read{Logs: st.Logs, Failed: len(st.Problems), BadLines: st.BadLines}
 	if !o.since.IsZero() {
 		// Weekly figures from part of the logs would replace fuller stored
 		// weeks, so a --since run leaves the history file alone.
@@ -489,27 +483,5 @@ func writeFile(path string, render func(io.Writer) error) error {
 	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() && info.Mode()&os.ModeSymlink == 0 {
 		return fmt.Errorf("%s exists and is not a file: choose another name", path)
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp") // made 0600
-	if err != nil {
-		return err
-	}
-	tmp := f.Name()
-	done := false
-	defer func() {
-		if !done {
-			_ = os.Remove(tmp)
-		}
-	}()
-	if err := render(f); err != nil {
-		_ = f.Close() // the write error is the one to report
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return err
-	}
-	done = true
-	return nil
+	return safefile.Write(path, 0o600, render)
 }

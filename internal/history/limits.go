@@ -23,8 +23,11 @@ func LimitsPath(home, configDir string) string {
 // moves a limit forward from the last line kept: a higher use in the same
 // window, or a later window. The status line runs every few seconds in every
 // open session, and a session that has been idle can repeat an older
-// reading, so anything else is dropped; the file then grows by at most one
-// line per percentage point per window. A limit in the last line whose reset
+// reading, so anything else is dropped; the file then grows by about one
+// line per percentage point per window. Nothing locks the file: two status
+// lines appending at the same instant can both add the same reading, which
+// changes no measurement (FindLimits uses each window's first and last
+// reading; docs/state-machines.md §5). A limit in the last line whose reset
 // time is implausibly far after the new reading (stored before readings were
 // checked) counts as absent, so it cannot hold back every later reading; the
 // line itself is left in the file. It holds numbers and times only, readable

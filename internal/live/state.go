@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/ChrisAdkin8/trimloop/internal/safefile"
 )
 
 // State remembers, per session, which nudges were shown, so each appears
@@ -99,20 +101,7 @@ func (s Store) Save(session string, st State) error {
 	if err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(s.Dir, ".state-*")
-	if err != nil {
-		return err
-	}
-	if _, err := tmp.Write(b); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	if err := os.Rename(tmp.Name(), p); err != nil {
+	if err := safefile.WriteBytes(p, 0o600, b); err != nil {
 		return err
 	}
 	s.prune(30 * 24 * time.Hour)

@@ -506,6 +506,7 @@ func TestParseLineRateLimitIsNotAUsageLimit(t *testing.T) {
 		{"rate_limit", "You've hit your Opus limit", source.KindLimitHit, "other"},
 		{"rate_limit", "API Error: 429 rate_limit_error: requests per minute", source.KindFailure, "not-sent"},
 		{"rate_limit", "API Error: Rate limit reached", source.KindFailure, "not-sent"},
+		{"rate_limit", "You've hit your rate limit for this API key", source.KindFailure, "not-sent"}, // a rate limit in a usage limit's words
 		{"authentication_failed", "Login expired · Please run /login", source.KindFailure, "not-sent"},
 		{"unknown", "API Error: 529 Overloaded", source.KindFailure, "not-sent"},
 		{"server_error", "API Error: Can't reach the API server (ENOTFOUND)", source.KindFailure, "not-sent"},

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/internal/history"
+	"github.com/ChrisAdkin8/trimloop/internal/safefile"
 )
 
 // The events trimloop hooks into, and the argument each hook command takes.
@@ -231,14 +232,14 @@ func decodeSettings(path string, b []byte) (map[string]any, error) {
 // in ~/.trimloop/backups (see writeBackup). It returns the backup's path
 // ("" if none) and whether the file was written.
 func WriteSettings(path, exe string, replace bool) (backup string, changed bool, err error) {
-	path = linkTarget(path)
+	path = LinkTarget(path)
 	cfg := map[string]any{}
 	mode := fs.FileMode(0o600)
 	old, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		old = nil
-		// Name the missing folder, not the temporary file writeAtomic
+		// Name the missing folder, not the temporary file safefile
 		// would fail to make in it.
 		if dir := filepath.Dir(path); !isDir(dir) {
 			return "", false, fmt.Errorf("cannot write %s: the folder %s does not exist (Claude Code makes it the first time it runs); nothing was written", path, dir)
@@ -315,7 +316,7 @@ func WriteSettings(path, exe string, replace bool) (backup string, changed bool,
 			return "", false, err
 		}
 	}
-	if err := writeAtomic(path, buf.Bytes(), mode); err != nil {
+	if err := safefile.WriteBytes(path, mode, buf.Bytes()); err != nil {
 		return backup, false, err
 	}
 	return backup, true, nil
@@ -421,36 +422,11 @@ func writeBackup(path string, data []byte) (string, error) {
 	}
 }
 
-// writeAtomic replaces path with data, writing a temporary file in the same
-// folder and renaming it, so a crash cannot leave half a settings file.
-func writeAtomic(path string, data []byte, mode fs.FileMode) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".settings-*.json")
-	if err != nil {
-		return err
-	}
-	cleanup := func(err error) error {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		return cleanup(err)
-	}
-	if err := tmp.Chmod(mode); err != nil {
-		return cleanup(err)
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
-}
-
-// linkTarget is the file a settings path stands for: the file a link points
+// LinkTarget is the file a settings path stands for: the file a link points
 // to, followed through every link, even when that file does not exist yet
 // (a dotfiles link made before the file), so writing it never replaces the
 // link with a plain file. Any other path is returned as it is.
-func linkTarget(path string) string {
+func LinkTarget(path string) string {
 	for range 40 { // links to links, but not a loop
 		if target, err := filepath.EvalSymlinks(path); err == nil {
 			return target

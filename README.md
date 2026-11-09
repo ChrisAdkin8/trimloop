@@ -301,6 +301,7 @@ linters are set in [.golangci.yml](.golangci.yml). The code is laid out as:
 | `cmd/trimloop` | The command: options, then runs the report or a live command |
 | `internal/adapters/source` | Log readers: `claudecode` (Claude Code logs), `jsonl` (shared line reader) |
 | `internal/sessions` | Finds and reads every log and builds the sessions (`sessions.Load`) |
+| `internal/safefile` | Replaces a file whole or not at all (reports, history, nudge state, settings) |
 | `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price list, usage normalisation |
 | `pkg/detectors` | The findings, attribution, reconciliation and weekly figures |
 | `pkg/cmdshape` | Shell commands reduced to their shape, without values |

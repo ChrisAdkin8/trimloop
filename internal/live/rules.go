@@ -9,6 +9,7 @@ package live
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -128,7 +129,7 @@ func (s Settings) Status(r Reply, now time.Time, cost float64, effort string) St
 			p.Cache += " · next message ≈ " + money(c)
 		}
 	case left <= s.Warn:
-		p.Cache = fmt.Sprintf("cache ends in %d min", int(left.Minutes())+1)
+		p.Cache = fmt.Sprintf("cache ends in %d min", int(math.Ceil(left.Minutes())))
 	}
 	return p
 }

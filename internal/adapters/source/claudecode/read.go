@@ -608,8 +608,8 @@ func limitKind(bs []block) string {
 		t := strings.ToLower(b.Text)
 		named := strings.Contains(t, "hit your") && strings.Contains(t, "limit") ||
 			strings.Contains(t, "usage limit") ||
-			strings.Contains(t, "limit reached") && !strings.Contains(t, "rate limit")
-		if !named {
+			strings.Contains(t, "limit reached")
+		if !named || strings.Contains(t, "rate limit") { // an API key's rate limit, in any wording
 			continue
 		}
 		switch {

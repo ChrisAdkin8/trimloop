@@ -21,10 +21,9 @@ import (
 // Read is what reading the logs found.
 type Read struct {
 	Logs     int       // logs found
-	Failed   int       // logs whose reading stopped early; what was read is kept
 	BadLines int       // lines that could not be parsed, skipped
 	Oldest   time.Time // the oldest log's last change: older logs may have been deleted
-	Problems []error   // why each failed log stopped, naming its path, in reading order
+	Problems []error   // one per log whose reading stopped early (what was read is kept), naming its path, in reading order
 }
 
 // Load finds every reader's logs, reads them all and builds their sessions.
@@ -52,7 +51,6 @@ func Load(readers []source.Reader) ([]event.Session, Read, error) {
 		read.BadLines += d.bad
 		if d.err != nil {
 			read.Problems = append(read.Problems, fmt.Errorf("%s: %w", l.Path, d.err))
-			read.Failed++
 		}
 		// Keep what was read even if the log failed partway.
 		data = append(data, d)
