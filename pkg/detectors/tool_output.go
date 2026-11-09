@@ -25,7 +25,7 @@ type ToolOutput struct {
 	ByNoise []Group `json:"by_noise"` // by kind of noise; largest saving first
 
 	FileViews     int     `json:"file_views"`     // results that showed a file
-	Rereads       int     `json:"rereads"`        // views of a file already viewed, unchanged, in the session
+	Rereads       int     `json:"rereads"`        // views of the same part of a file already viewed, unchanged, in the session
 	RereadCarried float64 `json:"reread_carried"` // carried cost of those re-reads
 }
 

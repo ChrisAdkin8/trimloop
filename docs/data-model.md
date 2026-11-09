@@ -26,11 +26,14 @@ worked out is in [measurements.md](measurements.md).
   catalogue version used, the build that made it (`trimloop_version`) and, for a `--since`
   run, the date it starts from (`read.since`). Each recommendation carries `pattern`, `title`, `finding` (a
   sentence), `saving` (an upper bound, "up to"), `likely` (a likelier
-  figure, 0 if not estimated), `likely_note` (how it was estimated),
+  figure, worked out only where `estimated` is true; then 0 is an estimate
+  of nothing, and `nothing` says why), `likely_note` (how it was estimated),
   `likely_low` and `likely_high` (a range, where the likely figure rests on
   a measured size that varies), the `primary` fix and `alternatives`.
   Actions are ranked by the upper bound, the one figure every
-  recommendation has ([ADR 0032](adr/0032-readable-reports.md),
+  recommendation has, except that a card estimated to save nothing goes
+  last ([ADR 0053](adr/0053-projects-by-conversation-and-ranking.md);
+  [ADR 0032](adr/0032-readable-reports.md),
   [ADR 0045](adr/0045-m0-measurement-method.md)).
 - **Week**, the history file: below.
 - **Limit readings** (`~/.trimloop/limits.jsonl`, one `limits-<id>.jsonl`
@@ -67,7 +70,7 @@ Numbers only: no names, titles, paths or session ids.
 | `sub_agents` | number | Spend in sub-agents |
 | `pause_rewrite` | number | Cache re-writes after long breaks the user took, in main sessions (P09; analysis version 4; a stored week from an earlier version counted other waits too, and reports mark it as older) |
 | `tool_output` | number | Carried cost of tool output added that week (P04; since version 4, carried history on rebuilt-cache turns is priced as a write) |
-| `file_views` / `rereads` | int | File views, and those that re-read an unchanged file |
+| `file_views` / `rereads` | int | File views, and those that re-read the same part of a file not changed since (analysis version 8; earlier versions counted any view of a file already viewed) |
 | `short_waits` | number | What a 5-minute cache expiring after 5–60 minute waits cost, against the cache still there (P02; added in version 5, [ADR 0043](adr/0043-weekly-trend-for-new-findings.md); this meaning from version 6, [ADR 0045](adr/0045-m0-measurement-method.md)). A week stored before version 5 has none: reports show a dash |
 | `top_effort` | number | Output cost of xhigh and max turns: the spend the P14 card is about, not its saving (version 5) |
 | `older_models` | number | Main-session spend on a model with a newer, cheaper version or a cheaper tier, shown as "cheaper choice": the spend the P13 cards are about, not their saving (version 5) |

@@ -378,8 +378,27 @@ func TestReconcileSectionGivesReasons(t *testing.T) {
 	var b strings.Builder
 	reconcileSection(&b, detectors.Reconciliation{Unpriced: 1, Behind: 2}, 10)
 	out := b.String()
-	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") || !strings.Contains(out, "2 sessions have a record that does not cover all of them") {
+	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") ||
+		!strings.Contains(out, "2 sessions have a record that does not cover all of them (they began") {
 		t.Errorf("got %q", out)
+	}
+	b.Reset()
+	reconcileSection(&b, detectors.Reconciliation{Behind: 1}, 10)
+	if out := b.String(); !strings.Contains(out, "1 session has a record that does not cover all of it (it began") {
+		t.Errorf("one session: got %q", out)
+	}
+	// The web page says the same, in the singular and the plural.
+	for n, want := range map[int]string{1: "1 session has a record that does not cover all of it (it began",
+		2: "2 sessions have a record that does not cover all of them (they began"} {
+		r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+		r.Reconciliation.Sessions, r.Reconciliation.Behind = 1, n
+		var page bytes.Buffer
+		if err := WriteHTML(&page, r); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(page.String(), want) {
+			t.Errorf("web page with %d left out has no %q", n, want)
+		}
 	}
 }
 

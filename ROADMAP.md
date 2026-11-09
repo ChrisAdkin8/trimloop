@@ -108,7 +108,10 @@ Done:
   retention ([ADR 0050](docs/adr/0050-second-gap-analysis-findings.md));
   unused desktop-app tools filed as P06, and requests refused before any
   work kept out of P12's re-sent cost
-  ([ADR 0052](docs/adr/0052-third-review-corrections.md)).
+  ([ADR 0052](docs/adr/0052-third-review-corrections.md));
+- projects credited by conversation, a card that saves nothing ranked last,
+  and re-reads counted by the part of a file viewed
+  ([ADR 0053](docs/adr/0053-projects-by-conversation-and-ranking.md)).
 
 To do:
 

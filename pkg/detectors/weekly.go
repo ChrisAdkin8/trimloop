@@ -56,8 +56,9 @@ type Week struct {
 // compactions after a session's last reply (ADR 0039); version 5 adds the
 // short-wait, top-effort and older-model figures (ADR 0043); version 6
 // prices short waits against the cache still there (ADR 0044); version 7
-// adds limit hits (ADR 0048).
-const AnalysisVersion = 7
+// adds limit hits (ADR 0048); version 8 counts a re-read only for the same
+// part of an unchanged file (ADR 0053).
+const AnalysisVersion = 8
 
 // The analysis version in which each later weekly figure was first
 // measured. A week stored by an earlier version does not have it; reports

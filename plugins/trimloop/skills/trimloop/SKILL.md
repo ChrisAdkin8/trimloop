@@ -64,7 +64,7 @@ Read these fields from the JSON:
 | Field | Meaning |
 |---|---|
 | `total`, `period.days`, `period.per_week` | spend at list prices, over how many days, per week |
-| `actions` | recommendations, largest "up to" saving first |
+| `actions` | recommendations, largest "up to" saving first; one estimated to save nothing comes last |
 | `actions[].title`, `.finding` | the change, and what was found |
 | `actions[].saving` | "up to": the most the change could save |
 | `actions[].likely`, `.likely_low`, `.likely_high`, `.estimated` | a likelier saving, replayed on their logs; only when `estimated` is true, and then even 0 is the estimate; `nothing` then says why |
@@ -122,7 +122,9 @@ say yes: it edits Claude Code's settings (after making a backup). Use the
 file `setup --check` named: with `CLAUDE_CONFIG_DIR` set it is not
 `~/.claude/settings.json`. If their status line is "another
 program's", tell them that `--replace-statusline` would replace it; never
-add that flag on your own. Changes take effect in new Claude Code sessions.
+add that flag on your own. If it says hooks are turned off, their settings
+set `disableAllHooks`, which stops the status line and the nudges: tell
+them, and leave that setting to them. Changes take effect in new Claude Code sessions.
 
 ## Commands at a glance
 

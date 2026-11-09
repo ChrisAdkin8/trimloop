@@ -62,8 +62,15 @@ message ids counted here (`turnOf`) and
 tool calls waiting for results (`callAt`); whether the user named the
 session (a generated title then never replaces it); the latest system
 prompt and tool list; and the harness's latest cost record per run (records
-are running totals, so the largest wins). Each is one variable with one
-rule, so they stay as they are. Lines copied into a resumed session are
+are running totals, so the largest wins); and the session's project
+folder, the first folder a reply names, which credits every later turn
+(`projectFor`: there, below or above it is the session's project). Each is
+one variable with one rule, so they stay as they are. After all logs are
+read, two passes run across sessions (ADR 0053): `inheritProjects` credits
+each sub-agent's turns by its main session's folder, then `nameProjects`
+turns folders into short names, adding parent folders only where two
+names would clash; a name therefore depends on which folders the run
+includes. Lines copied into a resumed session are
 counted once, in the oldest log, through the shared `seen` set (ADR 0026).
 
 ## 3. Trimloop's entries in Claude Code's settings (explicit)
@@ -126,7 +133,7 @@ can repeat an older reading, and every open session refreshes every 30
 seconds; anything not ahead is dropped, so the file grows by at most one
 line per percentage point per window. Two reset times within a minute of
 each other are the same window (`SameWindow`), both when keeping readings
-and when measuring the rate (ADR 0048).
+and when measuring the rate (ADR 0048). A limit in the last stored line whose reset time is more than eight days after the new reading's time (0.1.0 stored readings unchecked) counts as absent when comparing, so it cannot block later readings; the line itself stays in the file.
 A limit is read only when it has a use (a number, not null or negative;
 above 100 is read as 100) and a plausible reset time: Unix seconds (a
 number above 10^11 is taken as milliseconds), or an RFC 3339 time, between
@@ -138,7 +145,7 @@ dropped.
 
 Tests: `TestAppendAndLoadLimits`, `TestLoadLimitsSurvivesALongDamagedLine`,
 `TestFindLimits*`, `TestStatusLineKeepsLimitReadings`,
-`TestInputIsLenient`, `TestDecodeLimit`. Known edge: two status lines writing at the same
+`TestInputIsLenient`, `TestDecodeLimit`, `TestAppendLimitsPastAFarFutureLine`, `TestAppendLimitsKeepsPlausibleLastLine`. Known edge: two status lines writing at the same
 instant can both append; the measure uses each window's first and last
 reading, so a duplicate changes nothing.
 

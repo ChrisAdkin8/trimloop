@@ -74,16 +74,17 @@ var catalogue = map[string]Model{
 	"claude-haiku-4-5":          {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 }
 
-// lookup finds a model's prices. An id the catalogue does not hold as written
+// Key returns the catalogue key a model id resolves to, and false if the
+// catalogue holds no such model. An id the catalogue does not hold as written
 // is tried again without what cloud providers add around the model name:
 // "us.anthropic.claude-opus-5-5" and "anthropic.claude-opus-4-5-20251101-v1:0"
 // (Amazon Bedrock), "claude-opus-4-5@20251101" (Google Vertex AI), and a
 // date such as "claude-opus-4-5-20251101". A dated id the catalogue holds
 // (claude-haiku-4-5-20251001) is found before its date is removed. Nothing
 // else is guessed: an unknown model stays unpriced.
-func lookup(model string) (Model, bool) {
-	if m, ok := catalogue[model]; ok {
-		return m, true
+func Key(model string) (string, bool) {
+	if _, ok := catalogue[model]; ok {
+		return model, true
 	}
 	id := model
 	for _, p := range []string{"us.", "eu.", "apac.", "global."} {
@@ -94,11 +95,32 @@ func lookup(model string) (Model, bool) {
 	}
 	id = strings.TrimPrefix(id, "anthropic.")
 	id = bedrockVersion.ReplaceAllString(id, "")
-	if m, ok := catalogue[id]; ok {
-		return m, true
+	if _, ok := catalogue[id]; ok {
+		return id, true
 	}
-	m, ok := catalogue[dateSuffix.ReplaceAllString(id, "")]
-	return m, ok
+	id = dateSuffix.ReplaceAllString(id, "")
+	if _, ok := catalogue[id]; ok {
+		return id, true
+	}
+	return "", false
+}
+
+// key is Key, falling back to the id as written when the catalogue does not
+// hold the model.
+func key(model string) string {
+	if k, ok := Key(model); ok {
+		return k
+	}
+	return model
+}
+
+// lookup finds a model's prices through Key.
+func lookup(model string) (Model, bool) {
+	k, ok := Key(model)
+	if !ok {
+		return Model{}, false
+	}
+	return catalogue[k], true
 }
 
 var (
@@ -162,9 +184,9 @@ var cheaper = map[string]string{
 }
 
 // Cheaper returns the model to suggest in place of model, and false if there
-// is none.
+// is none. A provider or dated id is read as the model it names (Key).
 func Cheaper(model string) (string, bool) {
-	m, ok := cheaper[model]
+	m, ok := cheaper[key(model)]
 	return m, ok
 }
 
@@ -180,9 +202,10 @@ var successor = map[string]string{
 }
 
 // Successor returns the newer model to suggest in place of model, and false
-// if there is none.
+// if there is none. A provider or dated id is read as the model it names
+// (Key).
 func Successor(model string) (string, bool) {
-	m, ok := successor[model]
+	m, ok := successor[key(model)]
 	return m, ok
 }
 
@@ -193,17 +216,20 @@ var lowerTier = map[string]string{
 }
 
 // LowerTier returns the model one tier down from model for main sessions, and
-// false if there is none.
+// false if there is none. A provider or dated id is read as the model it
+// names (Key).
 func LowerTier(model string) (string, bool) {
-	m, ok := lowerTier[model]
+	m, ok := lowerTier[key(model)]
 	return m, ok
 }
 
 // DisplayName is a model's name as people write it: "claude-opus-5-5"
-// becomes "Opus 5.5", "claude-haiku-4-5-20251001" becomes "Haiku 4.5". Names
-// it does not recognise are returned unchanged.
+// becomes "Opus 5.5", "claude-haiku-4-5-20251001" becomes "Haiku 4.5". A
+// provider or dated id the catalogue holds is named as the model it resolves
+// to (Key): "us.anthropic.claude-opus-5-5-v1:0" is "Opus 5.5" too. Names it
+// does not recognise are returned unchanged.
 func DisplayName(model string) string {
-	rest, ok := strings.CutPrefix(model, "claude-")
+	rest, ok := strings.CutPrefix(key(model), "claude-")
 	if !ok {
 		return model
 	}

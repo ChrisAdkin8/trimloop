@@ -15,16 +15,16 @@ A run on one developer's 45 days of logs, shortened (the full output also
 covers their usage limits and Claude Code's own cost records):
 
 ```text
-Read 574 logs: 573 sessions, 18,210 turns.
-Spent $2,306 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $359 a week.
+Read 574 logs: 573 sessions, 18,601 turns.
+Spent $2,330 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $362 a week.
 
 What to do first (these savings overlap, so do not add them):
-  1. Compact long sessions earlier: likely about $579 ($555–$692), up to $891 (39%)
+  1. Compact long sessions earlier: likely about $581 ($557–$694), up to $896 (38%)
      Compact when a session passes about 200,000 tokens, or between tasks.
-  2. Start fresh after a long break: likely about $301, up to $311 (14%)
-     After a break of over an hour, start a new session with a short note instead of carrying on.
-  3. Run sub-agents on a cheaper model: up to $305 (13%)
+  2. Run sub-agents on a cheaper model: up to $312 (13%)
      Run sub-agents that search, read and summarise on Sonnet 5.5.
+  3. Start fresh after a long break: likely about $301, up to $312 (13%)
+     After a break of over an hour, start a new session with a short note instead of carrying on.
 ```
 
 In plain words: every turn re-sends the whole conversation, so long
@@ -35,7 +35,8 @@ Claude starts for side tasks, such as searching the code.
 The full report explains each finding, shows the sessions behind it, and
 gives the fix step by step. **See one:**
 [docs/examples/example-report.html](docs/examples/example-report.html) is the
-web page from the same run, with session titles left out. GitHub shows it as
+web page from the same run, with session titles left out and project
+folders renamed to neutral words (oak, larch, ...). GitHub shows it as
 code: download it ("Download raw file") and open it in a browser.
 
 **How far to trust the figures.** They are estimates:

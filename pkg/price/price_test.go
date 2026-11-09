@@ -162,3 +162,77 @@ func TestDisplayName(t *testing.T) {
 		}
 	}
 }
+
+func TestKey(t *testing.T) {
+	for in, want := range map[string]string{
+		"claude-opus-5-5":                            "claude-opus-5-5",
+		"us.anthropic.claude-opus-5-5-v1:0":          "claude-opus-5-5",
+		"claude-opus-5-5@20261001":                   "claude-opus-5-5",
+		"claude-opus-5-5-20261001":                   "claude-opus-5-5",
+		"us.anthropic.claude-opus-4-5-20251101-v1:0": "claude-opus-4-5",
+		"claude-haiku-4-5-20251001":                  "claude-haiku-4-5-20251001", // held as written
+		"anthropic.claude-haiku-4-5-20251001-v1:0":   "claude-haiku-4-5-20251001",
+	} {
+		if got, ok := Key(in); !ok || got != want {
+			t.Errorf("Key(%q) = %q, %v; want %q", in, got, ok, want)
+		}
+	}
+	for _, in := range []string{"claude-opus-4", "xx.anthropic.claude-opus-5-5", "<synthetic>"} {
+		if got, ok := Key(in); ok {
+			t.Errorf("Key(%q) = %q, want not found", in, got)
+		}
+	}
+}
+
+// TestSuggestionsForProviderIDs checks that a provider or dated id gets the
+// same suggestions as the model it names.
+func TestSuggestionsForProviderIDs(t *testing.T) {
+	helpers := map[string]func(string) (string, bool){
+		"Cheaper": Cheaper, "Successor": Successor, "LowerTier": LowerTier,
+	}
+	tests := []struct {
+		helper, model, want string
+	}{
+		{"Cheaper", "us.anthropic.claude-opus-5-5-v1:0", "claude-sonnet-5-5"},
+		{"Cheaper", "claude-opus-5-5@20261001", "claude-sonnet-5-5"},
+		{"Cheaper", "claude-opus-5-5-20261001", "claude-sonnet-5-5"},
+		{"Cheaper", "global.anthropic.claude-fable-5-1", "claude-sonnet-5-5"},
+		{"Successor", "us.anthropic.claude-opus-5-v1:0", "claude-opus-5-5"},
+		{"Successor", "claude-opus-4-8@20260801", "claude-opus-5-5"},
+		{"Successor", "claude-sonnet-5-20260601", "claude-sonnet-5-5"},
+		{"LowerTier", "us.anthropic.claude-fable-5-1-v1:0", "claude-opus-5-5"},
+		{"LowerTier", "claude-fable-5-1@20261001", "claude-opus-5-5"},
+		{"LowerTier", "claude-fable-5-1-20261001", "claude-opus-5-5"},
+	}
+	for _, tt := range tests {
+		if got, ok := helpers[tt.helper](tt.model); !ok || got != tt.want {
+			t.Errorf("%s(%q) = %q, %v; want %q", tt.helper, tt.model, got, ok, tt.want)
+		}
+	}
+	for _, tt := range []struct{ helper, model string }{
+		{"Cheaper", "us.anthropic.claude-sonnet-5-5-v1:0"},
+		{"Successor", "claude-opus-5-5@20261001"},
+		{"LowerTier", "claude-opus-5-5-20261001"},
+		{"Cheaper", "us.anthropic.claude-unknown-1-0"},
+	} {
+		if got, ok := helpers[tt.helper](tt.model); ok {
+			t.Errorf("%s(%q) = %q, want none", tt.helper, tt.model, got)
+		}
+	}
+}
+
+func TestDisplayNameProviderIDs(t *testing.T) {
+	for in, want := range map[string]string{
+		"claude-opus-5-5@20261001":                   "Opus 5.5",
+		"claude-opus-5-5-20261001":                   "Opus 5.5",
+		"us.anthropic.claude-opus-5-5-v1:0":          "Opus 5.5",
+		"us.anthropic.claude-opus-4-5-20251101-v1:0": "Opus 4.5",
+		"anthropic.claude-haiku-4-5-20251001-v1:0":   "Haiku 4.5",
+		"global.anthropic.claude-sonnet-5-5":         "Sonnet 5.5",
+		"us.anthropic.claude-unknown-1-0":            "us.anthropic.claude-unknown-1-0", // unknown: unchanged
+	} {
+		if got := DisplayName(in); got != want {
+			t.Errorf("DisplayName(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

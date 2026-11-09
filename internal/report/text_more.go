@@ -37,9 +37,10 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 			count(c.Unrecorded, "session")+agree(c.Unrecorded, " has", " have"), money(c.UnrecordedCost), pct(c.UnrecordedCost, all), agree(c.Unrecorded, "its total", "their totals"))
 	}
 	if c.Behind > 0 {
-		fmt.Fprintf(w, "  %s a record that does not cover all of %s (it began before the record's first run,\n"+
+		fmt.Fprintf(w, "  %s a record that does not cover all of %s (%s before the record's first run,\n"+
 			"  or went on after its last) and %s left out.\n",
-			count(c.Behind, "session")+agree(c.Behind, " has", " have"), agree(c.Behind, "it", "them"), agree(c.Behind, "is", "are"))
+			count(c.Behind, "session")+agree(c.Behind, " has", " have"), agree(c.Behind, "it", "them"),
+			agree(c.Behind, "it began", "they began"), agree(c.Behind, "is", "are"))
 	}
 	if c.Sessions == 0 {
 		return

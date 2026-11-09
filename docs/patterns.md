@@ -162,8 +162,9 @@ results. Claude Code already caps what the model sees of one result (about
 of moderate outputs carried for hundreds of turns are not.
 
 In the founder's logs the noisiest shell programs were file viewing and
-searching, not builds or tests, and many file views re-read a file already
-seen. Half or more of those commands were already piped through a filter;
+searching, not builds or tests. Few file views re-read the same part of a
+file not changed since (2.4 % after ADR 0053; an earlier count that took
+paging through a file for re-reading said 23 %). Half or more of those commands were already piped through a filter;
 the waste is whole-file views, broad searches and repeats. A one-off script
 that carried output past compactions measured more than the M0 detector,
 which drops output at each compaction as the harness does: compaction
