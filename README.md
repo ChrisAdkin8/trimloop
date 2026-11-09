@@ -113,6 +113,23 @@ CLAUDE_CONFIG_DIR=/tmp/trimloop-demo go run ./cmd/trimloop/ --no-history --forma
 once Claude Code has deleted old logs. `--history FILE` moves the file;
 `--no-history` neither reads nor writes it.
 
+### Ask Claude about it (Claude Code plugin)
+
+The trimloop plugin adds a skill to Claude Code: ask "where did my tokens
+go?" or "why do I keep hitting my usage limit?" and Claude runs trimloop
+and explains the result in plain words. It needs trimloop installed (see
+[Releases](#releases)). In Claude Code:
+
+```text
+/plugin marketplace add ChrisAdkin8/trimloop
+/plugin install trimloop@trimloop
+```
+
+With Claude Code 2.1.275 or later, one step does both:
+`/plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The plugin
+adds no hooks and changes no settings; the live nudges below are set up
+with `trimloop setup` ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
+
 ### Live nudges in Claude Code
 
 Trimloop can also nudge you while you work:

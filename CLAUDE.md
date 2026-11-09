@@ -62,3 +62,9 @@ so run it from a built binary (`go build -o ~/.local/bin/trimloop
   `go run github.com/goreleaser/goreleaser/v2@v2.19.0 release --snapshot
   --clean --skip=sign,sbom`. Pin new tools and actions to releases at least
   two weeks old, actions by commit hash.
+- Claude Code plugin (ADR 0049): this repo is also a marketplace
+  (`.claude-plugin/marketplace.json`, plugin in `plugins/trimloop/`). On a
+  release, set `version` in `plugins/trimloop/.claude-plugin/plugin.json`
+  to the new version. If the skill's commands or the JSON fields it names
+  change, update `skills/trimloop/SKILL.md`. Run
+  `claude plugin validate . --strict` after changing either.

@@ -96,7 +96,9 @@ Done:
   ([ADR 0042](docs/adr/0042-p02-p14-and-main-session-models.md));
 - usage limits for Pro and Max subscribers: the plan, limit hits, and
   savings as a share of the weekly limit from status-line readings
-  ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md)).
+  ([ADR 0048](docs/adr/0048-usage-limits-for-subscribers.md));
+- a Claude Code plugin whose skill runs trimloop and explains the report
+  ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
 
 To do:
 

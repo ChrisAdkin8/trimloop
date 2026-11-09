@@ -24,7 +24,7 @@ Which record governs what in the M0 prototype:
 | Reconciliation and weekly history | [0033](0033-reconciliation-history-standing-context.md), [0043](0043-weekly-trend-for-new-findings.md) |
 | Live nudges | [0034](0034-live-nudges.md) |
 | Licensing | [0046](0046-licensing.md) |
-| Releases | [0047](0047-first-release-pure-go.md), then [0014](0014-release-builds-per-os.md) once cgo arrives |
+| Releases | [0047](0047-first-release-pure-go.md), then [0014](0014-release-builds-per-os.md) once cgo arrives; [0049](0049-claude-code-plugin.md) (the plugin) |
 | Privacy | [0004](0004-local-first-hashes-only.md), [0011](0011-keyed-fingerprints.md), [0032](0032-readable-reports.md) (the local-report exception) |
 
 ## All records
@@ -44,7 +44,7 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0005](0005-thin-python-plugin-for-litellm.md) | Go core, thin Python plugin for LiteLLM | Gateway plugin (M1) | No (design) | Amended by 0006 |
 | [0006](0006-gateway-plugin-forwards-to-sidecar.md) | Gateway plugins forward raw events to a co-located sidecar | Gateway plugin (M1) | No (design) | Yes |
 | [0007](0007-recommend-skills-and-doc-retrieval.md) | Recommend skills and documentation retrieval; do not host RAG | Recommendations (M4) | No (design) | Yes |
-| [0008](0008-packaging-and-distribution.md) | One binary, one image, one Python package | Packaging | No (design) | Amended by 0014, 0046 |
+| [0008](0008-packaging-and-distribution.md) | One binary, one image, one Python package | Packaging | No (design) | Amended by 0014, 0046, 0049 |
 | [0009](0009-gateway-sidecar-before-local-proxy.md) | Ship the gateway sidecar before the local proxy | Build order (M1) | No (design) | Yes |
 | [0010](0010-go-detectors-sql-aggregates.md) | Detectors are Go state machines; SQL only for cross-session aggregates | Detectors | Partly: Go detectors, as one-pass functions; no incremental interface or SQL | Yes |
 | [0011](0011-keyed-fingerprints.md) | Keyed fingerprints (HMAC-SHA-256) with a customer-held key | Privacy | No (design) | Amended by 0019, 0024 |
@@ -83,8 +83,9 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0044](0044-effort-thinking-and-cache-figures.md) | Effort by thinking tokens, and fairer cache figures | Measurements (M0) | Yes | Superseded by 0045 |
 | [0045](0045-m0-measurement-method.md) | The M0 measurement method | Measurements (M0) | Yes | Amended by 0048 |
 | [0046](0046-licensing.md) | Licensing — FSL core, Apache-2.0 connectors, commercial team features | Licensing | Partly: LICENSE.md | Yes |
-| [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Yes |
+| [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Amended by 0049 |
 | [0048](0048-usage-limits-for-subscribers.md) | Usage limits for subscribers | Reports (M0) | Yes | Yes |
+| [0049](0049-claude-code-plugin.md) | A Claude Code plugin with a trimloop skill | Packaging | Yes: not yet tried by users | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

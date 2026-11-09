@@ -39,6 +39,7 @@
 | 7 | **Wire schemas** | `proto/trimloop/v1` | Buf Schema Registry | Authors of other plugins | M1 |
 | 8 | **Envoy integration** | `trimloop serve --extproc` — a mode of artefacts 1 and 2 | (as 1 and 2) | Envoy-based gateways | M4 |
 | 9 | **`trimloop-kong`** | Separate small binary and image | GitHub Releases, GHCR | Kong AI Gateway | M4 |
+| 10 | **Claude Code plugin** `trimloop` | A skill that runs trimloop and explains the report ([ADR 0049](adr/0049-claude-code-plugin.md)) | This repository as a Claude Code marketplace (`.claude-plugin/marketplace.json`) | Claude Code users | M0 |
 
 Milestones follow [ROADMAP.md](../ROADMAP.md): the gateway sidecar ships in M1,
 before the local proxy ([ADR 0009](adr/0009-gateway-sidecar-before-local-proxy.md)).

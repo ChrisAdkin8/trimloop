@@ -1,0 +1,14 @@
+{
+  "name": "trimloop",
+  "description": "trimloop for Claude Code: a skill that explains where your tokens went and which changes save the most.",
+  "owner": {
+    "name": "Chris Adkin"
+  },
+  "plugins": [
+    {
+      "name": "trimloop",
+      "source": "./plugins/trimloop",
+      "description": "Find where your Claude Code tokens go, and which changes to how you work save the most."
+    }
+  ]
+}
