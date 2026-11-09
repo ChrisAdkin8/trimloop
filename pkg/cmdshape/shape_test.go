@@ -196,6 +196,7 @@ func TestParseFolders(t *testing.T) {
 		{cmd: `cat a.go b.go`, file: "a.go", others: []string{"b.go"}},
 		{cmd: `cd web && head -n 5 a.ts b.ts`, file: "web/a.ts", others: []string{"web/b.ts"}},
 		{cmd: `sed -i 's/a/b/' x.go y.go`, file: "x.go"}, // an edit: the others are in Writes
+		{cmd: `sed -n '1,20p' a.go b.go`, file: "a.go"},  // one stream: b.go may not show
 		{cmd: `sed --expression=s/i/x/ a.go`, file: "a.go"},
 	}
 	for _, tt := range tests {

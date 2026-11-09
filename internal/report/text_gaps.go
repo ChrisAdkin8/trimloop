@@ -37,8 +37,8 @@ func gapSections(w io.Writer, r Results) {
 	all := r.Total
 	if sw := r.Switches; sw.Switches > 0 {
 		fmt.Fprintln(w, "\nP01 MODEL SWITCHES MID-SESSION")
-		fmt.Fprintf(w, "  %d switches in %s: the first turn on the new model saved the whole conversation\n",
-			sw.Switches, count(sw.Sessions, "session"))
+		fmt.Fprintf(w, "  %d %s in %s: the first turn on the new model saved the whole conversation\n",
+			sw.Switches, agree(sw.Switches, "switch", "switches"), count(sw.Sessions, "session"))
 		fmt.Fprintf(w, "  to the cache again. Those turns cost %s; reading instead would have saved %s.\n",
 			dollars(sw.Cost), dollars(sw.Saving))
 		if r.SwitchFix != nil {

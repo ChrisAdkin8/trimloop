@@ -16,8 +16,8 @@ import (
 // all is the total spend, for percentages; hideIDs is --no-titles.
 func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recommendation, all float64, hideIDs bool) {
 	fmt.Fprintf(w, "\nP04 WHAT FILLS YOUR CONTEXT: TOOL OUTPUT\n")
-	fmt.Fprintf(w, "  %s tool results added about %s tokens (at %d bytes per token).\n",
-		thousands(f.Calls), thousands(f.Tokens), event.BytesPerToken)
+	fmt.Fprintf(w, "  %s added about %s tokens (at %d bytes per token).\n",
+		count(f.Calls, "tool result"), thousands(f.Tokens), event.BytesPerToken)
 	fmt.Fprintf(w, "  Each stays in the context and is sent again on every later turn. Carried\n")
 	fmt.Fprintf(w, "  until the session ended or was compacted, they cost %s (%.0f%% of all spend).\n",
 		dollars(f.Carried), pct(f.Carried, all))
@@ -25,7 +25,7 @@ func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recomme
 		thousands(f.Target), dollars(f.Saving), pct(f.Saving, all))
 	fmt.Fprintln(w, "  This is part of P19's cost, not extra to it.")
 	if f.Persisted > 0 {
-		fmt.Fprintf(w, "  %s results were too large and saved to disk; the model saw a preview.\n", thousands(f.Persisted))
+		fmt.Fprintf(w, "  %s too large and saved to disk; the model saw a preview.\n", count(f.Persisted, "result")+agree(f.Persisted, " was", " were"))
 	}
 	if f.FileViews > 0 {
 		fmt.Fprintf(w, "  %s of %s file views (%.0f%%) re-read a file already viewed, unchanged, in\n",

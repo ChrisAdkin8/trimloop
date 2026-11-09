@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -682,5 +683,32 @@ func TestLabelsFirstSubAgentHasATime(t *testing.T) {
 		if l := labels(order, r, true)["gone"]; l.Project != "api" || l.Start.IsZero() {
 			t.Errorf("got %+v, want the timed sub-agent's project and start", l)
 		}
+	}
+}
+
+// Counts of one read as one in both formats: "1 time", "1 session", never
+// "1 times" or "1 was a breaks".
+func TestCountsOfOne(t *testing.T) {
+	r := Analyse(sample(), Read{Logs: 1}, Local{}, DefaultSettings(), t0)
+	r.Pause.Pauses, r.Pause.Sessions, r.Pause.Saving, r.Pause.Cost = 1, 1, 1, 1
+	r.Growth.Compactions, r.CacheLife.Waits, r.Switches.Switches = 1, 1, 1
+	r.Reconciliation.Sessions, r.SubAgents.Runs, r.Period.Days, r.Read.Unpriced = 1, 1, 1, 1
+	r.Reconciliation.Unrecorded, r.Reconciliation.Unpriced, r.Reconciliation.WebSearches = 1, 1, 1
+	r.Read.Failed, r.Read.BadLines, r.Tools.Calls, r.Tools.Persisted = 1, 1, 1, 1
+	bad := regexp.MustCompile(`\b1 (times|sessions|days|turns|runs|logs|lines|results|tool results|switches|web searches)\b|was a breaks|search[s]\b`) // the last: "search" with a plain s added
+	var text, page bytes.Buffer
+	if err := WriteText(&text, r); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteHTML(&page, r); err != nil {
+		t.Fatal(err)
+	}
+	for name, out := range map[string]string{"text": text.String(), "page": page.String()} {
+		if m := bad.FindAllString(out, -1); len(m) > 0 {
+			t.Errorf("%s says %q", name, m)
+		}
+	}
+	if !strings.Contains(text.String(), "1 time, work carried on") || !strings.Contains(page.String(), "1 time in 1 session, work carried on") {
+		t.Error("the long-break sentences do not say 1 time")
 	}
 }

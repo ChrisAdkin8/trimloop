@@ -435,10 +435,13 @@ func shapeOf(pipe []pipePart) Shape {
 			if files, part := fileArgs(prog, args); len(files) > 0 {
 				s.File = files[0]
 				if !s.Edit {
-					s.Others = files[1:]
-				}
-				if !s.Edit {
 					s.Part = part
+					// cat, head and tail show each file; sed runs its script
+					// over the files joined into one stream, so later ones
+					// may not show at all.
+					if prog != "sed" {
+						s.Others = files[1:]
+					}
 				}
 			}
 		}
