@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -74,12 +75,64 @@ func TestFindLimitsSkipsAReset(t *testing.T) {
 func TestFindLimitsWindowAcrossAMinuteEdge(t *testing.T) {
 	t0 := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
 	s := []event.Session{{ID: "a", Kind: event.MainSession, Turns: []event.Turn{{Time: t0}, {Time: t0.Add(5 * time.Hour), Cost: event.Cost{Output: 30}}}}}
-	reset := int64(1_800_000_029) // 1 s before a bucket edge in the old rule
+	reset := t0.Add(72*time.Hour).Unix() + 29 // 1 s before a bucket edge in the old rule; within 8 days of the readings
 	readings := []LimitReading{
 		{At: t0.Add(time.Minute), SevenDay: &LimitWindow{Used: 10, ResetsAt: reset}},
 		{At: t0.Add(5*time.Hour + time.Minute), SevenDay: &LimitWindow{Used: 16, ResetsAt: reset + 2}}, // same window, 2 s later
 	}
 	if r := FindLimits(s, readings, 1, 1).SevenDay; r.Windows != 1 || r.Rise != 6 {
 		t.Errorf("reset times 2 s apart: got %+v, want one window rising 6", r)
+	}
+}
+
+// Readings stored unchecked by 0.1.0 (a reset time in the year 9999 or in
+// milliseconds, or long before the reading) would join into one window
+// spanning the genuine ones; they are left out of the rate.
+func TestFindLimitsIgnoresImplausibleResets(t *testing.T) {
+	t0 := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
+	var turns []event.Turn
+	for h := range 300 { // $1 an hour for 300 hours
+		turns = append(turns, event.Turn{Time: t0.Add(time.Duration(h) * time.Hour), Cost: event.Cost{Output: 1}})
+	}
+	s := []event.Session{{ID: "a", Kind: event.MainSession, Turns: turns}}
+	week1, week2 := t0.Add(5*24*time.Hour).Unix(), t0.Add(12*24*time.Hour).Unix()
+	read := func(h int, used float64, reset int64) LimitReading {
+		return LimitReading{At: t0.Add(time.Duration(h)*time.Hour + time.Minute), SevenDay: &LimitWindow{Used: used, ResetsAt: reset}}
+	}
+	genuine := []LimitReading{
+		read(10, 10, week1), read(40, 19, week1), // +9 over $30
+		read(130, 2, week2), read(150, 8, week2), // +6 over $20
+	}
+	y9999 := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC).Unix()
+	stored := append([]LimitReading{
+		read(5, 1, y9999), read(20, 3, y9999), read(140, 60, y9999), read(200, 99, y9999), // one bogus window over both
+		read(30, 5, week1*1000), read(35, 50, week1*1000), // milliseconds
+		read(100, 0, t0.Unix()), read(120, 40, t0.Unix()), // reset days before the reading
+	}, genuine...)
+	sort.Slice(stored, func(i, j int) bool { return stored[i].At.Before(stored[j].At) })
+
+	want := FindLimits(s, genuine, 20, 5).SevenDay
+	if want.Windows != 2 || want.PerDollar != 0.3 {
+		t.Fatalf("genuine windows alone: got %+v, want 2 windows at 0.3 a dollar", want)
+	}
+	if got := FindLimits(s, stored, 20, 5).SevenDay; got != want {
+		t.Errorf("with implausible readings: got %+v, want %+v", got, want)
+	}
+
+	// The bounds: a day before the reading, eight days after.
+	at := t0
+	for _, c := range []struct {
+		reset int64
+		ok    bool
+	}{
+		{at.Add(-ResetsAtPast).Unix(), true},
+		{at.Add(-ResetsAtPast).Unix() - 1, false},
+		{at.Add(ResetsAtFuture).Unix(), true},
+		{at.Add(ResetsAtFuture).Unix() + 1, false},
+		{y9999, false},
+	} {
+		if got := PlausibleReset(c.reset, at); got != c.ok {
+			t.Errorf("PlausibleReset(%d): got %v, want %v", c.reset, got, c.ok)
+		}
 	}
 }

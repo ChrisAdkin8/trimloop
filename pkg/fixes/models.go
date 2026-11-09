@@ -76,11 +76,11 @@ func ForMainModels(f detectors.MainModels, minSaving float64) []Recommendation {
 			Pattern: "P13",
 			Title:   "Move to the newer model",
 			Finding: fmt.Sprintf("%d main-session turns ran on %s. Each has a newer version that costs less per "+
-				"token and counts tokens the same way.", f.NewerTurns, joinNames(from)),
+				"token and counts tokens the same way.", f.NewerTurns, joinNames(unique(from))),
 			Saving:   f.Newer,
-			Examples: from,
+			Examples: unique(from),
 			Primary: Fix{Advise,
-				"Switch main sessions " + joinNames(moves) + ".",
+				"Switch main sessions " + joinNames(unique(moves)) + ".",
 				`Choose the model with /model, or set "model" in .claude/settings.json.`},
 			Check: "Prompts tuned for the older model may need adjusting: compare turns per task for a week after switching.",
 		})
@@ -97,12 +97,12 @@ func ForMainModels(f detectors.MainModels, minSaving float64) []Recommendation {
 			Pattern: "P13",
 			Title:   fmt.Sprintf("Use %s for routine main-session work", joinNames(unique(to))),
 			Finding: fmt.Sprintf("%d main-session turns ran on %s. The same turns on %s would have cost less; whether "+
-				"it does the work as well is not known from the logs.", f.TierTurns, joinNames(from), joinNames(unique(to))),
+				"it does the work as well is not known from the logs.", f.TierTurns, joinNames(unique(from)), joinNames(unique(to))),
 			Saving:   f.LowerTier,
-			Examples: from,
+			Examples: unique(from),
 			Overlap:  "May share turns at the highest effort with the effort fix: do not add them",
 			Primary: Fix{Advise,
-				fmt.Sprintf("Start sessions on %s and switch to %s for the hardest problems.", joinNames(unique(to)), joinNames(from)),
+				fmt.Sprintf("Start sessions on %s and switch to %s for the hardest problems.", joinNames(unique(to)), joinNames(unique(from))),
 				`Choose the model with /model at the start of a task, or set "model" in .claude/settings.json.`},
 			Check: "Untested for quality: after a week, compare turns per task and tool errors with before, and switch back if they rose.",
 		})
@@ -141,7 +141,7 @@ func ForEffort(f detectors.Effort, minSaving float64) (Recommendation, bool) {
 		how = fmt.Sprintf(`The xhigh and max turns ran on %s. Effort can be set per model ("modelSettings" in `+
 			`~/.claude/settings.json): if it is, lower it there. Otherwise keep the default at %s with /effort %s `+
 			`(or "effortLevel" in .claude/settings.json), and raise it with /effort for a task that needs it.`,
-			joinNames(names), back, back)
+			joinNames(unique(names)), back, back)
 	}
 	return Recommendation{
 		Pattern: "P14",

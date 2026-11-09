@@ -120,17 +120,14 @@ func trimNewline(b []byte) []byte {
 	return b
 }
 
-// resetsAtFuture is the furthest after a reading's own time that a stored
-// reset time is believed: the weekly window plus slack, the same bound the
-// status line's decoder (internal/live decodeLimit) puts on new readings.
-const resetsAtFuture = 8 * 24 * time.Hour
-
 // plausible returns w, or nil when its reset time is more than
-// resetsAtFuture after at: version 0.1.0 stored readings unchecked, so a
-// file can end with a reset time in milliseconds or in the year 9999. A
-// zero at checks nothing.
+// detectors.ResetsAtFuture after at (the weekly window plus slack, the same
+// bound the status line's decoder puts on new readings): version 0.1.0
+// stored readings unchecked, so a file can end with a reset time in
+// milliseconds or in the year 9999. A zero at checks nothing. Only the later
+// bound is applied here, as before; FindLimits applies both to the rate.
 func plausible(w *detectors.LimitWindow, at time.Time) *detectors.LimitWindow {
-	if w == nil || at.IsZero() || w.ResetsAt <= at.Add(resetsAtFuture).Unix() {
+	if w == nil || at.IsZero() || w.ResetsAt <= at.Add(detectors.ResetsAtFuture).Unix() {
 		return w
 	}
 	return nil

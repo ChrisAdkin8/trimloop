@@ -229,20 +229,9 @@ func analyse() {
 		fmt.Fprintln(os.Stderr, noLogsMessage(claude.Projects()))
 		os.Exit(1)
 	}
-	oldestFirst(data)
 
-	// 3. Build sessions. seen is shared by all logs, so a message copied into
-	// several logs (for example, when a session is resumed) is counted only
-	// once: in the oldest log that has it (ADR 0026).
-	seen := map[string]bool{}
-	var sessions []event.Session
-	for _, d := range data {
-		if s := buildSession(d, seen); len(s.Turns) > 0 || len(s.LimitHits) > 0 {
-			sessions = append(sessions, s)
-		}
-	}
-	inheritProjects(sessions)
-	nameProjects(sessions)
+	// 3. Build sessions.
+	sessions := buildSessions(data)
 	read := report.Read{Logs: st.logs, Failed: st.failed, BadLines: st.badLines}
 	if !since.IsZero() {
 		// Weekly figures from part of the logs would replace fuller stored
@@ -567,7 +556,7 @@ func buildSession(d logData, seen map[string]bool) event.Session {
 				Fast:            m.Fast,
 				Effort:          m.Effort,
 				USOnly:          m.USOnly,
-				Project:         projectFor(m.Project, s.Project),
+				Project:         turnProject(s, m.Project),
 				Attribution:     m.Attribution,
 				CompactedBefore: h.compaction != nil,
 				Prompted:        h.prompted,
@@ -661,11 +650,32 @@ func sumRuns(runs map[string]event.HarnessRecord) *event.HarnessRecord {
 	return total
 }
 
+// buildSessions orders the logs oldest first and builds their sessions,
+// then credits and names projects across all of them. seen is shared by all
+// logs, so a message copied into several logs (for example, when a session
+// is resumed) is counted only once: in the oldest log that has it (ADR
+// 0026). The end-to-end test (golden_test.go) runs this same function.
+func buildSessions(data []logData) []event.Session {
+	oldestFirst(data)
+	seen := map[string]bool{}
+	var sessions []event.Session
+	for _, d := range data {
+		if s := buildSession(d, seen); len(s.Turns) > 0 || len(s.LimitHits) > 0 {
+			sessions = append(sessions, s)
+		}
+	}
+	inheritProjects(sessions)
+	nameProjects(sessions)
+	return sessions
+}
+
 // inheritProjects credits a subagent, and its turns, by its conversation:
-// a subagent belongs to its main session's project, as the main session's
+// each turn belongs to its main session's project, as the main session's
 // own turns do, when it ran there, in a subfolder or in a folder above
-// (projectFor). One started in a subfolder of the project is not a project
-// of its own; one that logged no folder takes the main session's.
+// (projectFor), and to the folder it ran in otherwise, whatever folder the
+// subagent started in (ADR 0053). One that logged no folder takes the main
+// session's; one whose main session was not read is matched against its
+// own first folder.
 func inheritProjects(sessions []event.Session) {
 	project := map[string]string{}
 	for _, s := range sessions {
@@ -674,15 +684,29 @@ func inheritProjects(sessions []event.Session) {
 		}
 	}
 	for i, s := range sessions {
-		p, ok := project[s.ParentID]
-		if !ok || s.Kind != event.SubAgentSession {
+		if s.Kind != event.SubAgentSession {
 			continue
+		}
+		p, ok := project[s.ParentID]
+		if !ok {
+			p = s.Project // its main session was not read: its own folder is the conversation's
 		}
 		sessions[i].Project = projectFor(s.Project, p)
 		for j := range s.Turns {
 			s.Turns[j].Project = projectFor(s.Turns[j].Project, p)
 		}
 	}
+}
+
+// turnProject is the folder a new turn of s is credited to while its log is
+// read: for a main session, by the session's folder (projectFor); for a
+// sub-agent, the folder as logged, since it belongs to its conversation's
+// folder, which inheritProjects applies once every log is read (ADR 0053).
+func turnProject(s event.Session, dir string) string {
+	if s.Kind == event.SubAgentSession {
+		return dir
+	}
+	return projectFor(dir, s.Project)
 }
 
 // projectFor returns the project folder to credit a turn that ran in dir to,

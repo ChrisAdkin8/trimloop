@@ -1,0 +1,284 @@
+{
+ "by_model": {
+  "claude-fable-5": {
+   "cost": 0.151669,
+   "turns": 1
+  },
+  "claude-fable-5-1": {
+   "cost": 9.507875875,
+   "turns": 10
+  },
+  "claude-haiku-4-5-20251001": {
+   "cost": 0.0393561,
+   "turns": 3
+  },
+  "claude-haiku-5-5": {
+   "cost": 0.27226909,
+   "turns": 9
+  },
+  "claude-nova-1": {
+   "cost": 0.0,
+   "turns": 1
+  },
+  "claude-opus-4-8": {
+   "cost": 0.5701355,
+   "turns": 5
+  },
+  "claude-opus-5": {
+   "cost": 0.5378925,
+   "turns": 2
+  },
+  "claude-opus-5-5": {
+   "cost": 4.3325332,
+   "turns": 21
+  },
+  "claude-sonnet-5": {
+   "cost": 0.2516054,
+   "turns": 4
+  },
+  "claude-sonnet-5-5": {
+   "cost": 0.3574067,
+   "turns": 12
+  }
+ },
+ "compactions": {
+  "manual": 2,
+  "total": 4
+ },
+ "cost": {
+  "cache_read": 0.603632765,
+  "cache_write_1h": 14.05912,
+  "cache_write_5m": 0.70614,
+  "input_uncached": 0.0012806,
+  "output": 0.65057
+ },
+ "main_by_model": {
+  "claude-fable-5": {
+   "cost": 0.151669,
+   "turns": 1
+  },
+  "claude-fable-5-1": {
+   "cost": 9.507875875,
+   "turns": 10
+  },
+  "claude-haiku-5-5": {
+   "cost": 0.1430666,
+   "turns": 4
+  },
+  "claude-opus-4-8": {
+   "cost": 0.5701355,
+   "turns": 5
+  },
+  "claude-opus-5": {
+   "cost": 0.5378925,
+   "turns": 2
+  },
+  "claude-opus-5-5": {
+   "cost": 4.156744,
+   "turns": 17
+  },
+  "claude-sonnet-5": {
+   "cost": 0.2516054,
+   "turns": 4
+  },
+  "claude-sonnet-5-5": {
+   "cost": 0.2968298,
+   "turns": 8
+  }
+ },
+ "p19": {
+  "cost": 5.42629365,
+  "saving": 0.4232369,
+  "sessions": 4,
+  "turns": 6
+ },
+ "period": {
+  "days": 25,
+  "per_week": 4.485808142
+ },
+ "prices": "anthropic-list-2026-11-09",
+ "projects": {
+  "beta": {
+   "conversations": 2,
+   "cost": 0.8443635,
+   "sub_agent_cost": 0.0393561,
+   "turns": 14
+  },
+  "delta": {
+   "conversations": 1,
+   "cost": 0.12830815,
+   "sub_agent_cost": 0.12830815,
+   "turns": 4
+  },
+  "dev/alpha": {
+   "conversations": 2,
+   "cost": 13.625363275,
+   "sub_agent_cost": 0.1757892,
+   "turns": 28
+  },
+  "epsilon": {
+   "conversations": 2,
+   "cost": 0.3481734,
+   "sub_agent_cost": 0.0,
+   "turns": 6
+  },
+  "feat": {
+   "conversations": 1,
+   "cost": 0.009939,
+   "sub_agent_cost": 0.0,
+   "turns": 1
+  },
+  "gamma": {
+   "conversations": 1,
+   "cost": 0.0359999,
+   "sub_agent_cost": 0.0,
+   "turns": 2
+  },
+  "sub": {
+   "conversations": 1,
+   "cost": 0.00089434,
+   "sub_agent_cost": 0.00089434,
+   "turns": 1
+  },
+  "tools": {
+   "conversations": 1,
+   "cost": 0.025958,
+   "sub_agent_cost": 0.0,
+   "turns": 1
+  },
+  "work/alpha": {
+   "conversations": 1,
+   "cost": 0.6895615,
+   "sub_agent_cost": 0.0,
+   "turns": 4
+  },
+  "zeta": {
+   "conversations": 2,
+   "cost": 0.3121823,
+   "sub_agent_cost": 0.0605769,
+   "turns": 7
+  }
+ },
+ "read": {
+  "bad_lines": 0,
+  "logs": 13,
+  "sessions": 12,
+  "turns": 68,
+  "unpriced": 2
+ },
+ "reconciliation": {
+  "behind": 2,
+  "behind_cost": 9.722921675,
+  "gap": 0.22245221,
+  "harness": 5.2,
+  "ours": 4.97754779,
+  "sessions": 4,
+  "unpriced": 1,
+  "unrecorded": 2,
+  "unrecorded_cost": 0.7501384
+ },
+ "sessions": {
+  "alpha-1": {
+   "cost": 3.9416982,
+   "turns": 14
+  },
+  "alpha-1/agent-a1explore01": {
+   "cost": 0.1757892,
+   "turns": 4
+  },
+  "alpha-2": {
+   "cost": 9.507875875,
+   "turns": 10
+  },
+  "alpha-3": {
+   "cost": 0.2516054,
+   "turns": 4
+  },
+  "beta-1": {
+   "cost": 0.2968298,
+   "turns": 8
+  },
+  "beta-1/agent-b1plan01": {
+   "cost": 0.0393561,
+   "turns": 3
+  },
+  "beta-1/agent-b1research01": {
+   "cost": 0.12920249,
+   "turns": 5
+  },
+  "beta-2": {
+   "cost": 0.5701355,
+   "turns": 6
+  },
+  "epsilon-1": {
+   "cost": 0.1430666,
+   "turns": 4
+  },
+  "epsilon-2": {
+   "cost": 0.2150458,
+   "turns": 3
+  },
+  "work-alpha-1": {
+   "cost": 0.6895615,
+   "turns": 4
+  },
+  "zeta-1/agent-z1orphan01": {
+   "cost": 0.0605769,
+   "turns": 3
+  }
+ },
+ "sub_agents": {
+  "by_model": {
+   "claude-haiku-4-5-20251001": {
+    "cost": 0.0393561,
+    "turns": 3
+   },
+   "claude-haiku-5-5": {
+    "cost": 0.12920249,
+    "turns": 5
+   },
+   "claude-opus-5-5": {
+    "cost": 0.1757892,
+    "turns": 4
+   },
+   "claude-sonnet-5-5": {
+    "cost": 0.0605769,
+    "turns": 3
+   }
+  },
+  "cost": 0.40492469,
+  "runs": 4,
+  "turns": 15
+ },
+ "tokens": {
+  "cache_read": 2990001,
+  "cache_write_1h": 1035015,
+  "cache_write_5m": 658306,
+  "input_uncached": 392,
+  "output": 29433
+ },
+ "total": 16.020743365,
+ "tz": "UTC",
+ "weeks": {
+  "2026-10-12": {
+   "compactions": 2,
+   "spend": 13.625363275,
+   "turns": 28
+  },
+  "2026-10-19": {
+   "compactions": 1,
+   "spend": 1.09536179,
+   "turns": 24
+  },
+  "2026-10-26": {
+   "compactions": 0,
+   "spend": 0.2523444,
+   "turns": 5
+  },
+  "2026-11-02": {
+   "compactions": 1,
+   "spend": 1.0476739,
+   "turns": 11
+  }
+ }
+}

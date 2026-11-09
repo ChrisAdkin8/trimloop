@@ -51,7 +51,8 @@ type Limits struct {
 // window (readings with the same reset time) it takes the rise from the
 // first reading to the last against the spend logged between them; a rate
 // is given only once the windows add up to at least minSpend and minRise
-// (ADR 0048). Readings outside the sessions' period are ignored.
+// (ADR 0048). Readings outside the sessions' period are ignored, and so is a
+// limit whose reset time is not plausible for its reading (PlausibleReset).
 func FindLimits(sessions []event.Session, readings []LimitReading, minSpend, minRise float64) Limits {
 	var l Limits
 	type spent struct {
@@ -115,8 +116,8 @@ func FindLimits(sessions []event.Session, readings []LimitReading, minSpend, min
 		var spans []*span
 		for _, r := range inPeriod {
 			w := window(r)
-			if w == nil {
-				continue
+			if w == nil || !PlausibleReset(w.ResetsAt, r.At) {
+				continue // a reading stored unchecked by 0.1.0 would join windows
 			}
 			var sp *span
 			for _, s := range spans {
@@ -150,6 +151,24 @@ func FindLimits(sessions []event.Session, readings []LimitReading, minSpend, min
 	l.FiveHour = rate(func(r LimitReading) *LimitWindow { return r.FiveHour })
 	l.SevenDay = rate(func(r LimitReading) *LimitWindow { return r.SevenDay })
 	return l
+}
+
+// Bounds on a plausible reset time around the time of a reading: a window
+// that reset up to a day before (a reading from an idle session), or one
+// resetting within the weekly window plus slack. The status line drops a new
+// reading outside them (internal/live), the limits file ignores a stored one
+// past the later bound when appending (internal/history), and FindLimits
+// leaves a stored one outside them out of the rate: version 0.1.0 stored
+// readings unchecked, with reset times in milliseconds or in the year 9999.
+const (
+	ResetsAtPast   = 24 * time.Hour
+	ResetsAtFuture = 8 * 24 * time.Hour
+)
+
+// PlausibleReset reports whether resetsAt (Unix seconds) lies within
+// ResetsAtPast before at and ResetsAtFuture after it.
+func PlausibleReset(resetsAt int64, at time.Time) bool {
+	return resetsAt >= at.Add(-ResetsAtPast).Unix() && resetsAt <= at.Add(ResetsAtFuture).Unix()
 }
 
 // SameWindow reports whether two reset times name the same limit window:

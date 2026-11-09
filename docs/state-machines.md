@@ -63,11 +63,15 @@ tool calls waiting for results (`callAt`); whether the user named the
 session (a generated title then never replaces it); the latest system
 prompt and tool list; and the harness's latest cost record per run (records
 are running totals, so the largest wins); and the session's project
-folder, the first folder a reply names, which credits every later turn
-(`projectFor`: there, below or above it is the session's project). Each is
+folder, the first folder a reply counted in this log names, which credits
+every later turn of a main session (`projectFor`: there, below or above it
+is the session's project); a sub-agent's turns keep the folder they ran in
+until `inheritProjects` matches them against the conversation's folder. Each is
 one variable with one rule, so they stay as they are. After all logs are
-read, two passes run across sessions (ADR 0053): `inheritProjects` credits
-each sub-agent's turns by its main session's folder, then `nameProjects`
+read, two passes run across sessions (ADR 0053; `buildSessions`, which
+`TestGolden` runs too): `inheritProjects` credits each sub-agent's turns by
+its main session's folder (its own first folder when the main log was not
+read), then `nameProjects`
 turns folders into short names, adding parent folders only where two
 names would clash; a name therefore depends on which folders the run
 includes. Lines copied into a resumed session are
@@ -148,6 +152,16 @@ Tests: `TestAppendAndLoadLimits`, `TestLoadLimitsSurvivesALongDamagedLine`,
 `TestInputIsLenient`, `TestDecodeLimit`, `TestAppendLimitsPastAFarFutureLine`, `TestAppendLimitsKeepsPlausibleLastLine`. Known edge: two status lines writing at the same
 instant can both append; the measure uses each window's first and last
 reading, so a duplicate changes nothing.
+
+When measuring the rate, `FindLimits` reads every stored line, including
+lines 0.1.0 stored unchecked, so it applies the same bounds per limit
+(`detectors.PlausibleReset`): a limit whose reset time is more than eight
+days after the reading's own time, or more than a day before it, is left
+out. Otherwise readings sharing one bogus reset time (milliseconds, the
+year 9999) would form a single window spanning several real ones and skew
+the rate. The two bounds live in one place (`detectors.ResetsAtPast`,
+`detectors.ResetsAtFuture`), used by the status line's decoder, the
+append rule and the rate. Test: `TestFindLimitsIgnoresImplausibleResets`.
 
 ## 6. Weekly history (explicit)
 

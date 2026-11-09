@@ -98,7 +98,7 @@ func FindSubAgents(sessions []event.Session, largeAbove int) SubAgents {
 			peak = max(peak, t.Context())
 			g.Turns++
 			f.Turns++
-			modelCost[typ][t.Model] += t.Cost.Total()
+			modelCost[typ][modelGroup(t.Model)] += t.Cost.Total()
 			if _, ok := price.Cheaper(t.Model); ok && !sharesCache[typ] {
 				f.Costly += t.Cost.Total()
 			}

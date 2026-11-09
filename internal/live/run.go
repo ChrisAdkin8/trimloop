@@ -96,8 +96,8 @@ func field[T any](raw map[string]json.RawMessage, key string, v *T) bool {
 // weekly window plus slack. A reset time outside them would sort after every
 // genuine reading, so the limits history would drop all later ones.
 const (
-	resetsAtPast   = 24 * time.Hour
-	resetsAtFuture = 8 * 24 * time.Hour
+	resetsAtPast   = detectors.ResetsAtPast
+	resetsAtFuture = detectors.ResetsAtFuture
 	// msAbove is the largest value read as Unix seconds (the year 5138);
 	// above it a number is taken as Unix milliseconds.
 	msAbove = 1e11

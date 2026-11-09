@@ -42,12 +42,13 @@ func FindMainModels(sessions []event.Session) MainModels {
 			if !t.Priced || t.Model == "" {
 				continue
 			}
-			g, ok := by[t.Model]
+			m := modelGroup(t.Model)
+			g, ok := by[m]
 			if !ok {
-				g = &ModelSpend{Model: t.Model}
-				g.Newer, _ = price.Successor(t.Model)
-				g.Tier, _ = price.LowerTier(t.Model)
-				by[t.Model] = g
+				g = &ModelSpend{Model: m}
+				g.Newer, _ = price.Successor(m)
+				g.Tier, _ = price.LowerTier(m)
+				by[m] = g
 			}
 			g.Turns++
 			g.Cost += t.Cost.Total()
@@ -74,4 +75,33 @@ func FindMainModels(sessions []event.Session) MainModels {
 	}
 	sortBy(f.ByModel, func(g ModelSpend) (float64, string) { return g.Cost, g.Model })
 	return f
+}
+
+// modelGroup is the name turns on one model are grouped under for display
+// and suggestions, so that one model is one row and one name. A provider or
+// dated id ("claude-opus-5@20260101", "us.anthropic.claude-fable-5-1-v1:0")
+// is grouped under the catalogue key it resolves to (price.Key), and a dated
+// key the catalogue also holds without its date ("claude-haiku-4-5-20251001")
+// under the dateless key, which has the same price. An id the catalogue does
+// not hold is kept as written.
+func modelGroup(model string) string {
+	k, ok := price.Key(model)
+	if !ok {
+		return model
+	}
+	if i := len(k) - 9; i > 0 && k[i] == '-' && allDigits(k[i+1:]) {
+		if d, ok := price.Key(k[:i]); ok && d == k[:i] {
+			return d
+		}
+	}
+	return k
+}
+
+func allDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return s != ""
 }

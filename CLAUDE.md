@@ -36,6 +36,13 @@ govulncheck) and keep it passing.
   `docs/state-machines.md`. Read the entry before changing one; update it
   after. Compare reports before and after a refactor on a frozen copy of the
   logs (`CLAUDE_CONFIG_DIR=<copy> trimloop --no-history --format json`).
+- `TestGolden` checks the report end to end against `testdata/golden`:
+  made-up logs from `scripts/gen-golden.py`, and figures from
+  `scripts/recount.py`, a second implementation of `docs/measurements.md`
+  in Python. When a method changes, change the recount to match the doc and
+  regenerate `expected.json` from it, never from trimloop
+  (`testdata/golden/README.md`). On real logs, `python3 -I
+  scripts/recount.py <dir> --compare <trimloop.json>` checks a run.
 - When a measurement method changes, update `docs/measurements.md` and the
   figures in `docs/log-signals.md` §8; older docs point there rather than
   restating new figures.
