@@ -30,9 +30,30 @@ type Shape struct {
 	// printed.
 	Filtered bool
 
-	File  string // the file a file-viewing or editing command names; "" if none
-	Edit  bool   // the command edits File in place (sed -i)
+	// File is the file a file-viewing or editing command names; "" if none,
+	// or if which file it is cannot be told (after a cd to a folder that is
+	// not written out). A relative name is relative to the folder the
+	// command line started in: a cd earlier in it is applied ("cd web &&
+	// cat a.ts" views web/a.ts).
+	File string
+	// Others are the further files a view names after File ("cat a.go
+	// b.go"), relative in the same way; a view shows each the same way.
+	Others []string
+	Edit   bool // the command edits File in place (sed -i)
+	// Part is the part of File a view prints: sed's script, or head's or
+	// tail's program and count; "" for the whole file. Like File, it is not
+	// part of the shape and may hold values.
+	Part  string
 	Noise event.NoiseKind
+
+	// Writes lists the files any command in cmd writes or changes: the
+	// targets of redirections and tee, and the files sed -i edits, relative
+	// like File.
+	Writes []string
+	// WritesUnknown is true when a command may change files it does not
+	// name (git checkout, mv, a formatter, perl -i), or writes a relative
+	// file after a cd that cannot be followed.
+	WritesUnknown bool
 }
 
 // String is the shape as shown in reports: program, subcommand, then flags,
@@ -50,31 +71,214 @@ func (s Shape) String() string {
 // and export: in "cd app && go test ./... | tail -5" it is "go test", filtered.
 func Parse(cmd string) Shape {
 	cmds := split(lex(cmd))
-	var first []pipePart
-	for _, c := range cmds {
+	dirs := folders(cmds)
+	i, s := describe(cmds)
+	if s.File != "" {
+		files := append([]string{s.File}, s.Others...)
+		s.File, s.Others = "", nil
+		for k, f := range files {
+			f, ok := dirs[i].join(f)
+			if !ok {
+				s.File, s.Others = "", nil // which files is not known
+				break
+			}
+			if k == 0 {
+				s.File = f
+			} else {
+				s.Others = append(s.Others, f)
+			}
+		}
+	}
+	s.Writes, s.WritesUnknown = writes(cmds, dirs)
+	return s
+}
+
+// folder is the folder a command runs in, relative to the one the command
+// line started in: path "" is that folder; one under the home folder starts
+// with "~/". known is false after a cd the shape cannot follow (cd alone,
+// cd -, another user's ~user, a variable, popd).
+type folder struct {
+	path  string
+	known bool
+}
+
+// join names file as seen from the command line's starting folder, and
+// false when that cannot be told. An absolute file, or one under the home
+// folder (~/...), is itself.
+func (f folder) join(file string) (string, bool) {
+	switch {
+	case path.IsAbs(file) || inHome(file):
+		return file, true
+	case !f.known:
+		return "", false
+	}
+	return path.Join(f.path, file), true
+}
+
+// folders works out the folder each command in cmds runs in, following cd
+// and pushd from command to command. A subshell's cd ends with it; a cd
+// inside a group ({ }) does not.
+func folders(cmds [][]pipePart) []folder {
+	dirs := make([]folder, len(cmds))
+	cur := folder{known: true}
+	var outer []folder // the folder outside each open subshell
+	for i, c := range cmds {
+		dirs[i] = cur
+		if len(c) == 0 {
+			continue
+		}
+		switch c[0].mark {
+		case "(":
+			outer = append(outer, cur)
+			continue
+		case ")":
+			if n := len(outer); n > 0 {
+				cur, outer = outer[n-1], outer[:n-1]
+			}
+			continue
+		}
+		if len(c[0].words) == 0 {
+			continue
+		}
+		switch path.Base(c[0].words[0]) {
+		case "cd", "pushd":
+			cur = cd(cur, skipOptions(c[0].words[1:], nil))
+		case "popd":
+			cur = folder{}
+		}
+	}
+	return dirs
+}
+
+// inHome reports whether a path is written from the home folder: ~ or ~/...
+// (not ~user, another user's).
+func inHome(p string) bool { return p == "~" || strings.HasPrefix(p, "~/") }
+
+// cd is the folder after cd with args, from cur.
+func cd(cur folder, args []string) folder {
+	if len(args) != 1 || args[0] == "-" || strings.HasPrefix(args[0], "~") && !inHome(args[0]) ||
+		strings.ContainsAny(args[0], "$`*?") {
+		return folder{} // the previous folder, another user's, or one only the shell knows
+	}
+	to, ok := cur.join(args[0])
+	if !ok {
+		return folder{}
+	}
+	return folder{path: path.Clean(to), known: true}
+}
+
+// describe returns the shape of the first command in cmds that does real
+// work, and its index.
+func describe(cmds [][]pipePart) (int, Shape) {
+	first := -1
+	for i, c := range cmds {
 		if len(c) == 0 || len(c[0].words) == 0 {
 			continue
 		}
-		if first == nil {
-			first = c
+		if first < 0 {
+			first = i
 		}
 		if !setup[path.Base(c[0].words[0])] {
-			return shapeOf(c)
+			return i, shapeOf(c)
 		}
 	}
-	if first == nil {
-		return Shape{}
+	if first < 0 {
+		return 0, Shape{}
 	}
-	return shapeOf(first)
+	return first, shapeOf(cmds[first])
+}
+
+// writes lists the files the commands write or change, and whether any
+// command may change files it does not name. Every command counts, not
+// only the one the shape describes: in "cat > a.go <<EOF ... EOF && go
+// build", the shape is go build's, but a.go has changed.
+func writes(cmds [][]pipePart, dirs []folder) (files []string, unknown bool) {
+	for i, c := range cmds {
+		add := func(names ...string) {
+			for _, n := range names {
+				if f, ok := dirs[i].join(n); ok {
+					files = append(files, f)
+				} else {
+					unknown = true // a file in a folder that is not known
+				}
+			}
+		}
+		for _, p := range c {
+			add(p.writes...)
+			if len(p.words) == 0 {
+				continue
+			}
+			_, prog, args := resolve(p.words)
+			switch {
+			case prog == "tee":
+				for _, a := range args {
+					if !strings.HasPrefix(a, "-") {
+						add(a)
+					}
+				}
+			case prog == "sed" && inPlace(args):
+				named, _ := fileArgs(prog, args)
+				add(named...)
+			case changesUnnamed(prog, args):
+				unknown = true
+			}
+		}
+	}
+	return files, unknown
+}
+
+// inPlace reports whether sed's arguments ask it to edit files in place:
+// -i, -i.bak, a bundle such as -ni, or --in-place. No other short flag of
+// sed has an i, and only -i's suffix follows it in the same word.
+func inPlace(args []string) bool {
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+		if strings.HasPrefix(a, "--in-place") ||
+			strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Contains(a, "i") {
+			return true
+		}
+	}
+	return false
+}
+
+// changesUnnamed reports whether a program, run with args, may change files
+// without naming them as a plain operand: moving, copying or deleting
+// files, switching git's working tree, formatting in place, or adding a
+// dependency (which rewrites the project's manifest).
+func changesUnnamed(prog string, args []string) bool {
+	switch {
+	case unnamedWriters[prog]:
+		return true
+	case prog == "perl" || prog == "ruby":
+		for _, a := range args {
+			if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.Contains(a, "i") {
+				return true // perl -pi -e, ruby -i.bak
+			}
+		}
+	case writeFlag[prog] != nil:
+		for _, a := range args {
+			name, _, _ := strings.Cut(a, "=")
+			if slices.Contains(writeFlag[prog], name) {
+				return true
+			}
+		}
+	case writingSubs[prog] != nil:
+		return slices.Contains(writingSubs[prog], subcommand(prog, args))
+	}
+	return false
 }
 
 // pipePart is one command in a pipeline: its words, with prefixes such as
 // "sudo" and "FOO=bar" removed, and where its output goes.
 type pipePart struct {
+	mark     string // "(" or ")" for a subshell's start or end, which has no words
 	words    []string
-	toFile   bool // stdout is redirected to a file (including /dev/null)
-	heredoc  bool // stdin is a here-document or here-string
-	fromFile bool // stdin is redirected from a file
+	toFile   bool     // stdout is redirected to a file (including /dev/null)
+	heredoc  bool     // stdin is a here-document or here-string
+	fromFile bool     // stdin is redirected from a file
+	writes   []string // files a redirection writes, stdout's or another's
 }
 
 // split groups tokens into commands (separated by ;, &&, ||, & and newlines),
@@ -102,6 +306,9 @@ func split(toks []token) [][]pipePart {
 			endPart()
 		case "&&", "||", ";", ";;", "&":
 			endCmd()
+		case ";(", ";)":
+			endCmd()
+			cmds = append(cmds, []pipePart{{mark: t.op[1:]}})
 		default: // a redirection; its target is the next word
 			target := ""
 			if i+1 < len(toks) && toks[i+1].op == "" {
@@ -114,14 +321,30 @@ func split(toks []token) [][]pipePart {
 			case t.op == "<":
 				cur.fromFile = true
 			case strings.HasPrefix(t.op, "2>"), t.op == ">&" && target != "1" && target != "-":
-				// stderr, or stdout duplicated onto stderr: not a file
+				// stderr, or stdout duplicated onto stderr: not stdout to a file
 			case strings.HasSuffix(t.op, ">"):
 				cur.toFile = target != "/dev/stderr" && target != "/dev/stdout"
+			}
+			if writesFile(t.op, target) {
+				cur.writes = append(cur.writes, target)
 			}
 		}
 	}
 	endCmd()
 	return cmds
+}
+
+// writesFile reports whether a redirection writes to the file target: any
+// output redirection (>, >>, 2>, &>), except one that duplicates a
+// descriptor (2>&1, >&-) or names a device.
+func writesFile(op, target string) bool {
+	if !strings.Contains(op, ">") || target == "" || strings.HasPrefix(target, "/dev/") {
+		return false
+	}
+	if strings.HasSuffix(op, ">&") && (target == "-" || isNumber(target)) {
+		return false
+	}
+	return true
 }
 
 // strip removes words in front of the program that do not change what it
@@ -192,13 +415,50 @@ func shapeOf(pipe []pipePart) Shape {
 		}
 	}
 
-	words := p.words
-	prog := path.Base(words[0])
-	args := words[1:]
+	raw, prog, args := resolve(p.words)
+	if strings.ContainsAny(raw, "$`(") || !progName.MatchString(prog) {
+		prog = "(computed command)" // never show what a substitution or odd word contains
+	}
+	s.Program = prog
 
-	// Runners: the program that matters is the one they run. raw is the
-	// word the program name came from, checked whole below.
-	raw := words[0]
+	switch {
+	case interpreters[prog]:
+		s.Sub = interpreterSub(args, p.heredoc)
+	case subcommands[prog] > 0:
+		s.Sub = subcommand(prog, args)
+	}
+	s.Flags = sizeFlags(prog, args)
+	s.Noise = noise(s)
+	if fileViewers[prog] || prog == "sed" {
+		s.Edit = prog == "sed" && inPlace(args)
+		if !p.toFile || prog == "sed" { // cat > file <<EOF writes a file
+			if files, part := fileArgs(prog, args); len(files) > 0 {
+				s.File = files[0]
+				if !s.Edit {
+					s.Part = part
+					// cat, head and tail show each file; sed runs its script
+					// over the files joined into one stream, so later ones
+					// may not show at all.
+					if prog != "sed" {
+						s.Others = files[1:]
+					}
+				}
+			}
+		}
+		if s.File == "" && s.Noise == event.NoiseFileView {
+			s.Noise = event.NoiseOther // reads stdin: not a file view
+		}
+	}
+	return s
+}
+
+// resolve returns the program a command's words run, and its arguments.
+// For a runner (npx, uv run, xargs, python -m) it is the program the runner
+// runs. raw is the word the program name came from.
+func resolve(words []string) (raw, prog string, args []string) {
+	prog = path.Base(words[0])
+	args = words[1:]
+	raw = words[0]
 	for {
 		if subs, ok := runners[prog]; ok {
 			rest := args
@@ -224,27 +484,7 @@ func shapeOf(pipe []pipePart) Shape {
 		}
 		break
 	}
-	if strings.ContainsAny(raw, "$`(") || !progName.MatchString(prog) {
-		prog = "(computed command)" // never show what a substitution or odd word contains
-	}
-	s.Program = prog
-
-	switch {
-	case interpreters[prog]:
-		s.Sub = interpreterSub(args, p.heredoc)
-	case subcommands[prog] > 0:
-		s.Sub = subcommand(prog, args)
-	}
-	s.Flags = sizeFlags(prog, args)
-	s.Noise = noise(s)
-	if fileViewers[prog] || prog == "sed" {
-		s.File = fileArg(prog, args, p)
-		s.Edit = prog == "sed" && slices.Contains(s.Flags, "-i")
-		if s.File == "" && s.Noise == event.NoiseFileView {
-			s.Noise = event.NoiseOther // reads stdin: not a file view
-		}
-	}
-	return s
+	return raw, prog, args
 }
 
 // interpreterSub tells inline code (python3 -c, node -e, a here-document)
@@ -353,22 +593,36 @@ func sizeFlags(prog string, args []string) []string {
 	return out
 }
 
-// fileArg returns the file a file-viewing command (cat, head, sed ...) reads,
-// or "" if it reads stdin, writes a file, or names none.
-func fileArg(prog string, args []string, p pipePart) string {
-	if p.toFile && prog != "sed" { // cat > file <<EOF writes a file
-		return ""
-	}
-	var operands []string
+// fileArgs returns the files a file-viewing command (cat, head, sed ...)
+// names, none if it reads stdin, and the part of a file it prints: sed's
+// script, or head's or tail's program and count ("" for the whole file).
+// Paging through a file with sed -n or head and tail views different parts,
+// which are not re-reads of each other.
+func fileArgs(prog string, args []string) (files []string, part string) {
+	var operands, scripts []string
 	script := prog == "sed"
+	counted := prog == "head" || prog == "tail"
+	count := ""
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
 		case a == "-e" || a == "--expression":
 			script = false // the script is the option's value
+			if i+1 < len(args) {
+				scripts = append(scripts, args[i+1])
+			}
 			i++
-		case a == "-n" && (prog == "head" || prog == "tail"), a == "-c" && (prog == "head" || prog == "tail"):
+		case strings.HasPrefix(a, "--expression="):
+			script = false
+			scripts = append(scripts, strings.TrimPrefix(a, "--expression="))
+		case counted && (a == "-n" || a == "-c"):
+			if i+1 < len(args) {
+				count = a + " " + args[i+1]
+			}
 			i++ // the line or byte count
+		case counted && (strings.HasPrefix(a, "-n") || strings.HasPrefix(a, "-c") || strings.HasPrefix(a, "--lines") ||
+			strings.HasPrefix(a, "--bytes") || isNumber(a)):
+			count = a // -n50, --lines=50, -50, +10
 		case strings.HasPrefix(a, "-") && a != "-":
 			continue
 		case a == "" || isNumber(a): // '' is macOS sed -i's empty suffix
@@ -378,12 +632,19 @@ func fileArg(prog string, args []string, p pipePart) string {
 		}
 	}
 	if script && len(operands) > 0 {
-		operands = operands[1:] // sed's first operand is its script
+		scripts = append(scripts, operands[0]) // sed's first operand is its script
+		operands = operands[1:]
+	}
+	switch {
+	case prog == "sed":
+		part = strings.Join(scripts, "\n")
+	case counted:
+		part = strings.TrimSpace(prog + " " + count)
 	}
 	if len(operands) == 0 || operands[0] == "-" {
-		return ""
+		return nil, part
 	}
-	return operands[0]
+	return operands, part
 }
 
 func isNumber(s string) bool {

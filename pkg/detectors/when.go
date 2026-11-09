@@ -85,9 +85,5 @@ func StartCost(sessions []event.Session) float64 {
 			costs = append(costs, s.Turns[0].Cost.Total())
 		}
 	}
-	if len(costs) == 0 {
-		return 0
-	}
-	sort.Float64s(costs)
-	return costs[int(0.5*float64(len(costs)))]
+	return median(costs)
 }

@@ -13,8 +13,9 @@ import (
 
 func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 	r := Results{Period: Period{Days: 14}, Actions: []fixes.Recommendation{
-		{Title: "a", Saving: 100, Likely: 60}, // $30 a week likely
-		{Title: "b", Saving: 2},               // $1 a week at most
+		{Title: "a", Saving: 100, Likely: 60, Estimated: true}, // $30 a week likely
+		{Title: "b", Saving: 2},                                // $1 a week at most
+		{Title: "c", Saving: 100, Estimated: true},             // replayed: saves nothing
 	}}
 	t0 := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
 	var turns []event.Turn
@@ -26,12 +27,19 @@ func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 		{At: t0.Add(time.Minute), SevenDay: &detectors.LimitWindow{Used: 10, ResetsAt: reset}},
 		{At: t0.Add(50*time.Hour + time.Minute), SevenDay: &detectors.LimitWindow{Used: 20, ResetsAt: reset}}, // +10 points for $50
 	}
-	AddLimits(&r, []event.Session{{ID: "s", Kind: "main", Turns: turns}}, Plan{Name: "Max 5×", Subscription: true}, readings)
+	addLimits(&r, []event.Session{{ID: "s", Kind: "main", Turns: turns}}, Plan{Name: "Max 5×", Subscription: true}, readings)
 	if got := r.Actions[0].WeeklyLimit; got != 6 { // $30 a week at 0.2 points a dollar
 		t.Errorf("share for a: got %v, want 6", got)
 	}
 	if got := limitText(r.Actions[1]); got != "; under 1% of your weekly limit each week" {
 		t.Errorf("small share: got %q", got)
+	}
+	// An estimate of nothing is not replaced by the upper bound.
+	if got := r.Actions[2].WeeklyLimit; got != 0 {
+		t.Errorf("share for c, estimated to save nothing: got %v, want 0", got)
+	}
+	if got := savingText(r.Actions[2], 1000); !strings.HasPrefix(got, "likely nothing") {
+		t.Errorf("c: got %q, want it to say the likely saving is nothing", got)
 	}
 	var out bytes.Buffer
 	if err := WriteSummary(&out, r, "", 3); err != nil {
@@ -47,7 +55,7 @@ func TestAddLimitsSharesOfTheWeek(t *testing.T) {
 
 func TestLimitsOnlyForSubscribers(t *testing.T) {
 	r := Results{Actions: []fixes.Recommendation{{Title: "a", Saving: 10}}}
-	AddLimits(&r, sample(), Plan{}, nil)
+	addLimits(&r, sample(), Plan{}, nil)
 	var out bytes.Buffer
 	if err := WriteSummary(&out, r, "", 3); err != nil {
 		t.Fatal(err)
@@ -58,7 +66,7 @@ func TestLimitsOnlyForSubscribers(t *testing.T) {
 	// Limit hits alone mark a subscriber, even with no account file.
 	s := sample()
 	s[0].LimitHits = []event.LimitHit{{At: time.Date(2026, 10, 9, 21, 0, 0, 0, time.UTC), Limit: "session"}}
-	AddLimits(&r, s, Plan{}, nil)
+	addLimits(&r, s, Plan{}, nil)
 	if !r.Subscriber() || r.LimitHitsText() != "Claude Code stopped 1 time because a usage limit was reached, most recently on 9 Oct." {
 		t.Errorf("hits: subscriber %v, %q", r.Subscriber(), r.LimitHitsText())
 	}
@@ -67,10 +75,24 @@ func TestLimitsOnlyForSubscribers(t *testing.T) {
 	}
 }
 
-func TestAddLocalSetsEverythingFromOutsideTheLogs(t *testing.T) {
-	var r Results
-	AddLocal(&r, sample(), Local{Version: "v1.2.3", Plan: Plan{Name: "Pro", Subscription: true}, Retention: Retention{Days: 365, Set: true}})
+func TestAnalyseSetsEverythingFromOutsideTheLogs(t *testing.T) {
+	r := Analyse(sample(), Read{}, Local{Version: "v1.2.3", Plan: Plan{Name: "Pro", Subscription: true}, Retention: Retention{Days: 365, Set: true}}, DefaultSettings(), time.Date(2026, 11, 9, 0, 0, 0, 0, time.UTC))
 	if r.Version != "v1.2.3" || r.Plan.Name != "Pro" || !r.Subscriber() || r.Retention.Days != 365 || r.ShortRetention() {
 		t.Errorf("got version %q, plan %+v, retention %+v", r.Version, r.Plan, r.Retention)
+	}
+}
+
+// A card whose replay found it saves nothing is ranked after every other,
+// whatever its upper bound, and says why in its own words.
+func TestSavesNothingRankedLast(t *testing.T) {
+	nothing := fixes.Recommendation{Title: "n", Saving: 500, Estimated: true, Nothing: "the reason"}
+	actions := []fixes.Recommendation{nothing, {Title: "small", Saving: 2}, {Title: "mid", Saving: 50, Likely: 10, Estimated: true}}
+	r := Results{Actions: actions}
+	sortActions(&r)
+	if got := []string{r.Actions[0].Title, r.Actions[1].Title, r.Actions[2].Title}; got[0] != "mid" || got[1] != "small" || got[2] != "n" {
+		t.Errorf("order: got %q, want mid, small, n", got)
+	}
+	if got := savingText(nothing, 1000); got != "likely nothing (the reason), up to $500 (50%)" {
+		t.Errorf("got %q", got)
 	}
 }

@@ -14,9 +14,9 @@ import (
 // a megabyte covers even a large tool result written after it.
 const tailBytes = 1 << 20
 
-// Synthetic is the model name Claude Code logs for a reply it made up itself,
+// synthetic is the model name Claude Code logs for a reply it made up itself,
 // for example after an API error. It has no real usage, so it is not a turn.
-const Synthetic = "<synthetic>"
+const synthetic = "<synthetic>"
 
 // ErrNoResponse means the end of the log holds no reply with usage.
 var ErrNoResponse = errors.New("no reply with usage near the end of the log")
@@ -97,7 +97,7 @@ func ReadTail(path string) (Tail, error) {
 			t.Compaction = &m
 			continue
 		}
-		if m.Kind != source.KindTurn || m.Model == Synthetic {
+		if m.Kind != source.KindTurn || m.Synthetic {
 			continue
 		}
 		wrote := m.Usage.CacheWrite5m+m.Usage.CacheWrite1h > 0

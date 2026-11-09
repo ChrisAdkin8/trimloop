@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestFindGrowth(t *testing.T) {
 	if len(f.TopShares) != 1 || f.TopShares[0].N != 1 || !near(f.TopShares[0].Share, 0.7) {
 		t.Errorf("shares: got %+v (only N <= conversations)", f.TopShares)
 	}
-	wantBands := []int{3, 1, 0, 3} // <50k, 50k-200k, 200k-500k, over 500k
+	wantBands := []int{4, 0, 0, 3} // up to 50k (the 50,000 one too), 50k-200k, 200k-500k, over 500k
 	for i, b := range f.Bands {
 		if b.Turns != wantBands[i] {
 			t.Errorf("band %d: got %d turns, want %d", i, b.Turns, wantBands[i])
@@ -311,5 +312,31 @@ func TestQuantile(t *testing.T) {
 	}
 	if quantile(nil, 0.5) != 0 || median(xs) != 30 {
 		t.Error("empty or median")
+	}
+}
+
+// The median conversation follows the rule every median here uses: the
+// upper middle for an even count.
+func TestFindGrowthMedianOfEvenCount(t *testing.T) {
+	var sessions []event.Session
+	for i, cost := range []float64{1, 2, 10, 20} {
+		sessions = append(sessions, event.Session{ID: fmt.Sprint(i), Kind: "main",
+			Turns: []event.Turn{{Usage: event.Usage{CacheRead: 1}, Cost: event.Cost{CacheRead: cost}, Priced: true}}})
+	}
+	if f := FindGrowth(sessions, 500_000, 1); !near(f.MedianCost, 10) || median([]float64{1, 2, 10, 20}) != 10 {
+		t.Errorf("median conversation: got $%v, want $10", f.MedianCost)
+	}
+}
+
+// A band's mean cost is over its priced turns: a turn on a model with no
+// price costs 0 and would pull it down. Turn counts keep every turn.
+func TestFindGrowthBandMeanLeavesOutUnpriced(t *testing.T) {
+	turn := func(cost float64, priced bool) event.Turn {
+		return event.Turn{Usage: event.Usage{CacheRead: 300_000}, Cost: event.Cost{CacheRead: cost}, Priced: priced}
+	}
+	s := event.Session{ID: "s", Kind: "main", Turns: []event.Turn{turn(4, true), turn(4, true), turn(0, false)}}
+	b := FindGrowth([]event.Session{s}, 500_000, 1).Bands[2] // 200k to 500k
+	if b.Turns != 3 || b.Priced != 2 || !near(b.MeanCost(), 4) {
+		t.Errorf("got %+v, mean %v; want 3 turns, 2 priced, $4 each", b, b.MeanCost())
 	}
 }

@@ -24,7 +24,7 @@ func toolInputLine(w io.Writer, r Results) {
 	}
 	var top []string
 	for _, g := range ti.ByTool[:min(3, len(ti.ByTool))] {
-		top = append(top, fmt.Sprintf("%s %s", toolLabel(g.Name, r.HideIDs), dollars(g.Carried)))
+		top = append(top, fmt.Sprintf("%s %s", printable(toolLabel(g.Name, r.HideIDs)), dollars(g.Carried)))
 	}
 	fmt.Fprintf(w, "  What Claude wrote in its tool calls (commands, scripts, file contents) also stays in the\n")
 	fmt.Fprintf(w, "  session: %s to carry (%.0f%% of spend; %s). Compacting clears it too.\n",
@@ -37,8 +37,8 @@ func gapSections(w io.Writer, r Results) {
 	all := r.Total
 	if sw := r.Switches; sw.Switches > 0 {
 		fmt.Fprintln(w, "\nP01 MODEL SWITCHES MID-SESSION")
-		fmt.Fprintf(w, "  %d switches in %s: the first turn on the new model saved the whole conversation\n",
-			sw.Switches, count(sw.Sessions, "session"))
+		fmt.Fprintf(w, "  %d %s in %s: the first turn on the new model saved the whole conversation\n",
+			sw.Switches, agree(sw.Switches, "switch", "switches"), count(sw.Sessions, "session"))
 		fmt.Fprintf(w, "  to the cache again. Those turns cost %s; reading instead would have saved %s.\n",
 			dollars(sw.Cost), dollars(sw.Saving))
 		if r.SwitchFix != nil {

@@ -103,18 +103,18 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 <h1>Where your Claude Code tokens went</h1>
 <p class="lead">
-{{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{.Days}} days) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.PerWeek}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{thousands .Read.Sessions}} sessions · list prices as of {{.Prices}}
+{{with .Period}}{{if .Days}}{{day .From}} to {{day .To}} ({{plural .Days "day"}}) · {{end}}{{end}}{{dollars .Total}} spent{{if .Period.PerWeek}}, about {{dollars .Period.PerWeek}} a week{{end}} · {{plural .Read.Sessions "session"}} · list prices as of {{.Prices}}
 {{if .ShortRetention}}<br><span class="muted small">{{retentionTip .Retention}}</span>{{end}}
 {{if .Read.Since}}<br><span class="note">Only sessions started on or after {{sinceDay .Read.Since}}, with their sub-agents.</span>{{end}}
 {{if .Read.Failed}}<br><span class="note">{{.Read.Failed}} log files could not be read to the end.</span>{{end}}
-{{if .Read.BadLines}}<br><span class="note">{{.Read.BadLines}} lines could not be read; Claude Code's log format may have changed.</span>{{end}}
-{{if .Read.Unpriced}}<br><span class="muted small">{{.Read.Unpriced}} turns used a model with no known price and are left out.</span>{{end}}
+{{if .Read.BadLines}}<br><span class="note">{{plural .Read.BadLines "line"}} could not be read; Claude Code's log format may have changed.</span>{{end}}
+{{if .Read.Unpriced}}<br><span class="muted small">{{plural .Read.Unpriced "turn"}} used a model with no known price and are left out.</span>{{end}}
 </p>
 {{if .Subscriber}}<p class="note">You are on {{.PlanName}}, a flat fee: these figures are list prices, a measure of how much of your usage limits work takes, not money you would get back. {{.LimitHitsText}} {{.LimitRateText}}</p>{{end}}
 
 {{with .Summary}}{{if .Bands}}
 <section class="panel summary" aria-label="Spend by session size">
-  <h2>{{p0 .LargeSpendShare}} of your spend came from turns over {{short .Threshold}} tokens</h2>
+  <h2>{{p0 .LargeSpendShare}} of your spend went on sending turns over {{short .Threshold}} tokens</h2>
   <p class="muted">A token is a word-piece of about four characters. Every turn sends the whole session so far, so turns get dearer as a session grows: only {{p0 .LargeTurnShare}} of turns were this large{{if and .LargeCost .SmallCost}}, but each cost {{.LargeCost}}, against {{.SmallCost}} for smaller ones{{end}}.</p>
   <div class="row"><b>Spend</b><div class="strip" role="img" aria-label="Share of spend by session size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .SpendShare}}%" title="{{.Label}} tokens: {{dollars .Cost}} ({{p0 .SpendShare}} of spend)"></span>{{end}}</div></div>
   <div class="row"><b>Turns</b><div class="strip" role="img" aria-label="Share of turns by session size">{{range .Bands}}<span class="{{.Class}}" style="width: {{w .TurnShare}}%" title="{{.Label}} tokens: {{p0 .TurnShare}} of turns"></span>{{end}}</div></div>
@@ -235,17 +235,17 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
   <p class="muted small">A typical session cost {{dollars .MedianCost}}.</p>
 
   <h3>Compaction</h3>
-  <p>Compacting replaces the session with a short summary. Claude Code did it {{.Compactions}} times ({{.Manual}} when asked){{if .MedianBefore}}, typically shrinking {{short .MedianBefore}} tokens to a {{short .MedianAfter}} summary{{if .MedianResume}}; with the system prompt and re-attached files, the next request sent about {{short .MedianResume}}{{end}}{{end}}{{if .Longest}}; the longest wait was {{duration .Longest}}{{end}}.</p>
+  <p>Compacting replaces the session with a short summary. Claude Code did it {{plural .Compactions "time"}} ({{.Manual}} when asked){{if .MedianBefore}}, typically shrinking {{short .MedianBefore}} tokens to a {{short .MedianAfter}} summary{{if .MedianResume}}; with the system prompt and re-attached files, the next request sent about {{short .MedianResume}}{{end}}{{end}}{{if .Longest}}; the longest wait was {{duration .Longest}}{{end}}.</p>
   {{end}}
 
   {{with .Pause}}
   <h3>Long breaks</h3>
-  <p>{{.Pauses}} times in {{.Sessions}} sessions, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) were not breaks you could restart from: Claude was waiting on a tool, a sub-agent, a timer or another agent. The other {{dollars .Saving}} followed breaks you took.{{end}}</p>
+  <p>{{plural .Pauses "time"}} in {{plural .Sessions "session"}}, work carried on after more than {{duration .MinGap}} away. The cache had expired, so the next turn paid to save the whole session again: {{dollars .Cost}} ({{pct .Cost $.Total}} of spend).{{if .Unprompted}} {{.Unprompted}} of these waits ({{dollars .UnpromptedCost}}) were not breaks you could restart from: Claude was waiting on a tool, a sub-agent, a timer or another agent. The other {{dollars .Saving}} followed breaks you took.{{end}}</p>
   {{end}}
   {{with .CacheLife}}
   <h3>Shorter waits</h3>
   <p>In these logs {{plural .MainShort "main session"}} and {{plural .SubShort "sub-agent"}} kept their cache for 5 minutes; {{plural .MainHour "main session"}} and {{plural .SubHour "sub-agent"}} for an hour.</p>
-  {{if .Waits}}<p>{{.Waits}} times ({{.SubAgent}} in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: {{dollars .Cost}}, {{dollars .Saving}} more than with the cache still there.{{if gt .HourNet 0.0}} Putting every session on the 5-minute cache on the hour's would have saved about {{dollars .HourNet}}, net of its dearer writes.{{else}} Putting every session on the 5-minute cache on the hour's would have cost {{dollars (neg .HourNet)}} more: its writes are dearer.{{end}}</p>
+  {{if .Waits}}<p>{{plural .Waits "time"}} ({{.SubAgent}} in sub-agents) a session on the 5-minute cache waited longer, up to an hour, and saved its whole history again: {{dollars .Cost}}, {{dollars .Saving}} more than with the cache still there.{{if gt .HourNet 0.0}} Putting every session on the 5-minute cache on the hour's would have saved about {{dollars .HourNet}}, net of its dearer writes.{{else}} Putting every session on the 5-minute cache on the hour's would have cost {{dollars (neg .HourNet)}} more: its writes are dearer.{{end}}</p>
   <div class="scroll"><table class="sortable">
     <thead><tr><th data-sort>Session</th><th class="n" data-sort>Waits</th><th class="n" data-sort>Largest context</th><th class="n" data-sort>Cost of the expiry</th></tr></thead>
     <tbody>
@@ -317,7 +317,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <h2 id="subagents">Sub-agents</h2>
 {{with .SubAgents}}
 {{if .Runs}}
-<p class="lead">Sub-agents are helpers Claude starts for side tasks. {{thousands .Runs}} runs cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend){{if $.SubCostly}}; {{share $.SubCostly}} of that was on a model with a cheaper choice{{end}}.</p>
+<p class="lead">Sub-agents are helpers Claude starts for side tasks. {{plural .Runs "run"}} cost {{dollars .Cost}} ({{pct .Cost $.Total}} of spend){{if $.SubCostly}}; {{share $.SubCostly}} of that was on a model with a cheaper choice{{end}}.</p>
 <details><summary>Show details</summary>
 <div class="panel">
   <div class="scroll"><table class="sortable">
@@ -370,7 +370,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <section class="area">
 <h2 id="interruptions">Interruptions and switches</h2>
 <ul>
-{{with .Switches}}{{if .Switches}}<li><strong>Model switches:</strong> {{.Switches}} times a session moved to another model part-way through, so its first turn on the new model saved the whole conversation again: {{dollars .Saving}} more than reading it.</li>{{end}}{{end}}
+{{with .Switches}}{{if .Switches}}<li><strong>Model switches:</strong> {{plural .Switches "time"}} a session moved to another model part-way through, so its first turn on the new model saved the whole conversation again: {{dollars .Saving}} more than reading it.</li>{{end}}{{end}}
 {{with .Failures}}{{if or .Sleep .Network .Other}}<li><strong>Replies cut off:</strong> {{.Sleep}} when the computer slept, {{.Network}} by the network, {{.Other}} other. Each was sent again, at least {{dollars .Resent}} in all; the cut-off part of the reply is not in the logs.</li>{{end}}{{end}}
 {{with .AppServers}}<li><strong>Desktop-app tools never used:</strong> {{range $i, $p := .}}{{if $i}}, {{end}}{{trimPrefix $p.Name "mcp__"}} ({{dollars $p.Cost}}){{end}}. The desktop app adds these servers; the terminal app does not load them.</li>{{end}}
 </ul>
@@ -390,10 +390,10 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 {{with .Reconciliation}}{{if .Sessions}}
 <section class="area">
 <h2 id="checks">Checking the totals</h2>
-<p class="lead">{{if ge .Gap 0.0}}Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs: requests the logs don't record, such as session titles, summaries after a break, compactions and web searches.{{else}}The logs show {{dollars (neg .Gap)}} more than Claude Code's own records; its records may have been written before some sessions ended.{{end}}{{if .Unrecorded}} {{.Unrecorded}} sessions ({{pct .UnrecordedCost $.Total}} of spend) have no record to check against.{{end}}</p>
+<p class="lead">{{if ge .Gap 0.0}}Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs: requests the logs don't record, such as session titles, summaries after a break, compactions and web searches.{{else}}The logs show {{dollars (neg .Gap)}} more than Claude Code's own records; its records may have been written before some sessions ended.{{end}}{{if .Unrecorded}} {{plural .Unrecorded "session"}} ({{pct .UnrecordedCost $.Total}} of spend) {{if eq .Unrecorded 1}}has{{else}}have{{end}} no record to check against.{{end}}</p>
 <details><summary>Show details</summary>
 <div class="panel">
-  <p>For {{.Sessions}} sessions with a record, Claude Code recorded {{dollars .Harness}} and the logs show {{dollars .Ours}}.{{if .WebSearches}} {{.WebSearches}} web searches cost about {{dollars .WebSearchCost}} in search fees.{{end}}{{if .Behind}} {{.Behind}} sessions went on after their record was last written and are left out.{{end}}{{if .Unpriced}} {{.Unpriced}} sessions used a model with no known price and are left out.{{end}}</p>
+  <p>For {{plural .Sessions "session"}} with a record, Claude Code recorded {{dollars .Harness}} and the logs show {{dollars .Ours}}.{{if .WebSearches}} {{if eq .WebSearches 1}}1 web search{{else}}{{thousands .WebSearches}} web searches{{end}} cost about {{dollars .WebSearchCost}} in search fees.{{end}}{{if .Behind}} {{plural .Behind "session"}} {{if eq .Behind 1}}has a record that does not cover all of it (it began before the record's first run, or went on after its last) and is left out{{else}}have a record that does not cover all of them (they began before the record's first run, or went on after its last) and are left out{{end}}.{{end}}{{if .Unpriced}} {{plural .Unpriced "session"}} used a model with no known price and are left out.{{end}}</p>
   <div class="scroll"><table>
     <thead><tr><th>Model</th><th class="n">Claude Code's record</th><th class="n">In the logs</th><th class="n">Difference</th></tr></thead>
     <tbody>
@@ -429,7 +429,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 
 <footer>
   <p>Costs are estimates at list prices ({{.Prices}}); tool output and added text are sized at about 4 characters per token. Savings are estimates and overlap.</p>
-  <p>Written by trimloop{{with .Version}} {{.}}{{end}} on {{date .Generated}}, on this machine. The page loads nothing from the network. It shows project names and session titles, which summarise what you asked: check before sharing it.</p>
+  <p>Written by trimloop{{with .Version}} {{.}}{{end}} on {{date .Generated}}, on this machine. The page loads nothing from the network. {{if .HideIDs}}It shows project names; session titles and ids are left out (--no-titles). Check before sharing it.{{else}}It shows project names and session titles, which summarise what you asked: check before sharing it.{{end}}</p>
 </footer>
 
 </main>
@@ -440,7 +440,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 <div class="panel card">
   <h3>{{$a.Title}}</h3>
   {{if $a.Finding}}<p>{{$a.Finding}}</p>{{end}}
-  <p class="money">{{if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join (toolLabels $a.Examples $hide) ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
+  <p class="money">{{if $a.SavesNothing}}<span class="likely">likely nothing</span> <span class="muted">({{$a.Nothing}}) · up to {{dollars $a.Saving}}</span>{{else if $a.Likely}}<span class="likely">likely about {{dollars $a.Likely}}</span>{{if gt $a.LikelyHigh $a.LikelyLow}} <span class="muted">({{dollars $a.LikelyLow}}–{{dollars $a.LikelyHigh}})</span>{{end}} <span class="muted">· up to {{dollars $a.Saving}}</span>{{else}}<span class="likely">up to {{dollars $a.Saving}}</span>{{if $a.Examples}} <span class="muted">· mostly {{join (toolLabels $a.Examples $hide) ", "}}</span>{{end}}{{end}}{{with limitShare $a}} <span class="likely">· {{.}}</span>{{end}}</p>
   <div class="fix">
     <p><b>{{$a.Primary.What}}</b></p>
     <div class="how">{{$a.Primary.How}}<button class="copy" type="button">Copy</button></div>

@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -85,6 +86,40 @@ func TestRereads(t *testing.T) {
 	}
 }
 
+// Paging through a file views different parts, which are not re-reads; a
+// shell command that writes a file, or may have changed files it does not
+// name, means the next view is not of an unchanged file.
+func TestRereadsPagesAndShellWrites(t *testing.T) {
+	view := func(id, file, part string) event.ToolCall {
+		return event.ToolCall{ID: id, Tool: "Read", Noise: event.NoiseFileView, File: file, FileOp: event.FileView, Part: part, HasResult: true}
+	}
+	shell := func(id string, writes []string, unknown bool) event.ToolCall {
+		return event.ToolCall{ID: id, Tool: "Bash", Writes: writes, WritesUnknown: unknown, HasResult: true}
+	}
+	catTo := view("cat-and-write", "f", "")
+	catTo.Writes = []string{"f"} // echo x >> f && cat f: f may have changed first
+	s := event.Session{Turns: []event.Turn{
+		priced(1, 1, view("p1", "f", "1-100"), view("p2", "f", "101-200")), // two pages
+		priced(1, 1, view("p3", "f", "1-100")),                             // page 1 again: a re-read
+		priced(1, 1, shell("redirect", []string{"f"}, false)),              // cat > f <<EOF
+		priced(1, 1, view("p4", "f", "1-100")),                             // f changed: not a re-read
+		priced(1, 1, view("w1", "g", "")),
+		priced(1, 1, shell("checkout", nil, true)), // git checkout: any file may have changed
+		priced(1, 1, view("w2", "g", "")),          // not a re-read
+		priced(1, 1, catTo),                        // viewed before, but written in the same call
+		priced(1, 1),
+	}}
+	var rereads []string
+	for _, cc := range carry(s) {
+		if cc.reread {
+			rereads = append(rereads, cc.call.ID)
+		}
+	}
+	if len(rereads) != 1 || rereads[0] != "p3" {
+		t.Errorf("re-reads: got %v, want [p3]", rereads)
+	}
+}
+
 func TestFindToolOutput(t *testing.T) {
 	sed := call("Bash", "sed -n", event.NoiseFileView, 3_000_000)
 	sed.Filtered = true
@@ -131,5 +166,29 @@ func TestRatesWithoutCache(t *testing.T) {
 	}
 	if arrivalRate(event.Turn{}) != 0 || historyRate(event.Turn{}) != 0 {
 		t.Error("a turn with no input should have zero rates")
+	}
+}
+
+// A view of several files ("cat a b") re-reads only when it shows nothing
+// new, and it counts as a view of each file it shows.
+func TestRereadsSeveralFiles(t *testing.T) {
+	view := func(id, file string, also ...string) event.ToolCall {
+		return event.ToolCall{ID: id, Tool: "Bash", Noise: event.NoiseFileView, File: file, Also: also, FileOp: event.FileView, HasResult: true}
+	}
+	s := event.Session{Turns: []event.Turn{
+		priced(1, 1, view("ab", "a", "b")),
+		priced(1, 1, view("b", "b")),       // b was shown by "cat a b": a re-read
+		priced(1, 1, view("ac", "a", "c")), // c is new: not a re-read
+		priced(1, 1, view("ca", "c", "a")), // both seen: a re-read
+		priced(1, 1),
+	}}
+	var rereads []string
+	for _, cc := range carry(s) {
+		if cc.reread {
+			rereads = append(rereads, cc.call.ID)
+		}
+	}
+	if want := []string{"b", "ca"}; !slices.Equal(rereads, want) {
+		t.Errorf("re-reads: got %v, want %v", rereads, want)
 	}
 }

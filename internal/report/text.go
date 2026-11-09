@@ -26,7 +26,8 @@ func WriteText(out io.Writer, r Results) error {
 		fmt.Fprintf(w, " Made by trimloop %s.", r.Version)
 	}
 	if r.Read.Unpriced > 0 {
-		fmt.Fprintf(w, " %d turns have no price and are left out.", r.Read.Unpriced)
+		fmt.Fprintf(w, " %s no price and %s left out.", count(r.Read.Unpriced, "turn")+agree(r.Read.Unpriced, " has", " have"),
+			agree(r.Read.Unpriced, "is", "are"))
 	}
 	fmt.Fprintln(w)
 	retentionLine(w, r)
@@ -76,11 +77,11 @@ func WriteText(out io.Writer, r Results) error {
 	growthSection(w, r.Growth, r.CompactFix, all)
 
 	fmt.Fprintf(w, "\nP09 LONG PAUSES (RESUME BLOAT)\n")
-	fmt.Fprintf(w, "  %d times, work carried on after a pause of over %s. The cache had expired, so\n",
-		pause.Pauses, duration(pause.MinGap))
+	fmt.Fprintf(w, "  %s, work carried on after a pause of over %s. The cache had expired, so\n",
+		count(pause.Pauses, "time"), duration(pause.MinGap))
 	fmt.Fprintf(w, "  the whole context was written again: %s (%.0f%% of all spend).\n", dollars(pause.Cost), pct(pause.Cost, all))
-	fmt.Fprintf(w, "  %d %s breaks you took, in %s; starting fresh could have saved up to %s.\n",
-		pause.Pauses-pause.Unprompted, agree(pause.Pauses-pause.Unprompted, "was a", "were"), count(pause.Sessions, "session"), dollars(pause.Saving))
+	fmt.Fprintf(w, "  You took %d of these breaks yourself, in %s; starting fresh could have saved up to %s.\n",
+		pause.Pauses-pause.Unprompted, count(pause.Sessions, "session"), dollars(pause.Saving))
 	if pause.Unprompted > 0 {
 		fmt.Fprintf(w, "  The other %d (%s) were not breaks you could restart from: Claude was waiting\n",
 			pause.Unprompted, dollars(pause.UnpromptedCost))
@@ -209,10 +210,10 @@ func count(n int, noun string) string {
 func readLine(w io.Writer, r Read) {
 	fmt.Fprintf(w, "Read %s: %s, %s", count(r.Logs, "log"), count(r.Sessions, "session"), count(r.Turns, "turn"))
 	if r.Failed > 0 {
-		fmt.Fprintf(w, ", %d logs failed", r.Failed)
+		fmt.Fprintf(w, ", %s failed", count(r.Failed, "log"))
 	}
 	if r.BadLines > 0 {
-		fmt.Fprintf(w, ", %d lines could not be parsed", r.BadLines)
+		fmt.Fprintf(w, ", %s could not be parsed", count(r.BadLines, "line"))
 	}
 	fmt.Fprintln(w, ".")
 	if d := sinceDay(r.Since); d != "" {

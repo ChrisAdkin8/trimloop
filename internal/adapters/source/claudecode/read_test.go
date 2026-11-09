@@ -171,9 +171,9 @@ func TestParseLineToolCalls(t *testing.T) {
 	}
 	mainGo := fileKey("/repo/main.go", "")
 	want := []event.ToolCall{
-		// The shell's cd is not followed, so sed's file resolves against the session's cwd.
-		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: mainGo, FileOp: event.FileView, InputBytes: 52},
-		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView, InputBytes: 40},
+		// The shell's cd is followed: sed views sub/main.go, not the session folder's main.go.
+		{ID: "t1", Tool: "Bash", Shape: "sed -n", Noise: event.NoiseFileView, Filtered: true, File: fileKey("/repo/sub/main.go", ""), FileOp: event.FileView, Part: partKey("1,9p"), InputBytes: 52},
+		{ID: "t2", Tool: "Read", Noise: event.NoiseFileView, File: mainGo, FileOp: event.FileView, Part: partKey("read offset= limit=20 pages="), InputBytes: 40},
 		{ID: "t3", Tool: "Edit", File: mainGo, FileOp: event.FileEdit, InputBytes: 23},
 		{ID: "t4", Tool: "mcp__github__get_issue", Noise: event.NoiseMCP, InputBytes: 32},
 		{ID: "t5", Tool: "Grep", Noise: event.NoiseSearch, InputBytes: 15},
@@ -241,7 +241,7 @@ func TestParseLineAttributionAndProject(t *testing.T) {
 		t.Fatalf("got ok=%v err=%v", ok, err)
 	}
 	want := event.Attribution{Skill: "review", Plugin: "tools", MCPServer: "github", Agent: "general-purpose"}
-	if m.Attribution != want || m.Project != "web" {
+	if m.Attribution != want || m.Project != "/code/web" {
 		t.Errorf("got attribution %+v project %q", m.Attribution, m.Project)
 	}
 }
@@ -258,10 +258,10 @@ func TestParseLineCompactionMetadata(t *testing.T) {
 func TestProjectOf(t *testing.T) {
 	for cwd, want := range map[string]string{
 		"":                                  "",
-		"/code/web":                         "web",
-		"/code/web/.claude/worktrees/x":     "web",
-		"/code/web/.claude/worktrees/x/sub": "web",
-		"/code/web/sub":                     "sub",
+		"/code/web/":                        "/code/web",
+		"/code/web/.claude/worktrees/x":     "/code/web",
+		"/code/web/.claude/worktrees/x/sub": "/code/web",
+		"/code/web/sub":                     "/code/web/sub",
 	} {
 		if got := projectOf(cwd); got != want {
 			t.Errorf("projectOf(%q) = %q, want %q", cwd, got, want)
@@ -506,6 +506,7 @@ func TestParseLineRateLimitIsNotAUsageLimit(t *testing.T) {
 		{"rate_limit", "You've hit your Opus limit", source.KindLimitHit, "other"},
 		{"rate_limit", "API Error: 429 rate_limit_error: requests per minute", source.KindFailure, "not-sent"},
 		{"rate_limit", "API Error: Rate limit reached", source.KindFailure, "not-sent"},
+		{"rate_limit", "You've hit your rate limit for this API key", source.KindFailure, "not-sent"}, // a rate limit in a usage limit's words
 		{"authentication_failed", "Login expired · Please run /login", source.KindFailure, "not-sent"},
 		{"unknown", "API Error: 529 Overloaded", source.KindFailure, "not-sent"},
 		{"server_error", "API Error: Can't reach the API server (ENOTFOUND)", source.KindFailure, "not-sent"},
@@ -517,5 +518,40 @@ func TestParseLineRateLimitIsNotAUsageLimit(t *testing.T) {
 		if err != nil || !ok || m.Kind != c.kind || got != c.detail {
 			t.Errorf("%s %q: got kind %v %q, want %v %q", c.errField, c.text, m.Kind, got, c.kind, c.detail)
 		}
+	}
+}
+
+// The Read tool's offset and limit are told apart, and a number written as
+// a string is the same part as the number.
+func TestReadParts(t *testing.T) {
+	part := func(in string) string {
+		line := `{"type":"assistant","cwd":"/r","message":{"id":"m","usage":{"output_tokens":1},"content":[` +
+			`{"type":"tool_use","id":"t","name":"Read","input":{"file_path":"/r/a.go"` + in + `}}]}}`
+		m, _, err := parseLine([]byte(line))
+		if err != nil || len(m.ToolCalls) != 1 {
+			t.Fatalf("%s: got %+v, %v", in, m, err)
+		}
+		return m.ToolCalls[0].Part
+	}
+	if part(`,"offset":100`) == part(`,"limit":100`) {
+		t.Error("offset 100 and limit 100 are the same part")
+	}
+	if part(`,"offset":100`) != part(`,"offset":"100"`) {
+		t.Error(`offset "100" and 100 are different parts`)
+	}
+	if part(``) != "" || part(`,"offset":null`) != "" {
+		t.Error("a whole-file read has a part")
+	}
+}
+
+// A file written from the home folder (~/...) is the user's file there,
+// whatever folder the session was in.
+func TestFileKeyHome(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home folder:", err)
+	}
+	if got, want := fileKey("~/code/a.go", "/repo"), fileKey(filepath.Join(home, "code", "a.go"), ""); got != want || got == "" {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"iter"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -110,6 +111,11 @@ type input struct {
 	Command      string `json:"command"`       // Bash
 	FilePath     string `json:"file_path"`     // Read, Edit, Write
 	NotebookPath string `json:"notebook_path"` // NotebookEdit
+
+	// Read: the part of the file read. Kept raw, as a number or a string.
+	Offset json.RawMessage `json:"offset"`
+	Limit  json.RawMessage `json:"limit"`
+	Pages  string          `json:"pages"` // a PDF's pages
 }
 
 // attachment is the part of an attachment line Read uses. A prompt snapshot
@@ -175,6 +181,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 	if err := json.Unmarshal(line, &rec); err != nil {
 		return source.Message{}, false, err
 	}
+	rec.clean()
 	// A timestamp that is missing or in an unexpected format leaves Time
 	// zero rather than failing the line: the rest is still worth counting.
 	var ts time.Time
@@ -190,7 +197,7 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return source.Message{Kind: source.KindLimitHit, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
 			Limit: limitKind(blocks(rec.Message.Content))}, true, nil
 
-	case rec.Type == "assistant" && rec.IsAPIErrorMessage && (rec.Message.Model == Synthetic || limitError(rec.Error)):
+	case rec.Type == "assistant" && rec.IsAPIErrorMessage && (rec.Message.Model == synthetic || limitError(rec.Error)):
 		return source.Message{Kind: source.KindFailure, SessionID: rec.SessionID, Time: ts, LineID: rec.UUID,
 			Failure: failureKind(errorText(rec.Error), blocks(rec.Message.Content))}, true, nil
 
@@ -201,8 +208,9 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			ID:        rec.Message.ID,
 			SessionID: rec.SessionID,
 			Time:      ts,
-			Project:   projectOf(rec.Cwd),
+			Project:   cleanFolder(projectOf(rec.Cwd)),
 			Model:     rec.Message.Model,
+			Synthetic: rec.Message.Model == synthetic,
 			Usage:     replyUsage(u.Usage, u.Iterations),
 			Fast:      u.Speed == "fast",
 			USOnly:    u.InferenceGeo == "us",
@@ -254,10 +262,12 @@ func parseLine(line []byte) (source.Message, bool, error) {
 			m.Record.Start = time.UnixMilli(startMs).UTC()
 		}
 		for model, u := range rec.ModelUsage {
-			m.Record.ByModel[model] = event.ModelRecord{
+			// Two ids that clean to the same one are added together.
+			model = clean(model)
+			m.Record.ByModel[model] = m.Record.ByModel[model].Add(event.ModelRecord{
 				Cost: u.CostUSD, InputUncached: u.InputTokens, CacheRead: u.CacheReadInputTokens,
 				CacheWrite: u.CacheCreationInputTokens, Output: u.OutputTokens, WebSearches: u.WebSearchRequests,
-			}
+			})
 		}
 		return m, true, nil
 
@@ -274,6 +284,17 @@ func parseLine(line []byte) (source.Message, bool, error) {
 		return m, true, nil
 	}
 	return source.Message{}, false, nil
+}
+
+// clean removes control and format characters from the record's
+// human-readable fields (see clean). The working folder is left as logged:
+// file identities are hashed from it, and the project folder is cleaned
+// apart (cleanFolder).
+func (rec *record) clean() {
+	rec.AITitle, rec.CustomTitle = clean(rec.AITitle), clean(rec.CustomTitle)
+	rec.Effort, rec.Message.Model = clean(rec.Effort), clean(rec.Message.Model)
+	rec.AttributionSkill, rec.AttributionPlugin = clean(rec.AttributionSkill), clean(rec.AttributionPlugin)
+	rec.AttributionMcpServer, rec.AttributionAgent = clean(rec.AttributionMcpServer), clean(rec.AttributionAgent)
 }
 
 // blocks decodes a content list. Content that is a plain string, or a list in
@@ -299,20 +320,41 @@ func toolCalls(bs []block, cwd string) []event.ToolCall {
 		}
 		var in input
 		_ = json.Unmarshal(b.Input, &in) // lenient: other argument types leave in empty
+		b.Name = clean(b.Name)
 		c := event.ToolCall{ID: b.ID, Tool: b.Name, InputBytes: len(b.Input)}
 		switch {
 		case b.Name == "Bash":
 			s := cmdshape.Parse(in.Command)
-			c.Shape, c.Noise, c.Filtered = s.String(), s.Noise, s.Filtered
+			c.Shape, c.Noise, c.Filtered = clean(s.String()), s.Noise, s.Filtered
 			if s.File != "" {
 				c.File, c.FileOp = fileKey(s.File, cwd), event.FileView
+				c.Part = partKey(s.Part)
 				if s.Edit {
 					c.FileOp = event.FileEdit
+				}
+				for _, o := range s.Others {
+					k := fileKey(o, cwd)
+					if k == "" {
+						c.File, c.Also = "", nil // a variable or a glob among them: not known files
+						break
+					}
+					c.Also = append(c.Also, k)
+				}
+			}
+			c.WritesUnknown = s.WritesUnknown
+			for _, w := range s.Writes {
+				if k := fileKey(w, cwd); k != "" {
+					c.Writes = append(c.Writes, k)
+				} else {
+					c.WritesUnknown = true // a variable or a glob: which file is not known
 				}
 			}
 		case b.Name == "Read" || b.Name == "NotebookRead":
 			c.Noise = event.NoiseFileView
 			c.File, c.FileOp = fileKey(firstOf(in.FilePath, in.NotebookPath), cwd), event.FileView
+			if o, l := rawArg(in.Offset), rawArg(in.Limit); o != "" || l != "" || in.Pages != "" {
+				c.Part = partKey("read offset=" + o + " limit=" + l + " pages=" + in.Pages)
+			}
 		case b.Name == "Edit" || b.Name == "MultiEdit" || b.Name == "Write" || b.Name == "NotebookEdit":
 			c.File, c.FileOp = fileKey(firstOf(in.FilePath, in.NotebookPath), cwd), event.FileEdit
 		case b.Name == "Grep" || b.Name == "Glob" || b.Name == "LS":
@@ -374,11 +416,43 @@ func fileKey(p, cwd string) string {
 	if p == "" || strings.ContainsAny(p, "$`*?") {
 		return "" // a variable or a glob: not one known file
 	}
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		// Under the home folder: the logs are read on the machine that wrote
+		// them, so it is this user's.
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		p = filepath.Join(home, strings.TrimPrefix(p, "~"))
+	}
 	if !filepath.IsAbs(p) && cwd != "" {
 		p = filepath.Join(cwd, p)
 	}
 	sum := sha256.Sum256([]byte(filepath.Clean(p)))
 	return hex.EncodeToString(sum[:8])
+}
+
+// partKey identifies the part of a file a view printed by a hash, so a
+// script or count is never kept; "" stays "" (the whole file).
+func partKey(part string) string {
+	if part == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(part))
+	return hex.EncodeToString(sum[:8])
+}
+
+// rawArg is an argument as logged, "" if absent or null. A number written
+// as a string ("100") reads the same as the number (100).
+func rawArg(r json.RawMessage) string {
+	var s string
+	if json.Unmarshal(r, &s) == nil {
+		return strings.TrimSpace(s)
+	}
+	if string(r) == "null" {
+		return ""
+	}
+	return string(r)
 }
 
 func firstOf(a, b string) string {
@@ -392,8 +466,10 @@ func firstOf(a, b string) string {
 // for a sub-agent: <project>/.claude/worktrees/<name>.
 var worktrees = string(filepath.Separator) + filepath.Join(".claude", "worktrees") + string(filepath.Separator)
 
-// projectOf names the project a working folder belongs to: the folder's own
-// name, or for a worktree, the name of the project it was copied from.
+// projectOf returns the project folder a working folder belongs to: the
+// folder itself, or for a worktree, the folder of the project it was copied
+// from. The caller turns folders into short names (ADR 0032 shows project
+// names, not paths).
 func projectOf(cwd string) string {
 	if cwd == "" {
 		return ""
@@ -401,7 +477,7 @@ func projectOf(cwd string) string {
 	if i := strings.Index(cwd, worktrees); i > 0 {
 		cwd = cwd[:i]
 	}
-	return filepath.Base(cwd)
+	return filepath.Clean(cwd)
 }
 
 // parseAttachment reads an attachment line: a snapshot of the system prompt
@@ -424,7 +500,7 @@ func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 			st.SystemBytes += len(p)
 		}
 		for _, t := range snap.Tools {
-			st.Tools = append(st.Tools, event.ToolDef{Name: t.Name, Bytes: len(t.Name) + len(t.Description) + len(t.Schema)})
+			st.Tools = append(st.Tools, event.ToolDef{Name: clean(t.Name), Bytes: len(t.Name) + len(t.Description) + len(t.Schema)})
 		}
 		if st.Bytes() == 0 {
 			return source.Message{}, false, nil
@@ -445,10 +521,10 @@ func parseAttachment(rec record, ts time.Time) (source.Message, bool, error) {
 	case a.Type == "mcp_instructions_delta" && len(a.AddedNames) > 0 && len(a.AddedNames) == len(a.AddedBlocks):
 		// One piece per server, so each can be sorted by who can change it.
 		for i, name := range a.AddedNames {
-			pieces = append(pieces, event.Injected{Kind: a.Type, Name: name, Bytes: len(a.AddedBlocks[i])})
+			pieces = append(pieces, event.Injected{Kind: a.Type, Name: clean(name), Bytes: len(a.AddedBlocks[i])})
 		}
 	default:
-		pieces = []event.Injected{{Kind: a.Type, Bytes: size}}
+		pieces = []event.Injected{{Kind: clean(a.Type), Bytes: size}}
 	}
 	return source.Message{Kind: source.KindInjected, SessionID: rec.SessionID, Time: ts, Injected: pieces, LineID: rec.UUID}, true, nil
 }
@@ -479,9 +555,9 @@ func renderedSize(raw json.RawMessage) int {
 func memoryName(f memFile) string {
 	name := filepath.Base(f.Path)
 	if f.Type != "" {
-		return f.Type + " " + name
+		name = f.Type + " " + name
 	}
-	return name
+	return clean(name)
 }
 
 // replyUsage normalises a reply's usage. When the top level is all zero but
@@ -550,8 +626,8 @@ func limitKind(bs []block) string {
 		t := strings.ToLower(b.Text)
 		named := strings.Contains(t, "hit your") && strings.Contains(t, "limit") ||
 			strings.Contains(t, "usage limit") ||
-			strings.Contains(t, "limit reached") && !strings.Contains(t, "rate limit")
-		if !named {
+			strings.Contains(t, "limit reached")
+		if !named || strings.Contains(t, "rate limit") { // an API key's rate limit, in any wording
 			continue
 		}
 		switch {

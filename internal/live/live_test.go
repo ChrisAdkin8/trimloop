@@ -35,7 +35,8 @@ func TestStatus(t *testing.T) {
 		eff     string
 	}{
 		{"small, fresh cache", reply(50_000, t0), t0.Add(time.Minute), "medium", "50k tokens", Small, "", ""},
-		{"large, cache ending", reply(312_000, t0), t0.Add(52 * time.Minute), "", "312k tokens", Large, "cache ends in 9 min", ""},
+		{"large, cache ending", reply(312_000, t0), t0.Add(52 * time.Minute), "", "312k tokens", Large, "cache ends in 8 min", ""},
+		{"large, cache ending part way through a minute", reply(312_000, t0), t0.Add(51*time.Minute + 30*time.Second), "", "312k tokens", Large, "cache ends in 9 min", ""},
 		{"very large, expired", reply(610_000, t0), t0.Add(2 * time.Hour), "max", "610k tokens", VeryLarge, "cache expired · next message ≈ $4.88", "max effort"},
 	}
 	for _, tt := range tests {
@@ -230,9 +231,9 @@ func TestWriteSettings(t *testing.T) {
 	if err := os.WriteFile(path, []byte(existing), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	backup, err := WriteSettings(path, "/bin/trimloop", false)
-	if err != nil || backup == "" {
-		t.Fatalf("got %q, %v", backup, err)
+	backup, changed, err := WriteSettings(path, "/bin/trimloop", false)
+	if err != nil || backup == "" || !changed {
+		t.Fatalf("got %q, %v, %v", backup, changed, err)
 	}
 	if b, _ := os.ReadFile(backup); string(b) != existing {
 		t.Error("the backup should hold the old file")
@@ -245,9 +246,9 @@ func TestWriteSettings(t *testing.T) {
 	if cfg["model"] != "opus" || !strings.Contains(string(b), "say done") || !strings.Contains(string(b), `'/bin/trimloop' hook stop`) {
 		t.Errorf("settings lost or missing: %s", b)
 	}
-	// Running it again adds nothing twice.
-	if _, err := WriteSettings(path, "/bin/trimloop", false); err != nil {
-		t.Fatal(err)
+	// Running it again adds nothing twice, and says nothing changed.
+	if backup, changed, err := WriteSettings(path, "/bin/trimloop", false); err != nil || changed || backup != "" {
+		t.Fatalf("second run: got %q, %v, %v", backup, changed, err)
 	}
 	b2, _ := os.ReadFile(path)
 	if strings.Count(string(b2), "hook stop") != 1 {
@@ -258,17 +259,17 @@ func TestWriteSettings(t *testing.T) {
 	if err := os.WriteFile(other, []byte(`{"statusLine":{"type":"command","command":"mine.sh"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := WriteSettings(other, "/bin/trimloop", false); !errors.Is(err, ErrStatusLineTaken) {
+	if _, _, err := WriteSettings(other, "/bin/trimloop", false); !errors.Is(err, ErrStatusLineTaken) {
 		t.Errorf("got %v, want ErrStatusLineTaken", err)
 	}
-	if _, err := WriteSettings(other, "/bin/trimloop", true); err != nil {
+	if _, _, err := WriteSettings(other, "/bin/trimloop", true); err != nil {
 		t.Error(err)
 	}
 	// A new file is created, with no backup.
-	if backup, err := WriteSettings(filepath.Join(dir, "new.json"), "/bin/trimloop", false); err != nil || backup != "" {
-		t.Errorf("new file: got %q, %v", backup, err)
+	if backup, changed, err := WriteSettings(filepath.Join(dir, "new.json"), "/bin/trimloop", false); err != nil || backup != "" || !changed {
+		t.Errorf("new file: got %q, %v, %v", backup, changed, err)
 	}
-	if _, err := WriteSettings(filepath.Join(dir, "missing", "x.json"), "/bin/trimloop", false); err == nil {
+	if _, _, err := WriteSettings(filepath.Join(dir, "missing", "x.json"), "/bin/trimloop", false); err == nil {
 		t.Error("got no error writing into a missing folder")
 	}
 }
@@ -283,7 +284,7 @@ func TestWriteSettingsSafety(t *testing.T) {
 		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := WriteSettings(p, "/bin/trimloop", false); err == nil {
+		if _, _, err := WriteSettings(p, "/bin/trimloop", false); err == nil {
 			t.Errorf("%s: got no error", body)
 		}
 		if b, _ := os.ReadFile(p); string(b) != body {
@@ -297,7 +298,7 @@ func TestWriteSettingsSafety(t *testing.T) {
 	if err := os.WriteFile(odd, []byte(`{"hooks":{"Stop":["x"]}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := WriteSettings(odd, "/bin/trimloop", false); err != nil {
+	if _, _, err := WriteSettings(odd, "/bin/trimloop", false); err != nil {
 		t.Fatal(err)
 	}
 	if b, _ := os.ReadFile(odd); !strings.Contains(string(b), `"x"`) || !strings.Contains(string(b), "hook stop") {
@@ -309,7 +310,7 @@ func TestWriteSettingsSafety(t *testing.T) {
 	if err := os.WriteFile(p, []byte(orig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	b1, err := WriteSettings(p, "/bin/trimloop", false)
+	b1, _, err := WriteSettings(p, "/bin/trimloop", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,14 +318,14 @@ func TestWriteSettingsSafety(t *testing.T) {
 	if !strings.Contains(string(got), "12345678901234567890") || !strings.Contains(string(got), `a && b < c > d`) {
 		t.Errorf("values changed: %s", got)
 	}
-	if b2, err := WriteSettings(p, "/bin/trimloop", false); err != nil || b2 != "" {
+	if b2, changed, err := WriteSettings(p, "/bin/trimloop", false); err != nil || b2 != "" || changed {
 		t.Errorf("second run should change nothing: backup %q, %v", b2, err)
 	}
 	// Force a second backup in the same second: it must not replace the first.
 	if err := os.WriteFile(p, []byte(orig), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	b3, err := WriteSettings(p, "/bin/trimloop", false)
+	b3, _, err := WriteSettings(p, "/bin/trimloop", false)
 	if err != nil || b3 == b1 {
 		t.Errorf("backups: first %q, second %q (%v)", b1, b3, err)
 	}
@@ -355,7 +356,7 @@ func TestWriteSettingsLinksMovesAndQuoting(t *testing.T) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := WriteSettings(link, "/old/trimloop", false); err != nil {
+	if _, _, err := WriteSettings(link, "/old/trimloop", false); err != nil {
 		t.Fatal(err)
 	}
 	if fi, err := os.Lstat(link); err != nil || fi.Mode()&os.ModeSymlink == 0 {
@@ -366,7 +367,7 @@ func TestWriteSettingsLinksMovesAndQuoting(t *testing.T) {
 	}
 
 	// The binary moved: the status line and hooks follow, with no duplicates.
-	if _, err := WriteSettings(link, "/new/trimloop", false); err != nil {
+	if _, _, err := WriteSettings(link, "/new/trimloop", false); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(target)
@@ -442,8 +443,8 @@ func TestStatusLineKeepsLimitReadings(t *testing.T) {
 		var m map[string]any
 		_ = json.Unmarshal([]byte(session(t, 100_000, t0)), &m)
 		m["rate_limits"] = map[string]any{
-			"five_hour": map[string]any{"used_percentage": used, "resets_at": 1_800_000_000},
-			"seven_day": map[string]any{"used_percentage": 40, "resets_at": 1_800_500_000},
+			"five_hour": map[string]any{"used_percentage": used, "resets_at": t0.Add(3 * time.Hour).Unix()},
+			"seven_day": map[string]any{"used_percentage": 40, "resets_at": t0.Add(5 * 24 * time.Hour).Unix()},
 		}
 		b, _ := json.Marshal(m)
 		return string(b)
@@ -498,7 +499,7 @@ func TestCheckSettingsStates(t *testing.T) {
 	hook := func(cmd string) string {
 		return `[{"hooks":[{"type":"command","command":` + strconv.Quote(cmd) + `,"timeout":5}]}]`
 	}
-	c, err := CheckSettings(write(`{"statusLine":{"command":"\"/home/u/bin/trimloop\" statusline"},"hooks":{`+
+	c, err := CheckSettings(write(`{"statusLine":{"type":"command","command":"\"/home/u/bin/trimloop\" statusline","refreshInterval":30},"hooks":{`+
 		`"Stop":`+hook(`"/home/u/bin/trimloop" hook stop`)+`,`+
 		`"UserPromptSubmit":`+hook(`/old/trimloop hook prompt`)+`}}`), exe)
 	if err != nil {
@@ -516,6 +517,138 @@ func TestCheckSettingsStates(t *testing.T) {
 	}
 	if _, err := CheckSettings(write(`[1]`), exe); err == nil {
 		t.Error("a settings file that is not an object: want an error")
+	}
+}
+
+// The status line is up to date only with today's type and refresh
+// interval, like hooks with their timeout; numbers count however written.
+func TestCheckSettingsStatusLineFields(t *testing.T) {
+	exe := "/bin/trimloop"
+	p := filepath.Join(t.TempDir(), "settings.json")
+	for _, c := range []struct {
+		name, statusLine string
+		want             EntryState
+	}{
+		{"today's", `{"type":"command","command":"'/bin/trimloop' statusline","refreshInterval":30}`, Current},
+		{"written as 30.0", `{"type":"command","command":"'/bin/trimloop' statusline","refreshInterval":30.0}`, Current},
+		{"no refresh", `{"type":"command","command":"'/bin/trimloop' statusline"}`, Stale},
+		{"other refresh", `{"type":"command","command":"'/bin/trimloop' statusline","refreshInterval":5}`, Stale},
+		{"refresh as text", `{"type":"command","command":"'/bin/trimloop' statusline","refreshInterval":"30"}`, Stale},
+		{"no type", `{"command":"'/bin/trimloop' statusline","refreshInterval":30}`, Stale},
+		{"old path", `{"type":"command","command":"/old/trimloop statusline","refreshInterval":30}`, Stale},
+		{"someone else's", `{"type":"command","command":"ccstatus","refreshInterval":30}`, Other},
+	} {
+		if err := os.WriteFile(p, []byte(`{"statusLine":`+c.statusLine+`}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := CheckSettings(p, exe)
+		if err != nil || got.StatusLine != c.want {
+			t.Errorf("%s: got %v (%v), want %v", c.name, got.StatusLine, err, c.want)
+		}
+	}
+}
+
+// "disableAllHooks": true stops Claude Code running any hook or status
+// line, so the entries are not working even when they are up to date.
+func TestCheckSettingsHooksOff(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "settings.json")
+	for _, c := range []struct {
+		value  string
+		off    bool
+		wantOK bool
+	}{
+		{`true`, true, false},
+		{`false`, false, true},
+		{`"true"`, false, true}, // not a JSON true: Claude Code ignores it too
+	} {
+		if _, _, err := WriteSettings(p, "/bin/trimloop", false); err != nil {
+			t.Fatal(err)
+		}
+		b, _ := os.ReadFile(p)
+		var cfg map[string]any
+		if err := json.Unmarshal(b, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		cfg["disableAllHooks"] = json.RawMessage(c.value)
+		b, _ = json.Marshal(cfg)
+		if err := os.WriteFile(p, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := CheckSettings(p, "/bin/trimloop")
+		if err != nil || got.HooksOff != c.off || got.OK() != c.wantOK || got.StatusLine != Current {
+			t.Errorf("disableAllHooks %s: got %+v, OK %v, %v", c.value, got, got.OK(), err)
+		}
+	}
+}
+
+// Anything after the settings object is refused by --write, leaving the
+// file as it was, and by --check, so the two agree.
+func TestSettingsTrailingData(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "settings.json")
+	for _, c := range []struct {
+		name, body string
+		wantErr    bool
+	}{
+		{"comment and second object", "{\"model\":\"opus\"}\n// comment\n{\"second\":true}", true},
+		{"second object", `{"model":"opus"} {"second":true}`, true},
+		{"stray value", `{"model":"opus"} 1`, true},
+		{"stray brace", `{"model":"opus"}}`, true},
+		{"trailing blank lines", "{\"model\":\"opus\"}\n\n  \t\n", false},
+	} {
+		if err := os.WriteFile(p, []byte(c.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, checkErr := CheckSettings(p, "/bin/trimloop")
+		_, _, writeErr := WriteSettings(p, "/bin/trimloop", false)
+		if (checkErr != nil) != c.wantErr || (writeErr != nil) != c.wantErr {
+			t.Errorf("%s: check %v, write %v; want an error: %v", c.name, checkErr, writeErr, c.wantErr)
+		}
+		if b, _ := os.ReadFile(p); c.wantErr && string(b) != c.body {
+			t.Errorf("%s: file changed to %s", c.name, b)
+		}
+		if c.wantErr && !strings.Contains(fmt.Sprint(writeErr), "has more after its settings object") {
+			t.Errorf("%s: unclear error %v", c.name, writeErr)
+		}
+	}
+}
+
+// Updating trimloop's own status line changes only the keys trimloop owns,
+// keeping the user's others; someone else's is replaced whole when asked.
+func TestWriteSettingsStatusLineKeys(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "settings.json")
+	for _, c := range []struct {
+		name, statusLine string
+		replace          bool
+		wantPadding      bool
+	}{
+		{"old path", `{"type":"command","command":"/old/trimloop statusline","refreshInterval":30,"padding":2}`, false, true},
+		{"no refresh", `{"type":"command","command":"'/bin/trimloop' statusline","padding":2}`, false, true},
+		{"other refresh", `{"type":"command","command":"'/bin/trimloop' statusline","refreshInterval":5,"padding":2}`, false, true},
+		{"someone else's", `{"type":"command","command":"ccstatus","padding":2}`, true, false},
+	} {
+		if err := os.WriteFile(p, []byte(`{"statusLine":`+c.statusLine+`}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, changed, err := WriteSettings(p, "/bin/trimloop", c.replace); err != nil || !changed {
+			t.Fatalf("%s: changed %v, %v", c.name, changed, err)
+		}
+		b, _ := os.ReadFile(p)
+		var cfg struct {
+			StatusLine map[string]any `json:"statusLine"`
+		}
+		if err := json.Unmarshal(b, &cfg); err != nil {
+			t.Fatal(err)
+		}
+		sl := cfg.StatusLine
+		if sl["command"] != "'/bin/trimloop' statusline" || sl["type"] != "command" || sl["refreshInterval"] != float64(30) {
+			t.Errorf("%s: trimloop's keys not set: %v", c.name, sl)
+		}
+		if _, has := sl["padding"]; has != c.wantPadding {
+			t.Errorf("%s: padding kept %v, want %v", c.name, has, c.wantPadding)
+		}
+		if got, _ := CheckSettings(p, "/bin/trimloop"); !got.OK() {
+			t.Errorf("%s: not up to date after --write: %+v", c.name, got)
+		}
 	}
 }
 
@@ -562,5 +695,145 @@ func TestStateBeforeSendPausesOncePerBreak(t *testing.T) {
 	r.Time = t0.Add(4 * time.Hour) // a new reply, then another long break
 	if st.beforeSend(s, r, r.Time.Add(2*time.Hour)) == "" {
 		t.Error("a new break: pause again")
+	}
+}
+
+// TestInputIsLenient checks that a field sent with an unexpected shape loses
+// only that field: the hooks still see the session, and no zero or
+// half-read usage-limit reading is kept.
+func TestInputIsLenient(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	line := fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"id":"m1","model":"claude-opus-5-5",`+
+		`"usage":{"cache_read_input_tokens":249000,"cache_creation":{"ephemeral_1h_input_tokens":1000},"output_tokens":10}}}`+"\n",
+		t0.Format(time.RFC3339))
+	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base := fmt.Sprintf(`"session_id":"s1","transcript_path":%q,"cost":{"total_cost_usd":4.1}`, path)
+	five := func(v string) string { return `{` + base + `,"rate_limits":{"five_hour":` + v + `}}` }
+	for _, c := range []struct {
+		name, in  string
+		hooks     bool  // the hooks still see the session
+		size      bool  // the status line still shows the context size
+		cost      bool  // the status line still shows the cost
+		resetsAt  int64 // the five-hour reading kept; 0 for none
+		effortHas string
+	}{
+		{name: "effort as a string", in: `{` + base + `,"effort":"max"}`, hooks: true, size: true, cost: true},
+		{name: "effort as a struct", in: `{` + base + `,"effort":{"level":"max"}}`, hooks: true, size: true, cost: true, effortHas: "max effort"},
+		{name: "unknown fields", in: `{` + base + `,"new_thing":{"a":[1,2]},"workspace":7}`, hooks: true, size: true, cost: true},
+		{name: "cost as a string", in: fmt.Sprintf(`{"session_id":"s1","transcript_path":%q,"cost":"4.10"}`, path), hooks: true, size: true},
+		{name: "resets_at as RFC 3339", in: five(`{"used_percentage":12,"resets_at":"2026-11-09T18:00:00Z"}`),
+			hooks: true, size: true, cost: true, resetsAt: time.Date(2026, 11, 9, 18, 0, 0, 0, time.UTC).Unix()},
+		{name: "resets_at as a number", in: five(`{"used_percentage":12,"resets_at":1794150000}`), hooks: true, size: true, cost: true, resetsAt: 1_794_150_000},
+		{name: "resets_at in milliseconds", in: five(`{"used_percentage":12,"resets_at":1794150000000}`), hooks: true, size: true, cost: true, resetsAt: 1_794_150_000},
+		{name: "resets_at far in the future", in: five(`{"used_percentage":12,"resets_at":1e300}`), hooks: true, size: true, cost: true},
+		{name: "used_percentage null", in: five(`{"used_percentage":null,"resets_at":1794150000}`), hooks: true, size: true, cost: true},
+		{name: "resets_at not a time", in: five(`{"used_percentage":12,"resets_at":"soon"}`), hooks: true, size: true, cost: true},
+		{name: "resets_at missing", in: five(`{"used_percentage":12}`), hooks: true, size: true, cost: true},
+		{name: "resets_at zero", in: five(`{"used_percentage":12,"resets_at":0}`), hooks: true, size: true, cost: true},
+		{name: "used_percentage a string", in: five(`{"used_percentage":"12","resets_at":1794150000}`), hooks: true, size: true, cost: true},
+		{name: "rate_limits a list", in: `{` + base + `,"rate_limits":[1]}`, hooks: true, size: true, cost: true},
+		{name: "session_id a number", in: fmt.Sprintf(`{"session_id":1,"transcript_path":%q}`, path), size: true},
+		{name: "not JSON", in: `not json`},
+		{name: "a JSON list", in: `[1,2]`},
+		{name: "empty", in: ``},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := env(t, t0.Add(2*time.Hour))
+			e.Limits = filepath.Join(t.TempDir(), "limits.jsonl")
+			var out bytes.Buffer
+			StatusLine(strings.NewReader(c.in), &out, e)
+			line := out.String()
+			if c.size != strings.Contains(line, "250k tokens") {
+				t.Errorf("status line %q: size shown %v, want %v", line, !c.size, c.size)
+			}
+			if c.cost != strings.Contains(line, "$4.10") {
+				t.Errorf("status line %q: cost shown %v, want %v", line, !c.cost, c.cost)
+			}
+			if c.effortHas != "" && !strings.Contains(line, c.effortHas) {
+				t.Errorf("status line %q: want effort %q", line, c.effortHas)
+			}
+			if !c.size && !c.cost && line != "" {
+				t.Errorf("status line %q, want nothing", line)
+			}
+			b, err := os.ReadFile(e.Limits)
+			switch {
+			case c.resetsAt == 0 && err == nil:
+				t.Errorf("limit reading kept: %s", b)
+			case c.resetsAt != 0 && !strings.Contains(string(b), fmt.Sprintf(`"used":12,"resets_at":%d`, c.resetsAt)):
+				t.Errorf("limit reading: %s (%v), want resets_at %d", b, err, c.resetsAt)
+			}
+			out.Reset()
+			Hook("stop", strings.NewReader(c.in), &out, e)
+			if got := strings.Contains(out.String(), "200k"); got != c.hooks {
+				t.Errorf("stop hook: got %q, want a nudge %v", out.String(), c.hooks)
+			}
+		})
+	}
+}
+
+// TestDecodeLimit checks which usage-limit readings are plausible enough to
+// keep: a reading that is not would sort after every genuine one in the
+// limits history, which would then drop them all.
+func TestDecodeLimit(t *testing.T) {
+	now := t0
+	in3h := now.Add(3 * time.Hour).Unix()
+	for _, c := range []struct {
+		name, in string
+		ok       bool
+		used     float64
+		resetsAt int64
+	}{
+		{name: "a normal reading", in: fmt.Sprintf(`{"used_percentage":12.5,"resets_at":%d}`, in3h), ok: true, used: 12.5, resetsAt: in3h},
+		{name: "RFC 3339", in: `{"used_percentage":12,"resets_at":"2026-11-08T12:00:00Z"}`, ok: true, used: 12, resetsAt: in3h},
+		{name: "milliseconds", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, in3h*1000), ok: true, used: 12, resetsAt: in3h},
+		{name: "a weekly reset", in: fmt.Sprintf(`{"used_percentage":40,"resets_at":%d}`, now.Add(7*24*time.Hour).Unix()), ok: true, used: 40,
+			resetsAt: now.Add(7 * 24 * time.Hour).Unix()},
+		{name: "reset a few hours ago", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, now.Add(-5*time.Hour).Unix()), ok: true, used: 12,
+			resetsAt: now.Add(-5 * time.Hour).Unix()},
+		{name: "over 100 is read as 100", in: fmt.Sprintf(`{"used_percentage":150,"resets_at":%d}`, in3h), ok: true, used: 100, resetsAt: in3h},
+		{name: "far future number", in: `{"used_percentage":12,"resets_at":1e300}`},
+		{name: "far future RFC 3339", in: `{"used_percentage":12,"resets_at":"9999-12-31T00:00:00Z"}`},
+		{name: "more than 8 days ahead", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, now.Add(9*24*time.Hour).Unix())},
+		{name: "more than a day ago", in: fmt.Sprintf(`{"used_percentage":12,"resets_at":%d}`, now.Add(-25*time.Hour).Unix())},
+		{name: "long past", in: `{"used_percentage":12,"resets_at":1000}`},
+		{name: "used_percentage null", in: fmt.Sprintf(`{"used_percentage":null,"resets_at":%d}`, in3h)},
+		{name: "used_percentage missing", in: fmt.Sprintf(`{"resets_at":%d}`, in3h)},
+		{name: "used_percentage negative", in: fmt.Sprintf(`{"used_percentage":-1,"resets_at":%d}`, in3h)},
+		{name: "resets_at null", in: `{"used_percentage":12,"resets_at":null}`},
+		{name: "missing", in: ``},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var b json.RawMessage
+			if c.in != "" {
+				b = json.RawMessage(c.in)
+			}
+			r := decodeLimit(b, now)
+			switch {
+			case !c.ok && r != nil:
+				t.Errorf("got %+v, want none", *r)
+			case c.ok && r == nil:
+				t.Error("got none, want a reading")
+			case c.ok && (r.UsedPercentage != c.used || int64(r.ResetsAt) != c.resetsAt):
+				t.Errorf("got %+v, want used %v, resets_at %d", *r, c.used, c.resetsAt)
+			}
+		})
+	}
+}
+
+// The hooks-only snippet has both hooks and no status line; a missing
+// settings folder is named in the error, not the temporary file.
+func TestHooksSnippetAndMissingFolder(t *testing.T) {
+	s := HooksSnippet("/bin/trimloop")
+	for want, ok := range map[string]bool{`"Stop"`: true, `"UserPromptSubmit"`: true, "hook prompt": true, `"statusLine"`: false} {
+		if strings.Contains(s, want) != ok {
+			t.Errorf("snippet has %q: %v, want %v\n%s", want, !ok, ok, s)
+		}
+	}
+	missing := filepath.Join(t.TempDir(), ".claude")
+	_, _, err := WriteSettings(filepath.Join(missing, "settings.json"), "/bin/trimloop", false)
+	if err == nil || !strings.Contains(err.Error(), "the folder "+missing+" does not exist") || strings.Contains(err.Error(), ".tmp") {
+		t.Errorf("got %v, want the missing folder named", err)
 	}
 }

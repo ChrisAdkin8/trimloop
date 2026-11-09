@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 )
@@ -22,15 +23,24 @@ func LimitsPath(home, configDir string) string {
 // moves a limit forward from the last line kept: a higher use in the same
 // window, or a later window. The status line runs every few seconds in every
 // open session, and a session that has been idle can repeat an older
-// reading, so anything else is dropped; the file then grows by at most one
-// line per percentage point per window. It holds numbers and times only,
-// readable by the owner only.
+// reading, so anything else is dropped; the file then grows by about one
+// line per percentage point per window. Nothing locks the file: two status
+// lines appending at the same instant can both add the same reading, which
+// changes no measurement (FindLimits uses each window's first and last
+// reading; docs/state-machines.md §5). A limit in the last line whose reset
+// time is implausibly far after the new reading (stored before readings were
+// checked) counts as absent, so it cannot hold back every later reading; the
+// line itself is left in the file. It holds numbers and times only, readable
+// by the owner only.
 func AppendLimits(path string, r detectors.LimitReading) error {
 	if r.FiveHour == nil && r.SevenDay == nil {
 		return nil
 	}
-	if last, ok := lastReading(path); ok && !ahead(r.FiveHour, last.FiveHour) && !ahead(r.SevenDay, last.SevenDay) {
-		return nil
+	if last, ok := lastReading(path); ok {
+		lastFive, lastSeven := plausible(last.FiveHour, r.At), plausible(last.SevenDay, r.At)
+		if !ahead(r.FiveHour, lastFive) && !ahead(r.SevenDay, lastSeven) {
+			return nil
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -111,6 +121,19 @@ func trimNewline(b []byte) []byte {
 		b = b[:len(b)-1]
 	}
 	return b
+}
+
+// plausible returns w, or nil when its reset time is more than
+// detectors.ResetsAtFuture after at (the weekly window plus slack, the same
+// bound the status line's decoder puts on new readings): version 0.1.0
+// stored readings unchecked, so a file can end with a reset time in
+// milliseconds or in the year 9999. A zero at checks nothing. Only the later
+// bound is applied here, as before; FindLimits applies both to the rate.
+func plausible(w *detectors.LimitWindow, at time.Time) *detectors.LimitWindow {
+	if w == nil || at.IsZero() || w.ResetsAt <= at.Add(detectors.ResetsAtFuture).Unix() {
+		return w
+	}
+	return nil
 }
 
 // ahead reports whether reading r of one limit moves it forward from last:

@@ -41,8 +41,15 @@ type Recommendation struct {
 	Finding    string          `json:"finding"` // what was found, in a sentence
 	Noise      event.NoiseKind `json:"noise"`
 	Saving     float64         `json:"saving"`                // the finding's estimated saving, an upper bound
-	Likely     float64         `json:"likely"`                // a likelier saving for this fix; 0 if not estimated
+	Likely     float64         `json:"likely"`                // a likelier saving for this fix; see Estimated
 	LikelyNote string          `json:"likely_note,omitempty"` // how Likely was estimated
+	// Estimated is true when Likely was worked out. Likely is then the
+	// estimate even when it is 0: replaying the logs, the fix would cost
+	// about what it saves. When false, only Saving is known.
+	Estimated bool `json:"estimated,omitempty"`
+	// Nothing says why the estimate is nothing, for when it is: each card
+	// estimates its own way.
+	Nothing string `json:"nothing,omitempty"`
 	// LikelyLow and LikelyHigh bound Likely when it rests on a measured
 	// quantity that varies (the size after a compaction); 0 if not given.
 	LikelyLow  float64 `json:"likely_low,omitempty"`
@@ -66,6 +73,18 @@ type Recommendation struct {
 // likely estimate, so ranking uses the upper bound, the one figure every
 // recommendation has; mixing the two would compare unlike things.
 func (r Recommendation) Expected() float64 { return r.Saving }
+
+// SavesNothing reports whether the likely saving was worked out and is
+// nothing.
+func (r Recommendation) SavesNothing() bool { return r.Estimated && r.Likely <= 0 }
+
+// nothingIf returns why, for a likely saving of nothing, and "" otherwise.
+func nothingIf(likely float64, why string) string {
+	if likely > 0 {
+		return ""
+	}
+	return why
+}
 
 // ForToolOutput recommends fixes for the kinds of noise in f with the
 // largest savings, at most n, skipping any with a saving under minSaving.

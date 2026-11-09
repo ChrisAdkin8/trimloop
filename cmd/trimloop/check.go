@@ -22,13 +22,32 @@ func checkSetup(w io.Writer, settings, exe, home, cfgDir string) int {
 		return 2
 	}
 	fmt.Fprintf(w, "Claude Code settings: %s\n", settings)
-	fmt.Fprintf(w, "  status line: %s%s\n", c.StatusLine, advice(c.StatusLine, "status line"))
+	if reads := unreadSettings(settings, home, cfgDir); reads != "" {
+		fmt.Fprintf(w, "  Warning: CLAUDE_CONFIG_DIR is set, so Claude Code reads %s, not this file.\n"+
+			"  To check that file, run: trimloop setup --check\n", reads)
+	}
+	// With another program's status line, 'setup --write' writes nothing,
+	// so the advice points to the choices printed below instead.
+	other := c.StatusLine == live.Other
+	fmt.Fprintf(w, "  status line: %s%s\n", c.StatusLine, advice(c.StatusLine, settings, other))
 	for _, h := range []struct{ event, what string }{
 		{"Stop", "hook after each reply"},
 		{"UserPromptSubmit", "hook before each message"},
 	} {
 		s := c.Hooks[h.event]
-		fmt.Fprintf(w, "  %s (%s): %s%s\n", h.what, h.event, s, advice(s, "hook"))
+		fmt.Fprintf(w, "  %s (%s): %s%s\n", h.what, h.event, s, advice(s, settings, other))
+	}
+	if other {
+		hooksDone := true
+		for _, s := range c.Hooks {
+			hooksDone = hooksDone && s == live.Current
+		}
+		fmt.Fprintln(w, "Another program's status line is set, so 'trimloop setup --write' would refuse and write nothing.")
+		fmt.Fprint(w, otherStatusLineChoices(settings, exe, hooksDone))
+	}
+	if c.HooksOff {
+		fmt.Fprintln(w, "  hooks are turned off: this file sets \"disableAllHooks\": true, so Claude Code runs no")
+		fmt.Fprintln(w, "  hooks and no status line, trimloop's included; remove it to see the nudges")
 	}
 
 	path := history.LimitsPath(home, cfgDir)
@@ -57,13 +76,17 @@ func checkSetup(w io.Writer, settings, exe, home, cfgDir string) int {
 	return 0
 }
 
-// advice says what to do about a settings entry that is not up to date.
-func advice(s live.EntryState, what string) string {
-	switch s {
-	case live.Missing, live.Stale:
-		return "; run 'trimloop setup --write <settings file>' to fix it"
-	case live.Other:
-		return "; trimloop's " + what + " is not shown ('setup --write <file> --replace-statusline' replaces it)"
+// advice says what to do about a settings entry that is not up to date in
+// the settings file. When the file has another program's status line
+// (other), the choices are printed after the entries.
+func advice(s live.EntryState, settings string, other bool) string {
+	switch {
+	case s == live.Other:
+		return "; trimloop's status line is not shown (see the choices below)"
+	case s != live.Missing && s != live.Stale:
+		return ""
+	case other:
+		return "; see the choices below"
 	}
-	return ""
+	return "; to fix it, run: trimloop setup --write " + shellArg(settings)
 }

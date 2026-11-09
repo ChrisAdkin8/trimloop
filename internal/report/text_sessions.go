@@ -79,7 +79,11 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 		if b.Max == 0 {
 			label = "over " + short(b.Min)
 		}
-		fmt.Fprintf(w, "    %-16s %8s turns, %s each on average\n", label, thousands(b.Turns), dollars(b.MeanCost()))
+		priced := ""
+		if b.Priced < b.Turns {
+			priced = fmt.Sprintf(" (of the %s with a price)", thousands(b.Priced))
+		}
+		fmt.Fprintf(w, "    %-16s %8s %s, %s each on average%s\n", label, thousands(b.Turns), agree(b.Turns, "turn", "turns"), dollars(b.MeanCost()), priced)
 	}
 
 	fmt.Fprintf(w, "\n  %s (%d asked for)", count(g.Compactions, "compaction"), g.Manual)

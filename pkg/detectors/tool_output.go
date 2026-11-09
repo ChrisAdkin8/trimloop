@@ -25,7 +25,7 @@ type ToolOutput struct {
 	ByNoise []Group `json:"by_noise"` // by kind of noise; largest saving first
 
 	FileViews     int     `json:"file_views"`     // results that showed a file
-	Rereads       int     `json:"rereads"`        // views of a file already viewed, unchanged, in the session
+	Rereads       int     `json:"rereads"`        // views of the same part of a file already viewed, unchanged, in the session
 	RereadCarried float64 `json:"reread_carried"` // carried cost of those re-reads
 }
 
@@ -149,18 +149,39 @@ func addTo(g *Group, cc callCost, saving float64) {
 // never sent, cost nothing.
 func carry(s event.Session) []callCost {
 	var out []callCost
-	viewed := map[string]bool{} // files viewed, unchanged, since the last compaction
-	walkCarried(s, func() { viewed = map[string]bool{} },
+	// viewed holds, for each file viewed and unchanged since the last
+	// compaction, the parts of it viewed ("" is the whole file).
+	viewed := map[string]map[string]bool{}
+	walkCarried(s, func() { viewed = map[string]map[string]bool{} },
 		func(c event.ToolCall) (int, bool) { return c.Result.Tokens(), c.HasResult },
 		func(t event.Turn, c event.ToolCall, cost float64) func(float64) {
 			cc := callCost{call: c, carried: cost, at: t.Time}
 			switch {
 			case c.File == "":
 			case c.FileOp == event.FileView:
-				cc.reread = viewed[c.File]
-				viewed[c.File] = true
+				// A call that also writes files may have changed these
+				// before viewing them: its view is not counted as a re-read.
+				// A view of several files re-reads only if it shows nothing
+				// new: each of them was viewed already, the same part.
+				files := append([]string{c.File}, c.Also...)
+				cc.reread = len(c.Writes) == 0 && !c.WritesUnknown
+				for _, f := range files {
+					cc.reread = cc.reread && viewed[f][c.Part]
+				}
+				for _, f := range files {
+					if viewed[f] == nil {
+						viewed[f] = map[string]bool{}
+					}
+					viewed[f][c.Part] = true
+				}
 			case c.FileOp == event.FileEdit:
 				delete(viewed, c.File)
+			}
+			for _, w := range c.Writes {
+				delete(viewed, w)
+			}
+			if c.WritesUnknown {
+				clear(viewed)
 			}
 			out = append(out, cc)
 			k := len(out) - 1

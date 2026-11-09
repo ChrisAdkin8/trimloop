@@ -59,23 +59,39 @@ func ForSubAgents(f detectors.SubAgents, minSaving float64) (Recommendation, boo
 	}, true
 }
 
+// CompactionCounts are the sessions the compaction card names: main
+// sessions with a priced turn, the ones its replay can change.
+type CompactionCounts struct {
+	Threshold   int // the context size, in tokens, at which to compact
+	Over        int // sessions with a priced turn past Threshold
+	Limit       int // the size past which a session that never compacted is named
+	Uncompacted int // sessions with a priced turn past Limit and no compaction
+}
+
 // ForCompaction recommends compacting earlier when sessions grew past the
 // limit without compacting (P19's fix, with P10's records; ADR 0031), or
-// returns false if compacting would save less than minCost. threshold is the context
-// size, in tokens, at which to compact; likely and upTo come from
-// detectors.LikelyCompactionSaving, and after is the size it assumed.
-func ForCompaction(g detectors.Growth, threshold int, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
+// returns false if compacting would save less than minCost. likely and upTo
+// come from detectors.LikelyCompactionSaving, and after is the size it
+// assumed.
+func ForCompaction(c CompactionCounts, upTo, likely float64, after int, minCost float64) (Recommendation, bool) {
 	if upTo < minCost {
 		return Recommendation{}, false
 	}
+	threshold := c.Threshold
+	finding := fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
+		"%s passed %s tokens; Claude Code compacts on its own only near the limit.",
+		plural(c.Over, "session"), thousandsInt(threshold))
+	if c.Uncompacted > 0 {
+		finding += fmt.Sprintf(" %s went past %s tokens without compacting at all.", plural(c.Uncompacted, "session"), thousandsInt(c.Limit))
+	}
 	return Recommendation{
-		Pattern: "P19",
-		Title:   "Compact long sessions earlier",
-		Finding: fmt.Sprintf("Every turn sends the whole session again, so long sessions get dearer each turn. "+
-			"%d sessions passed %s tokens without compacting; Claude Code compacts on its own only near the limit.",
-			g.Uncompacted, thousandsInt(g.Limit)),
-		Saving: upTo,
-		Likely: likely,
+		Pattern:   "P19",
+		Title:     "Compact long sessions earlier",
+		Finding:   finding,
+		Saving:    upTo,
+		Likely:    likely,
+		Estimated: true,
+		Nothing:   nothingIf(likely, "replaying the logs, each compaction costs about what it saves"),
 		LikelyNote: fmt.Sprintf("Replays each main session as if compacted to %s tokens (what the first request "+
 			"after a compaction typically sends) whenever it passed %s, "+
 			"including the cost of each compaction, and assumes it then went on the same way. "+
@@ -106,8 +122,8 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, startCost, minS
 		return Recommendation{}, false
 	}
 	gap := spanText(p.MinGap)
-	finding := fmt.Sprintf("%d times, you carried on after more than %s away. The saved copy of the "+
-		"session (the cache) had expired, so the next turn paid to store all of it again.", p.Pauses-p.Unprompted, gap)
+	finding := fmt.Sprintf("%s, you carried on after more than %s away. The saved copy of the "+
+		"session (the cache) had expired, so the next turn paid to store all of it again.", plural(p.Pauses-p.Unprompted, "time"), gap)
 	if startCost > 0 {
 		finding += fmt.Sprintf(" Starting a new session instead costs about %s for its first turn.", cents(startCost))
 	}
@@ -124,6 +140,8 @@ func ForPauses(p detectors.LongPause, likely float64, fresh int, startCost, minS
 		Finding:    finding,
 		Saving:     saving,
 		Likely:     likely,
+		Estimated:  true,
+		Nothing:    nothingIf(likely, "the sessions picked up after a break were no larger than a new one"),
 		LikelyNote: fmt.Sprintf("As if each of those turns had started a new session of about %s tokens.", thousandsInt(fresh)),
 		Overlap:    "Shares money with the compaction fix: do not add them",
 		Primary: Fix{Advise,

@@ -83,10 +83,11 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 				unpriced[id] = true
 			}
 			ours[id] += t.Cost.Total()
-			g := oursModel[id][t.Model]
+			m := modelGroup(t.Model)
+			g := oursModel[id][m]
 			if g == nil {
-				g = &ModelGap{Model: t.Model}
-				oursModel[id][t.Model] = g
+				g = &ModelGap{Model: m}
+				oursModel[id][m] = g
 			}
 			g.Ours += t.Cost.Total()
 			g.OursUncached += t.Usage.InputUncached
@@ -158,6 +159,7 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 }
 
 func gapFor(m map[string]*ModelGap, model string) *ModelGap {
+	model = modelGroup(model)
 	g, ok := m[model]
 	if !ok {
 		g = &ModelGap{Model: model}

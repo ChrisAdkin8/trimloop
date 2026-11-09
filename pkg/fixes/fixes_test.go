@@ -1,12 +1,14 @@
 package fixes
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
+	"github.com/ChrisAdkin8/trimloop/pkg/price"
 )
 
 // TestLadders checks the ADR 0030 rules: one primary fix and at most two
@@ -84,12 +86,21 @@ func TestForSubAgents(t *testing.T) {
 }
 
 func TestForCompaction(t *testing.T) {
-	r, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 7, 3, 30_000, 1)
+	r, ok := ForCompaction(CompactionCounts{Threshold: 200_000, Over: 2, Limit: 500_000}, 7, 3, 30_000, 1)
 	if !ok || r.Saving != 7 || r.Likely != 3 || r.Expected() != 7 || r.Overlap == "" || !strings.Contains(r.Primary.What, "200,000") || !strings.Contains(r.Primary.How, "/compact") {
 		t.Errorf("got %+v ok=%v", r, ok)
 	}
-	if _, ok := ForCompaction(detectors.Growth{UncompactedCost: 10}, 200_000, 0.5, 0.2, 30_000, 1); ok {
+	if _, ok := ForCompaction(CompactionCounts{Threshold: 200_000, Over: 2, Limit: 500_000}, 0.5, 0.2, 30_000, 1); ok {
 		t.Error("a saving under the minimum should give no recommendation")
+	}
+	// The finding counts the sessions that passed where to compact, and
+	// names those that never compacted only when there are some.
+	if !strings.Contains(r.Finding, "2 sessions passed 200,000 tokens") || strings.Contains(r.Finding, "without compacting") {
+		t.Errorf("finding: %q", r.Finding)
+	}
+	r, _ = ForCompaction(CompactionCounts{Threshold: 200_000, Over: 3, Limit: 500_000, Uncompacted: 1}, 7, 3, 30_000, 1)
+	if !strings.Contains(r.Finding, "3 sessions passed 200,000 tokens") || !strings.Contains(r.Finding, "1 session went past 500,000 tokens without compacting") {
+		t.Errorf("finding: %q", r.Finding)
 	}
 	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1,000", 1234567: "1,234,567"} {
 		if got := thousandsInt(n); got != want {
@@ -103,6 +114,9 @@ func TestForPauses(t *testing.T) {
 	if !ok || r.Pattern != "P09" || r.Saving != 15 || r.Likely != 15 || !strings.Contains(r.LikelyNote, "30,000") ||
 		!strings.Contains(r.Finding, "3 times") || !strings.Contains(r.Finding, "Another long wait was") {
 		t.Errorf("got %+v ok=%v", r, ok)
+	}
+	if r, ok := ForPauses(detectors.LongPause{Pauses: 1, Saving: 15}, 15, 30_000, 0, 1); !ok || !strings.HasPrefix(r.Finding, "1 time, you carried on") {
+		t.Errorf("one break: got %q", r.Finding)
 	}
 	if _, ok := ForPauses(detectors.LongPause{Saving: 0.5}, 0, 0, 0, 1); ok {
 		t.Error("a saving under the minimum should give no recommendation")
@@ -237,5 +251,97 @@ func TestGapCards(t *testing.T) {
 	r, _ := ForPauses(detectors.LongPause{Pauses: 3, Saving: 50}, 0, 30_000, 0.06, 1)
 	if !strings.Contains(r.Finding, "about $0.06 for its first turn") {
 		t.Errorf("start cost: got %q", r.Finding)
+	}
+}
+
+// One model under plain and decorated ids is named once in the P13 and P14
+// cards: not "ran on Opus 5 and Opus 5".
+func TestModelCardsNameEachModelOnce(t *testing.T) {
+	u := event.Usage{CacheRead: 1_000_000, Output: 10_000}
+	turn := func(model, effort string) event.Turn {
+		c, _ := price.Cost(model, u, price.Options{})
+		return event.Turn{Model: model, Usage: u, Cost: c, Priced: true, Effort: effort}
+	}
+	cases := []struct {
+		name       string
+		ids        []string
+		card, want string
+	}{
+		{"opus plain and Vertex", []string{"claude-opus-5", "claude-opus-5@20260101"}, "Move to the newer model", "from Opus 5 to Opus 5.5"},
+		{"opus dated and Bedrock", []string{"claude-opus-5-20260101", "us.anthropic.claude-opus-5-v1:0", "claude-opus-5"}, "Move to the newer model", "from Opus 5 to Opus 5.5"},
+		{"fable Bedrock and plain", []string{"us.anthropic.claude-fable-5-1-v1:0", "claude-fable-5-1"}, "Use Opus 5.5 for routine main-session work", "ran on Fable 5.1."},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var turns, xhigh []event.Turn
+			for _, id := range c.ids {
+				turns = append(turns, turn(id, ""))
+				xhigh = append(xhigh, turn(id, "xhigh"))
+			}
+			recs := ForMainModels(detectors.FindMainModels([]event.Session{{ID: "m", Kind: event.MainSession, Turns: turns}}), 0.01)
+			var found bool
+			for _, r := range recs {
+				text := r.Finding + " " + r.Primary.What
+				if r.Title == c.card {
+					found = true
+					if strings.Count(text, c.want) != 1 {
+						t.Errorf("%s: want %q once, got %q", r.Title, c.want, text)
+					}
+				}
+				for _, name := range []string{"Opus 5", "Fable 5.1"} {
+					if strings.Contains(text, name+" and "+name+" ") || strings.Contains(text, name+" and "+name+".") || len(r.Examples) != 1 {
+						t.Errorf("%s: a name repeated: %q (examples %v)", r.Title, text, r.Examples)
+					}
+				}
+			}
+			if !found {
+				t.Errorf("no %q card in %+v", c.card, recs)
+			}
+
+			e := detectors.FindEffort([]event.Session{{ID: "e", Kind: event.MainSession, Turns: xhigh}})
+			r, _ := ForEffort(detectors.Effort{Saving: 2, Turns: 5, Usual: "medium", TopModels: e.TopModels}, 1)
+			if want := "turns ran on " + price.DisplayName(c.ids[0]) + ". "; !strings.Contains(r.Primary.How, want) {
+				t.Errorf("P14: want %q, got %q", want, r.Primary.How)
+			}
+		})
+	}
+}
+
+// Card findings read right for a count of one: "1 main-session turn",
+// "1 turn ran", never "1 turns" or "the other 1".
+func TestCardsCountsOfOne(t *testing.T) {
+	bad := regexp.MustCompile(`\b1 (turns|main-session turns|times|sessions)\b|other 1\b|Had 1 of them`)
+	var findings []string
+	models := detectors.MainModels{Newer: 5, NewerTurns: 1, LowerTier: 5, TierTurns: 1, ByModel: []detectors.ModelSpend{
+		{Model: "claude-opus-5", Newer: "claude-opus-5-5", NewerSave: 5},
+		{Model: "claude-fable-5-1", Tier: "claude-opus-5-5", TierSave: 5},
+	}}
+	for _, r := range ForMainModels(models, 1) {
+		findings = append(findings, r.Finding)
+	}
+	for _, e := range []detectors.Effort{
+		{Saving: 5, Turns: 1, Usual: "high"},
+		{Saving: 5, Turns: 3, Unmatched: 2, Usual: "high"},
+		{Saving: 5, Turns: 3, Unmatched: 1, Usual: "high"},
+	} {
+		r, ok := ForEffort(e, 1)
+		if !ok {
+			t.Fatalf("no effort card for %+v", e)
+		}
+		findings = append(findings, r.Finding)
+	}
+	if len(findings) != 5 {
+		t.Fatalf("got %d findings, want 5", len(findings))
+	}
+	for _, f := range findings {
+		if m := bad.FindAllString(f, -1); len(m) > 0 {
+			t.Errorf("%q says %q", f, m)
+		}
+	}
+	if !strings.HasPrefix(findings[2], "1 turn ran at the highest effort") || !strings.Contains(findings[2], "Had it ") {
+		t.Errorf("one turn: got %q", findings[2])
+	}
+	if !strings.Contains(findings[3], "Had one of them") || !strings.Contains(findings[3], "The other 2 ran") {
+		t.Errorf("one compared: got %q", findings[3])
 	}
 }

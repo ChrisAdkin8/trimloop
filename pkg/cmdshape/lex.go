@@ -113,7 +113,16 @@ func lex(s string) []token {
 				word.WriteByte(c) // part of a word such as ${x} or a{b,c}
 				continue
 			}
-			emit(";") // a subshell or group: treat as a command boundary
+			// A subshell or group is a command boundary. A subshell's own
+			// mark lets a cd inside it end with it (folders).
+			switch c {
+			case '(':
+				emit(";(")
+			case ')':
+				emit(";)")
+			default:
+				emit(";")
+			}
 		default:
 			word.WriteByte(c)
 			inWord = true

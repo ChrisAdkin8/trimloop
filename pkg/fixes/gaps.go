@@ -16,9 +16,9 @@ func ForModelSwitches(f detectors.ModelSwitches, minSaving float64) (Recommendat
 	return Recommendation{
 		Pattern: "P01",
 		Title:   "Pick the model when a session starts",
-		Finding: fmt.Sprintf("%d times, in %s, a session moved to another model part-way through. The saved copy "+
+		Finding: fmt.Sprintf("%s, in %s, a session moved to another model part-way through. The saved copy "+
 			"of the conversation (the cache) belongs to one model, so the first turn on the new one paid to save "+
-			"the whole conversation again.", f.Switches, plural(f.Sessions, "session")),
+			"the whole conversation again.", plural(f.Switches, "time"), plural(f.Sessions, "session")),
 		Saving: f.Saving,
 		Primary: Fix{Advise,
 			"Choose the model when you start a session, and keep it.",

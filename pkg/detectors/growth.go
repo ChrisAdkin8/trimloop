@@ -1,6 +1,8 @@
 package detectors
 
 import (
+	"cmp"
+	"slices"
 	"sort"
 	"time"
 
@@ -61,20 +63,23 @@ type ConversationStat struct {
 	Cost    float64 `json:"cost"`
 }
 
-// Band is the turns whose context falls in [Min, Max) tokens.
+// Band is the turns whose context falls in (Min, Max] tokens: more than
+// Min, up to and including Max (Max 0: no upper end).
 type Band struct {
-	Min   int     `json:"min"`
-	Max   int     `json:"max"` // 0 means no upper bound
-	Turns int     `json:"turns"`
-	Cost  float64 `json:"cost"`
+	Min    int     `json:"min"`
+	Max    int     `json:"max"`    // 0 means no upper bound
+	Turns  int     `json:"turns"`  // all turns, priced or not
+	Priced int     `json:"priced"` // those with a price
+	Cost   float64 `json:"cost"`
 }
 
-// MeanCost is the average cost of a turn in the band.
+// MeanCost is the average cost of a priced turn in the band: a turn on a
+// model with no price costs 0 here, which would pull the mean down.
 func (b Band) MeanCost() float64 {
-	if b.Turns == 0 {
+	if b.Priced == 0 {
 		return 0
 	}
-	return b.Cost / float64(b.Turns)
+	return b.Cost / float64(b.Priced)
 }
 
 // bandEdges are the context sizes, in tokens, that split turns into bands.
@@ -117,9 +122,12 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 			if t.Project != "" {
 				projects[id][t.Project] += t.Cost.Total()
 			}
-			b := &f.Bands[sort.SearchInts(bandEdges, ctx+1)]
+			b := &f.Bands[sort.SearchInts(bandEdges, ctx)] // exactly 200k is not over 200k
 			b.Turns++
 			b.Cost += t.Cost.Total()
+			if t.Priced {
+				b.Priced++
+			}
 			if t.CompactedBefore {
 				compacted = true
 				f.Compactions++
@@ -173,7 +181,9 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 	sortBy(all, func(c ConversationStat) (float64, string) { return c.Cost, c.ID })
 	f.Conversations = len(all)
 	if len(all) > 0 {
-		f.MedianCost = all[len(all)/2].Cost
+		// all is largest first: the median rule (the upper middle) counts
+		// from the other end.
+		f.MedianCost = all[(len(all)-1)/2].Cost
 	}
 	for _, n := range []int{1, 5, 10} {
 		if n > len(all) || f.Cost == 0 {
@@ -193,13 +203,15 @@ func FindGrowth(sessions []event.Session, limit, topN int) Growth {
 }
 
 // median returns the middle value of xs (the upper middle for an even
-// count), or 0 if xs is empty. It sorts a copy.
-func median(xs []int) int {
+// count), or 0 if xs is empty. It sorts a copy. Every median the findings
+// report uses this rule.
+func median[T cmp.Ordered](xs []T) T {
+	var zero T
 	if len(xs) == 0 {
-		return 0
+		return zero
 	}
-	s := append([]int(nil), xs...)
-	sort.Ints(s)
+	s := slices.Clone(xs)
+	slices.Sort(s)
 	return s[len(s)/2]
 }
 

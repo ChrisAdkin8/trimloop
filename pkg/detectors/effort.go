@@ -101,7 +101,8 @@ func FindEffort(sessions []event.Session) Effort {
 			if !t.Priced {
 				continue
 			}
-			k := key{t.Model, t.Effort}
+			m := modelGroup(t.Model)
+			k := key{m, t.Effort}
 			g := bm[k]
 			if g == nil {
 				g = &EffortLevel{Level: t.Effort}
@@ -115,10 +116,10 @@ func FindEffort(sessions []event.Session) Effort {
 				g.ThinkN++
 			}
 			if t.Effort == "high" {
-				if highSessions[t.Model] == nil {
-					highSessions[t.Model] = map[string]bool{}
+				if highSessions[m] == nil {
+					highSessions[m] = map[string]bool{}
 				}
-				highSessions[t.Model][s.ID] = true
+				highSessions[m][s.ID] = true
 			}
 		}
 	}

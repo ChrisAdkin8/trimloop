@@ -314,6 +314,36 @@ chart are published by their own jobs in the same workflow.
 Release notes list changed detectors, profiles and price-catalogue versions,
 because those change findings.
 
+### Cutting a release
+
+Pushing a version tag (`git tag v0.1.0 && git push origin v0.1.0`) runs
+[.github/workflows/release.yml](../.github/workflows/release.yml), which
+builds a draft GitHub release with [GoReleaser](../.goreleaser.yaml):
+archives for macOS and Linux, each for amd64 (Intel and AMD) and arm64
+(Apple silicon and other ARM), `.deb` and `.rpm` packages, signed
+checksums, a software bill of materials and build provenance. Check the
+draft, then publish it. With a `HOMEBREW_TAP_TOKEN` secret the release also
+updates the `ChrisAdkin8/homebrew-tap` cask, for
+`brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
+release dry run ([ci.yml](../.github/workflows/ci.yml)) on every push to
+`main` and every pull request. [ADR 0047](adr/0047-first-release-pure-go.md)
+has the detail.
+
+While the repository is private, releases skip the signature and
+provenance (both need it public, or a paid plan) and stay drafts.
+**Going public**, in this order
+([ADR 0051](adr/0051-private-releases-and-going-public.md),
+[ADR 0052](adr/0052-third-review-corrections.md)):
+
+1. Decide whether to tidy the git history: it goes public too.
+2. Make this repository public, and turn on private vulnerability
+   reporting (Settings → Code security), which the README's "Licence and
+   security" section points people to.
+3. Delete the v0.1.0 draft and its tag, then tag the current commit and
+   push the tag (re-running the old workflow would rebuild the old commit).
+4. Check that the new draft is signed, and publish it.
+5. Make the tap public.
+
 ### Pinned by hand
 
 Dependabot updates the GitHub Actions and Go modules. It cannot see the

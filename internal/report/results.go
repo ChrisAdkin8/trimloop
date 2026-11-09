@@ -129,6 +129,7 @@ type Settings struct {
 	TopFixes         int            // kinds of tool noise with fixes
 	MinFixSaving     float64        // dollars; smaller savings get no recommendation
 	CompactTo        int            // context after a compaction, when the logs show none
+	SummaryTo        int            // tokens a compaction's summary writes, when the logs show none
 	Titles           bool           // show session titles, which summarise conversations
 	Location         *time.Location // for week boundaries
 }
@@ -145,14 +146,17 @@ func DefaultSettings() Settings {
 		TopFixes:         4,
 		MinFixSaving:     1.0,
 		CompactTo:        80_000,
+		SummaryTo:        25_000, // the measured median is 22-29k (docs/log-signals.md section 8)
 		Titles:           true,
 		Location:         time.Local,
 	}
 }
 
-// Analyse runs every finding over sessions. read gives the log counts; the
-// session and turn counts are filled in here.
-func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Results {
+// Analyse runs every finding over sessions and returns the whole report.
+// read gives the log counts; the session and turn counts are filled in here.
+// local is what comes from outside the logs (the build, the plan, usage-limit
+// readings, how long logs are kept); the zero Local leaves those out.
+func Analyse(sessions []event.Session, read Read, local Local, s Settings, now time.Time) Results {
 	r := Results{Format: FormatVersion, Generated: now.UTC(), Prices: price.Version, Read: read}
 	r.Read.Sessions = len(sessions)
 	r.Read.Turns, r.Read.Unpriced = 0, 0
@@ -164,7 +168,6 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 			}
 		}
 	}
-	r.Limits = detectors.FindLimits(sessions, nil, minLimitSpend, minLimitRise) // AddLimits adds readings
 	r.Cost = detectors.TotalCost(sessions)
 	r.Total = r.Cost.Total()
 
@@ -184,17 +187,21 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 	if after == 0 {
 		after = s.CompactTo
 	}
-	if summary == 0 || summary > after {
-		summary = after
+	if summary == 0 {
+		summary = s.SummaryTo // not the whole size after: the summary is only part of it
 	}
+	summary = min(summary, after)
 	likely, upTo := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, after, summary)
-	if f, ok := fixes.ForCompaction(r.Growth, s.ContextThreshold, upTo, likely, after, s.MinFixSaving); ok {
+	if f, ok := fixes.ForCompaction(compactionCounts(sessions, s.ContextThreshold, s.UncompactedLimit),
+		upTo, likely, after, s.MinFixSaving); ok {
 		// The likely saving rests on the size after a compaction, measured
 		// on few compactions: show what its quartiles give.
 		if lo, hi := r.Growth.ResumeLow, r.Growth.ResumeHigh; lo > 0 && hi > lo {
 			high, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, lo, min(summary, lo))
 			low, _ := detectors.LikelyCompactionSaving(sessions, s.ContextThreshold, hi, min(summary, hi))
-			f.LikelyLow, f.LikelyHigh = min(low, likely), max(high, likely)
+			// The range is capped at "up to", which is the replay with every
+			// compaction free: at the low quartile the replay can pass it.
+			f.LikelyLow, f.LikelyHigh = min(low, likely), min(max(high, likely), upTo)
 			f.LikelyNote += fmt.Sprintf(" The size after a compaction varies (the middle half of %d measured "+
 				"runs from %s to %s tokens): at %s the likely saving is %s, at %s it is %s.",
 				r.Growth.Resumes, approx(lo), approx(hi), approx(lo), money(high), approx(hi), money(low))
@@ -255,10 +262,11 @@ func Analyse(sessions []event.Session, read Read, s Settings, now time.Time) Res
 		r.Actions = append(r.Actions, *r.SubAgentFix)
 	}
 	r.Actions = append(r.Actions, r.ToolFixes...)
-	sort.SliceStable(r.Actions, func(i, j int) bool { return r.Actions[i].Expected() > r.Actions[j].Expected() })
+	sortActions(&r)
 	r.Period = period(sessions, r.Total)
 	r.Labels = labels(sessions, r, s.Titles)
 	r.HideIDs = !s.Titles
+	addLocal(&r, sessions, local) // the limits, which need the period, and everything else from outside the logs
 	return r
 }
 
@@ -303,7 +311,7 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 	child := map[string]event.Session{} // a conversation's first sub-agent, for one whose main log is gone
 	for _, s := range sessions {
 		byID[s.ID] = s
-		if c, ok := child[s.ParentID]; s.ParentID != "" && (!ok || s.Start().Before(c.Start())) {
+		if c, ok := child[s.ParentID]; s.ParentID != "" && (!ok || earlier(s.Start(), c.Start())) {
 			child[s.ParentID] = s
 		}
 	}
@@ -332,6 +340,12 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 		out[id] = l
 	}
 	return out
+}
+
+// earlier reports whether a is before b, a time not known (zero) coming
+// after every known one.
+func earlier(a, b time.Time) bool {
+	return !a.IsZero() && (b.IsZero() || a.Before(b))
 }
 
 // Retention is how long Claude Code keeps session logs (ADR 0050): its
@@ -365,4 +379,45 @@ func RetentionTip(r Retention) string {
 	}
 	return fmt.Sprintf("Claude Code deletes session logs once they have gone unused for %d days (%s), so older work "+
 		`drops out of reports. Set "cleanupPeriodDays": 365 in Claude Code's settings to keep a year.`, r.Days, how)
+}
+
+// sortActions ranks the actions: largest "up to" first, except that a card
+// whose replay found it saves nothing goes after every other, as its upper
+// bound is no reason to do it first.
+func sortActions(r *Results) {
+	sort.SliceStable(r.Actions, func(i, j int) bool {
+		a, b := r.Actions[i], r.Actions[j]
+		if a.SavesNothing() != b.SavesNothing() {
+			return b.SavesNothing()
+		}
+		return a.Expected() > b.Expected()
+	})
+}
+
+// compactionCounts counts, for the compaction card, the main sessions with
+// a priced turn over threshold tokens of context, and those with a priced
+// turn over limit that never compacted: the sessions the card's replay can
+// change (detectors.LikelyCompactionSaving). The growth figures count every
+// session, sub-agents and unpriced turns included, so they can differ.
+func compactionCounts(sessions []event.Session, threshold, limit int) fixes.CompactionCounts {
+	c := fixes.CompactionCounts{Threshold: threshold, Limit: limit}
+	for _, s := range sessions {
+		if s.Kind != event.MainSession {
+			continue
+		}
+		peak, compacted := 0, len(s.Unreplied) > 0
+		for _, t := range s.Turns {
+			compacted = compacted || t.CompactedBefore
+			if t.Priced {
+				peak = max(peak, t.Context())
+			}
+		}
+		if peak > threshold {
+			c.Over++
+		}
+		if peak > limit && !compacted {
+			c.Uncompacted++
+		}
+	}
+	return c
 }

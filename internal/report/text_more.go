@@ -37,15 +37,17 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 			count(c.Unrecorded, "session")+agree(c.Unrecorded, " has", " have"), money(c.UnrecordedCost), pct(c.UnrecordedCost, all), agree(c.Unrecorded, "its total", "their totals"))
 	}
 	if c.Behind > 0 {
-		fmt.Fprintf(w, "  %s on after their record was written and %s left out.\n",
-			count(c.Behind, "session")+" went", agree(c.Behind, "is", "are"))
+		fmt.Fprintf(w, "  %s a record that does not cover all of %s (%s before the record's first run,\n"+
+			"  or went on after its last) and %s left out.\n",
+			count(c.Behind, "session")+agree(c.Behind, " has", " have"), agree(c.Behind, "it", "them"),
+			agree(c.Behind, "it began", "they began"), agree(c.Behind, "is", "are"))
 	}
 	if c.Sessions == 0 {
 		return
 	}
 	fmt.Fprintf(w, "\n    %-10s %-10s %-10s %s\n", "recorded", "in logs", "gap", "model")
 	for _, m := range c.ByModel {
-		fmt.Fprintf(w, "    %-10s %-10s %-10s %s\n", money(m.Harness), money(m.Ours), money(m.Gap), modelName(m.Model))
+		fmt.Fprintf(w, "    %-10s %-10s %-10s %s\n", money(m.Harness), money(m.Ours), money(m.Gap), printable(modelName(m.Model)))
 	}
 }
 

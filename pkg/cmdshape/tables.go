@@ -148,3 +148,36 @@ var builders = set("go", "npm", "pnpm", "yarn", "bun", "pytest", "jest", "vitest
 // dataDumpers print data from an API, a database or a cluster.
 var dataDumpers = set("curl", "wget", "http", "kubectl", "aws", "gcloud", "az",
 	"jq", "yq", "sqlite3", "duckdb", "psql", "mysql", "redis-cli", "mongosh", "printenv")
+
+// unnamedWriters may change files without naming them as a plain operand:
+// they move, copy, delete or unpack files, or apply a patch. A file viewed
+// before one of them may have changed, so a later view is not a re-read.
+var unnamedWriters = set("mv", "cp", "rm", "ln", "install", "rsync", "dd",
+	"truncate", "patch", "unzip", "tar", "rustfmt", "black", "isort", "autopep8")
+
+// writeFlag lists, for programs that change files only when asked, the
+// flags that ask: gofmt -w, prettier --write, eslint --fix.
+var writeFlag = map[string][]string{
+	"gofmt":        {"-w"},
+	"goimports":    {"-w"},
+	"gofumpt":      {"-w"},
+	"prettier":     {"-w", "--write"},
+	"eslint":       {"--fix"},
+	"biome":        {"--write", "--fix", "--apply"},
+	"ruff":         {"--fix", "format"}, // ruff format: a subcommand, matched as a word
+	"clang-format": {"-i"},
+}
+
+// writingSubs lists, for programs with subcommands, the subcommands that
+// change files in the working tree or the project's manifest and lock file.
+var writingSubs = map[string][]string{
+	"git":    {"checkout", "restore", "reset", "stash", "switch", "merge", "rebase", "pull", "cherry-pick", "apply", "am", "revert", "mv", "rm", "clean"},
+	"go":     {"fmt", "generate", "get", "mod"},
+	"cargo":  {"fmt", "add", "remove", "update", "fix"},
+	"npm":    {"install", "i", "add", "uninstall", "remove", "update"},
+	"pnpm":   {"install", "i", "add", "remove", "update"},
+	"yarn":   {"install", "add", "remove", "upgrade"},
+	"bun":    {"install", "i", "add", "remove", "update"},
+	"uv":     {"add", "remove", "lock"},
+	"poetry": {"add", "remove", "lock", "update"},
+}

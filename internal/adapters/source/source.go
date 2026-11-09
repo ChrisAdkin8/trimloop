@@ -51,6 +51,15 @@ type Log struct {
 	Harness string // Name of the Reader that found it
 	Path    string
 
+	// Session is the id the log's session is shown by; "" means the log's
+	// file name without its ending. Parent is, for a sub-agent's log, the id
+	// of the main session that started it, and "" for a main session's log.
+	// AgentType is a sub-agent's type as the harness recorded it beside the
+	// log; "" if unknown (lines may still name it). Discover sets all three.
+	Session   string
+	Parent    string
+	AgentType string
+
 	// Offset is the byte where reading starts, so a re-run reads only new
 	// lines. Read moves it past each complete line. Discover always sets it
 	// to 0: offsets are not saved between runs yet.
@@ -69,11 +78,12 @@ type Message struct {
 	// resumed or forked session copies earlier lines with their ids, so the
 	// caller counts injected text and compactions once per LineID.
 	LineID  string
-	Project string // name of the project folder the line was logged in; "" if not known
+	Project string // the project folder the line was logged in (a worktree's project); "" if not known
 
 	// KindTurn: a model response that carries usage.
 	ID        string // provider message id; usage is counted once per id
 	Model     string
+	Synthetic bool // a reply the harness made up itself (after an API error): activity, not a turn
 	Usage     event.Usage
 	Fast      bool             // fast mode, which changes the price
 	USOnly    bool             // US-only inference, which changes the price

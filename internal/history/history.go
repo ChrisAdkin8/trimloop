@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/ChrisAdkin8/trimloop/internal/safefile"
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 )
 
@@ -106,8 +107,9 @@ func decide(old detectors.Week, stored bool, w detectors.Week, partialUpTo strin
 	return fromLogs
 }
 
-// Save writes the history to path, creating its folder. It writes a new file
-// and renames it into place, so a crash cannot leave half a file.
+// Save writes the history to path, readable by the owner only, creating its
+// folder. The file is replaced whole or not at all (safefile), so a crash
+// cannot leave half a file.
 func Save(path string, f File) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
@@ -116,18 +118,5 @@ func Save(path string, f File) error {
 	if err != nil {
 		return err
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".history-*.json")
-	if err != nil {
-		return err
-	}
-	if _, err := tmp.Write(b); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return safefile.WriteBytes(path, 0o600, b)
 }

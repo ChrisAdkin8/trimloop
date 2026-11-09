@@ -1,0 +1,591 @@
+{
+ "compactions": {
+  "manual": 5,
+  "total": 8
+ },
+ "cost": {
+  "cache_read": 0.656885365,
+  "cache_write_1h": 14.37512,
+  "cache_write_5m": 1.249225,
+  "input_uncached": 0.0015346,
+  "output": 0.72269
+ },
+ "main_by_model": {
+  "claude-fable-5": {
+   "cost": 0.151669,
+   "turns": 1
+  },
+  "claude-fable-5-1": {
+   "cost": 9.507875875,
+   "turns": 10
+  },
+  "claude-haiku-4-5": {
+   "cost": 0.2814019,
+   "turns": 4
+  },
+  "claude-haiku-5-5": {
+   "cost": 0.1430666,
+   "turns": 4
+  },
+  "claude-opus-4-8": {
+   "cost": 0.5701355,
+   "turns": 5
+  },
+  "claude-opus-5": {
+   "cost": 0.5378925,
+   "turns": 2
+  },
+  "claude-opus-5-5": {
+   "cost": 4.5043674,
+   "turns": 21
+  },
+  "claude-sonnet-5": {
+   "cost": 0.4292796,
+   "turns": 10
+  },
+  "claude-sonnet-5-5": {
+   "cost": 0.3459765,
+   "turns": 10
+  }
+ },
+ "p19": {
+  "cost": 5.42629365,
+  "saving": 0.4232369,
+  "sessions": 4,
+  "turns": 6
+ },
+ "projects": {
+  "beta": {
+   "conversations": 2,
+   "cost": 0.8468635,
+   "sub_agent_cost": 0.0393561,
+   "turns": 14
+  },
+  "delta": {
+   "conversations": 1,
+   "cost": 0.12830815,
+   "sub_agent_cost": 0.12830815,
+   "turns": 4
+  },
+  "dev/alpha": {
+   "conversations": 2,
+   "cost": 13.625363275,
+   "sub_agent_cost": 0.1757892,
+   "turns": 28
+  },
+  "epsilon": {
+   "conversations": 2,
+   "cost": 0.3481734,
+   "sub_agent_cost": 0.0,
+   "turns": 6
+  },
+  "eta": {
+   "conversations": 1,
+   "cost": 0.3566644,
+   "sub_agent_cost": 0.0752625,
+   "turns": 7
+  },
+  "feat": {
+   "conversations": 1,
+   "cost": 0.009939,
+   "sub_agent_cost": 0.0,
+   "turns": 1
+  },
+  "gamma": {
+   "conversations": 1,
+   "cost": 0.0359999,
+   "sub_agent_cost": 0.0,
+   "turns": 2
+  },
+  "iota": {
+   "conversations": 1,
+   "cost": 0.0173174,
+   "sub_agent_cost": 0.0173174,
+   "turns": 1
+  },
+  "kappa": {
+   "conversations": 3,
+   "cost": 0.5719443,
+   "sub_agent_cost": 0.0,
+   "turns": 12
+  },
+  "sub": {
+   "conversations": 1,
+   "cost": 0.00089434,
+   "sub_agent_cost": 0.00089434,
+   "turns": 1
+  },
+  "theta": {
+   "conversations": 1,
+   "cost": 0.0362855,
+   "sub_agent_cost": 0.0362855,
+   "turns": 2
+  },
+  "tools": {
+   "conversations": 1,
+   "cost": 0.025958,
+   "sub_agent_cost": 0.0,
+   "turns": 1
+  },
+  "work/alpha": {
+   "conversations": 1,
+   "cost": 0.6895615,
+   "sub_agent_cost": 0.0,
+   "turns": 4
+  },
+  "zeta": {
+   "conversations": 2,
+   "cost": 0.3121823,
+   "sub_agent_cost": 0.0605769,
+   "turns": 7
+  }
+ },
+ "rates": {
+  "claude-fable-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 1,
+    "cache_write_1h": 20,
+    "cache_write_5m": 12.5,
+    "input": 10,
+    "output": 50
+   },
+   "us_only": 1.1
+  },
+  "claude-fable-5-1": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.25,
+    "cache_write_1h": 20,
+    "cache_write_5m": 12.5,
+    "input": 10,
+    "output": 50
+   },
+   "us_only": 1.1
+  },
+  "claude-haiku-4-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.1,
+    "cache_write_1h": 2,
+    "cache_write_5m": 1.25,
+    "input": 1,
+    "output": 5
+   },
+   "us_only": 0
+  },
+  "claude-haiku-4-5-20251001": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.1,
+    "cache_write_1h": 2,
+    "cache_write_5m": 1.25,
+    "input": 1,
+    "output": 5
+   },
+   "us_only": 0
+  },
+  "claude-haiku-5-5": {
+   "fast": 0,
+   "long": {
+    "cache_read": 0.05,
+    "cache_write_1h": 1,
+    "cache_write_5m": 0.625,
+    "input": 0.5,
+    "output": 2.5
+   },
+   "long_above": 100000,
+   "rates": {
+    "cache_read": 0.01,
+    "cache_write_1h": 0.2,
+    "cache_write_5m": 0.125,
+    "input": 0.1,
+    "output": 0.5
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-4-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 0
+  },
+  "claude-opus-4-6": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-4-7": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-4-8": {
+   "fast": 2,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-5": {
+   "fast": 2,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.5,
+    "cache_write_1h": 10,
+    "cache_write_5m": 6.25,
+    "input": 5,
+    "output": 25
+   },
+   "us_only": 1.1
+  },
+  "claude-opus-5-5": {
+   "fast": 2,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.2,
+    "cache_write_1h": 8,
+    "cache_write_5m": 5,
+    "input": 4,
+    "output": 20
+   },
+   "us_only": 1.1
+  },
+  "claude-sonnet-4-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.3,
+    "cache_write_1h": 6,
+    "cache_write_5m": 3.75,
+    "input": 3,
+    "output": 15
+   },
+   "us_only": 0
+  },
+  "claude-sonnet-4-6": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.3,
+    "cache_write_1h": 6,
+    "cache_write_5m": 3.75,
+    "input": 3,
+    "output": 15
+   },
+   "us_only": 1.1
+  },
+  "claude-sonnet-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.2,
+    "cache_write_1h": 4,
+    "cache_write_5m": 2.5,
+    "input": 2,
+    "output": 10
+   },
+   "us_only": 1.1
+  },
+  "claude-sonnet-5-5": {
+   "fast": 0,
+   "long": null,
+   "long_above": 0,
+   "rates": {
+    "cache_read": 0.1,
+    "cache_write_1h": 4,
+    "cache_write_5m": 2.5,
+    "input": 2,
+    "output": 10
+   },
+   "us_only": 1.1
+  }
+ },
+ "read": {
+  "bad_lines": 2,
+  "logs": 19,
+  "sessions": 18,
+  "turns": 90,
+  "unpriced": 2
+ },
+ "reconciliation": {
+  "behind": 2,
+  "behind_cost": 9.722921675,
+  "gap": 0.21995221,
+  "harness": 5.2,
+  "ours": 4.98004779,
+  "sessions": 4,
+  "unpriced": 1,
+  "unrecorded": 7,
+  "unrecorded_cost": 1.73235
+ },
+ "sessions": {
+  "alpha-1": {
+   "cost": 3.9416982,
+   "turns": 14
+  },
+  "alpha-1/agent-a1explore01": {
+   "cost": 0.1757892,
+   "turns": 4
+  },
+  "alpha-2": {
+   "cost": 9.507875875,
+   "turns": 10
+  },
+  "alpha-3": {
+   "cost": 0.2516054,
+   "turns": 4
+  },
+  "beta-1": {
+   "cost": 0.2993298,
+   "turns": 8
+  },
+  "beta-1/agent-b1plan01": {
+   "cost": 0.0393561,
+   "turns": 3
+  },
+  "beta-1/agent-b1research01": {
+   "cost": 0.12920249,
+   "turns": 5
+  },
+  "beta-2": {
+   "cost": 0.5701355,
+   "turns": 6
+  },
+  "epsilon-1": {
+   "cost": 0.1430666,
+   "turns": 4
+  },
+  "epsilon-2": {
+   "cost": 0.2150458,
+   "turns": 3
+  },
+  "eta-1": {
+   "cost": 0.2814019,
+   "turns": 4
+  },
+  "eta-1/agent-e1plan01": {
+   "cost": 0.0752625,
+   "turns": 3
+  },
+  "kappa-1": {
+   "cost": 0.1776742,
+   "turns": 6
+  },
+  "kappa-2": {
+   "cost": 0.3476234,
+   "turns": 4
+  },
+  "kappa-3": {
+   "cost": 0.0466467,
+   "turns": 2
+  },
+  "theta-1/agent-t1orphan01": {
+   "cost": 0.0536029,
+   "turns": 3
+  },
+  "work-alpha-1": {
+   "cost": 0.6895615,
+   "turns": 4
+  },
+  "zeta-1/agent-z1orphan01": {
+   "cost": 0.0605769,
+   "turns": 3
+  }
+ },
+ "sub_agents": {
+  "by_type": {
+   "Explore": {
+    "cost": 0.2293921,
+    "model": "claude-opus-5-5",
+    "runs": 2,
+    "turns": 7
+   },
+   "Plan": {
+    "cost": 0.1146186,
+    "model": "claude-haiku-4-5",
+    "runs": 2,
+    "turns": 6
+   },
+   "general-purpose": {
+    "cost": 0.12920249,
+    "model": "claude-haiku-5-5",
+    "runs": 1,
+    "turns": 5
+   },
+   "unknown": {
+    "cost": 0.0605769,
+    "model": "claude-sonnet-5-5",
+    "runs": 1,
+    "turns": 3
+   }
+  },
+  "cost": 0.53379009,
+  "runs": 6,
+  "turns": 21
+ },
+ "tokens": {
+  "cache_read": 3411289,
+  "cache_write_1h": 1074515,
+  "cache_write_5m": 984774,
+  "input_uncached": 521,
+  "output": 36550
+ },
+ "total": 17.005454965,
+ "zones": {
+  "America/Los_Angeles": {
+   "period": {
+    "days": 25,
+    "per_week": 4.76152739
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 2,
+     "spend": 1.51395019,
+     "turns": 34
+    },
+    "2026-10-26": {
+     "compactions": 2,
+     "spend": 0.4618032,
+     "turns": 10
+    },
+    "2026-11-02": {
+     "compactions": 2,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
+  },
+  "Asia/Kolkata": {
+   "period": {
+    "days": 25,
+    "per_week": 4.76152739
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 1,
+     "spend": 0.88533169,
+     "turns": 26
+    },
+    "2026-10-26": {
+     "compactions": 3,
+     "spend": 1.0904217,
+     "turns": 18
+    },
+    "2026-11-02": {
+     "compactions": 2,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
+  },
+  "Pacific/Auckland": {
+   "period": {
+    "days": 25,
+    "per_week": 4.76152739
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 1,
+     "spend": 0.76614049,
+     "turns": 22
+    },
+    "2026-10-26": {
+     "compactions": 2,
+     "spend": 1.0633017,
+     "turns": 20
+    },
+    "2026-11-02": {
+     "compactions": 3,
+     "spend": 1.5506495,
+     "turns": 20
+    }
+   }
+  },
+  "UTC": {
+   "period": {
+    "days": 25,
+    "per_week": 4.76152739
+   },
+   "weeks": {
+    "2026-10-12": {
+     "compactions": 2,
+     "spend": 13.625363275,
+     "turns": 28
+    },
+    "2026-10-19": {
+     "compactions": 2,
+     "spend": 1.32218269,
+     "turns": 32
+    },
+    "2026-10-26": {
+     "compactions": 2,
+     "spend": 0.6535707,
+     "turns": 12
+    },
+    "2026-11-02": {
+     "compactions": 2,
+     "spend": 1.4043383,
+     "turns": 18
+    }
+   }
+  }
+ }
+}

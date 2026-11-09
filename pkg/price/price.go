@@ -6,6 +6,8 @@
 package price
 
 import (
+	"maps"
+	"regexp"
 	"strings"
 
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
@@ -14,11 +16,12 @@ import (
 // Version identifies the catalogue. Every cost figure should record it.
 // Source: https://platform.claude.com/docs/en/about-claude/pricing, list
 // prices read on 2026-11-07 and checked again on 2026-11-08, when the
-// still-served 4.6-and-later models were added. Cache reads on Opus 5.5 and
+// still-served 4.6-and-later models were added, and on 2026-11-09, when
+// Opus 4.5 and Sonnet 4.5 were added. Cache reads on Opus 5.5 and
 // Sonnet 5.5 are 0.05x the input price and on Fable 5.1 0.025x (the page's
 // footnotes), not the usual 0.1x: Claude Code's own cost records price
 // Sonnet 5.5 reads at 0.1x, which shows up as reconciliation gap.
-const Version = "anthropic-list-2026-11-08"
+const Version = "anthropic-list-2026-11-09"
 
 // Rates are prices in US dollars per million tokens.
 type Rates struct {
@@ -65,9 +68,74 @@ var catalogue = map[string]Model{
 		Long:      Rates{0.50, 0.625, 1, 0.05, 2.50},
 		USOnly:    1.1,
 	},
-	"claude-haiku-4-5-20251001": {Rates: Rates{1, 1.25, 2, 0.10, 5}}, // before 4.6: no US-only surcharge
+	// Before 4.6: no US-only surcharge and no fast mode.
+	"claude-opus-4-5":           {Rates: Rates{5, 6.25, 10, 0.50, 25}},
+	"claude-sonnet-4-5":         {Rates: Rates{3, 3.75, 6, 0.30, 15}},
+	"claude-haiku-4-5-20251001": {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 	"claude-haiku-4-5":          {Rates: Rates{1, 1.25, 2, 0.10, 5}},
 }
+
+// Catalogue returns a copy of the catalogue, by model id, for checks that
+// compare it with another copy of the price list (the end-to-end test in
+// cmd/trimloop compares it with scripts/recount.py's). Changing the copy
+// changes nothing here.
+func Catalogue() map[string]Model {
+	return maps.Clone(catalogue)
+}
+
+// Key returns the catalogue key a model id resolves to, and false if the
+// catalogue holds no such model. An id the catalogue does not hold as written
+// is tried again without what cloud providers add around the model name:
+// "us.anthropic.claude-opus-5-5" and "anthropic.claude-opus-4-5-20251101-v1:0"
+// (Amazon Bedrock), "claude-opus-4-5@20251101" (Google Vertex AI), and a
+// date such as "claude-opus-4-5-20251101". A dated id the catalogue holds
+// (claude-haiku-4-5-20251001) is found before its date is removed. Nothing
+// else is guessed: an unknown model stays unpriced.
+func Key(model string) (string, bool) {
+	if _, ok := catalogue[model]; ok {
+		return model, true
+	}
+	id := model
+	for _, p := range []string{"us.", "eu.", "apac.", "global."} {
+		if rest, ok := strings.CutPrefix(id, p); ok {
+			id = rest
+			break
+		}
+	}
+	id = strings.TrimPrefix(id, "anthropic.")
+	id = bedrockVersion.ReplaceAllString(id, "")
+	if _, ok := catalogue[id]; ok {
+		return id, true
+	}
+	id = dateSuffix.ReplaceAllString(id, "")
+	if _, ok := catalogue[id]; ok {
+		return id, true
+	}
+	return "", false
+}
+
+// key is Key, falling back to the id as written when the catalogue does not
+// hold the model.
+func key(model string) string {
+	if k, ok := Key(model); ok {
+		return k
+	}
+	return model
+}
+
+// lookup finds a model's prices through Key.
+func lookup(model string) (Model, bool) {
+	k, ok := Key(model)
+	if !ok {
+		return Model{}, false
+	}
+	return catalogue[k], true
+}
+
+var (
+	bedrockVersion = regexp.MustCompile(`-v[0-9]+:[0-9]+$`) // "-v1:0"
+	dateSuffix     = regexp.MustCompile(`[-@][0-9]{8}$`)    // "-20251101" or Vertex's "@20251101"
+)
 
 // Options are the request settings that change the price.
 type Options struct {
@@ -82,7 +150,7 @@ func Cost(model string, u event.Usage, o Options) (c event.Cost, ok bool) {
 	if u.InputTotal() == 0 && u.Output == 0 {
 		return event.Cost{}, true
 	}
-	m, found := catalogue[model]
+	m, found := lookup(model)
 	if !found {
 		return event.Cost{}, false
 	}
@@ -125,9 +193,9 @@ var cheaper = map[string]string{
 }
 
 // Cheaper returns the model to suggest in place of model, and false if there
-// is none.
+// is none. A provider or dated id is read as the model it names (Key).
 func Cheaper(model string) (string, bool) {
-	m, ok := cheaper[model]
+	m, ok := cheaper[key(model)]
 	return m, ok
 }
 
@@ -143,9 +211,10 @@ var successor = map[string]string{
 }
 
 // Successor returns the newer model to suggest in place of model, and false
-// if there is none.
+// if there is none. A provider or dated id is read as the model it names
+// (Key).
 func Successor(model string) (string, bool) {
-	m, ok := successor[model]
+	m, ok := successor[key(model)]
 	return m, ok
 }
 
@@ -156,22 +225,25 @@ var lowerTier = map[string]string{
 }
 
 // LowerTier returns the model one tier down from model for main sessions, and
-// false if there is none.
+// false if there is none. A provider or dated id is read as the model it
+// names (Key).
 func LowerTier(model string) (string, bool) {
-	m, ok := lowerTier[model]
+	m, ok := lowerTier[key(model)]
 	return m, ok
 }
 
 // DisplayName is a model's name as people write it: "claude-opus-5-5"
-// becomes "Opus 5.5", "claude-haiku-4-5-20251001" becomes "Haiku 4.5". Names
-// it does not recognise are returned unchanged.
+// becomes "Opus 5.5", "claude-haiku-4-5-20251001" becomes "Haiku 4.5". A
+// provider or dated id the catalogue holds is named as the model it resolves
+// to (Key): "us.anthropic.claude-opus-5-5-v1:0" is "Opus 5.5" too. Names it
+// does not recognise are returned unchanged.
 func DisplayName(model string) string {
-	rest, ok := strings.CutPrefix(model, "claude-")
+	rest, ok := strings.CutPrefix(key(model), "claude-")
 	if !ok {
 		return model
 	}
 	parts := strings.Split(rest, "-")
-	if len(parts) < 2 {
+	if len(parts) < 2 || parts[0] == "" { // "claude--5": no family to name
 		return model
 	}
 	var version []string

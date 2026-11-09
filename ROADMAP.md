@@ -50,7 +50,9 @@ Each item is tagged **Done**, **Partly** or **Not built** for the prototype.
   claims against fixtures, golden events — so the M0 profiles pass it before
   being enabled.
 - **Partly.** Fixtures: synthetic sessions in the repository
-  (`testdata/sessions`) and detector unit tests are done; a private,
+  (`testdata/sessions`), detector unit tests, and an end-to-end check of
+  the report's figures against an independent recount on made-up logs
+  (`testdata/golden`, `scripts/recount.py`) are done; a private,
   access-controlled store of real (redacted) sessions, never committed, is
   not.
 - **Done.** Local files protected by file permissions (mode 0600);
@@ -108,7 +110,10 @@ Done:
   retention ([ADR 0050](docs/adr/0050-second-gap-analysis-findings.md));
   unused desktop-app tools filed as P06, and requests refused before any
   work kept out of P12's re-sent cost
-  ([ADR 0052](docs/adr/0052-third-review-corrections.md)).
+  ([ADR 0052](docs/adr/0052-third-review-corrections.md));
+- projects credited by conversation, a card that saves nothing ranked last,
+  and re-reads counted by the part of a file viewed
+  ([ADR 0053](docs/adr/0053-projects-by-conversation-and-ranking.md)).
 
 To do:
 

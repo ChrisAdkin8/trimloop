@@ -1,6 +1,6 @@
 # ADR 0031: Re-rank M0 from measured spend; sub-agent model fit in M0
 
-- Status: Accepted — mostly built (items 1–4, 6, 9 and 10; item 5 without auxiliary turns, item 7 without saved offsets, item 8 without filters; item 11 on to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md)
+- Status: Accepted — mostly built (items 1–4, 6, 9 and 10; item 5 without auxiliary turns, item 7 without saved offsets, item 8 without filters; item 11 on to do); amended by [ADR 0035](0035-measurement-corrections.md) and [ADR 0036](0036-prices-reconciliation-status.md), and by [ADR 0042](0042-p02-p14-and-main-session-models.md); method summarised and amended by [ADR 0045](0045-m0-measurement-method.md); decision 3 (attribution by project) amended by [ADR 0053](0053-projects-by-conversation-and-ranking.md)
 - Date: 2026-11-07
 - Amends: [ADR 0029](0029-m0-build-order-by-user-value.md) (M0 build order), [patterns.md](../patterns.md) (P13, P14 milestones)
 

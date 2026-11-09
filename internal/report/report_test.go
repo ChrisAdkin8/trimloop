@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestDuration(t *testing.T) {
 
 func TestReportRuns(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteText(&buf, Analyse(nil, Read{Logs: 1}, DefaultSettings(), t0)); err != nil {
+	if err := WriteText(&buf, Analyse(nil, Read{Logs: 1}, Local{}, DefaultSettings(), t0)); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"COST BY TOKEN CLASS", "WHERE THE SPEND WENT", "P19 ", "P10)", "P09 ", "P04 ", "P13 "} {
@@ -55,7 +56,7 @@ type failingWriter struct{}
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
 
 func TestReportReturnsWriteError(t *testing.T) {
-	err := WriteText(failingWriter{}, Analyse(nil, Read{Logs: 1}, DefaultSettings(), t0))
+	err := WriteText(failingWriter{}, Analyse(nil, Read{Logs: 1}, Local{}, DefaultSettings(), t0))
 	if err == nil {
 		t.Fatal("got no error from a writer that always fails")
 	}
@@ -90,7 +91,7 @@ func sample() []event.Session {
 }
 
 func TestJSON(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 2}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 2}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteJSON(&buf, r); err != nil {
 		t.Fatal(err)
@@ -111,7 +112,7 @@ func TestJSON(t *testing.T) {
 }
 
 func TestAnalyseOrdersActions(t *testing.T) {
-	r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0)
 	if r.Read.Sessions != 2 || r.Read.Turns != 3 {
 		t.Errorf("read: got %+v", r.Read)
 	}
@@ -123,7 +124,7 @@ func TestAnalyseOrdersActions(t *testing.T) {
 }
 
 func TestHTML(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 2}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 2}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteHTML(&buf, r); err != nil {
 		t.Fatal(err)
@@ -148,7 +149,7 @@ func TestHTML(t *testing.T) {
 
 func TestHTMLWithNoSessions(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteHTML(&buf, Analyse(nil, Read{}, DefaultSettings(), t0)); err != nil {
+	if err := WriteHTML(&buf, Analyse(nil, Read{}, Local{}, DefaultSettings(), t0)); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), "Nothing found was worth changing") {
@@ -157,7 +158,7 @@ func TestHTMLWithNoSessions(t *testing.T) {
 }
 
 func TestSummary(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 2}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 2}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteSummary(&buf, r, "out.html", 1); err != nil {
 		t.Fatal(err)
@@ -201,13 +202,13 @@ func TestNames(t *testing.T) {
 func TestLabels(t *testing.T) {
 	sessions := sample()
 	sessions[0].Title = "Fix the scoring"
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	if l := r.Labels["m1"]; l.Title != "Fix the scoring" || l.SubAgent {
 		t.Errorf("main: got %+v", l)
 	}
 	settings := DefaultSettings()
 	settings.Titles = false
-	if l := Analyse(sessions, Read{}, settings, t0).Labels["m1"]; l.Title != "" {
+	if l := Analyse(sessions, Read{}, Local{}, settings, t0).Labels["m1"]; l.Title != "" {
 		t.Errorf("titles off: got %+v", l)
 	}
 	var buf bytes.Buffer
@@ -221,7 +222,7 @@ func TestLabels(t *testing.T) {
 
 func TestPeriod(t *testing.T) {
 	s := []event.Session{{Turns: []event.Turn{{Time: t0, Cost: event.Cost{Output: 7}}, {Time: t0.Add(13 * 24 * time.Hour)}}}}
-	p := Analyse(s, Read{}, DefaultSettings(), t0).Period
+	p := Analyse(s, Read{}, Local{}, DefaultSettings(), t0).Period
 	if p.Days != 14 || !p.From.Equal(t0) || p.PerWeek != 3.5 {
 		t.Errorf("got %+v, want 14 days at $3.50 a week", p)
 	}
@@ -229,7 +230,7 @@ func TestPeriod(t *testing.T) {
 
 func TestSummaryWithoutFile(t *testing.T) {
 	var buf bytes.Buffer
-	if err := WriteSummary(&buf, Analyse(sample(), Read{}, DefaultSettings(), t0), "", 3); err != nil {
+	if err := WriteSummary(&buf, Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0), "", 3); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), "--format html") {
@@ -249,7 +250,7 @@ func TestTextHasNewSections(t *testing.T) {
 	sessions := sample()
 	sessions[0].Harness = &event.HarnessRecord{Cost: 105, ByModel: map[string]event.ModelRecord{"claude-opus-5-5": {Cost: 105}}}
 	sessions[0].Turns[0].Time = t0
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	var buf bytes.Buffer
 	if err := WriteText(&buf, r); err != nil {
 		t.Fatal(err)
@@ -282,12 +283,52 @@ func TestContextName(t *testing.T) {
 	}
 }
 
+// The web page's headline share of large turns is the text report's P19
+// figure and the weekly table's: input only, and only turns strictly over
+// the threshold.
+func TestLargeShareMatchesP19(t *testing.T) {
+	turn := func(ctx int, output float64) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Time: t0, Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: float64(ctx) / 1e6, Output: output}, Priced: true}
+	}
+	s := []event.Session{{ID: "m", Kind: "main", Turns: []event.Turn{
+		turn(10_000, 0), turn(300_000, 4), turn(300_000, 4), turn(200_000, 0)}}}
+	r := Analyse(s, Read{}, Local{}, DefaultSettings(), t0)
+	v := newSummary(r)
+	if want := pct(0.6, r.Total); !near(v.LargeSpendShare, want) || !near(v.LargeTurnShare, 50) {
+		t.Errorf("got %v%% of spend, %v%% of turns; want %v%%, 50%%", v.LargeSpendShare, v.LargeTurnShare, want)
+	}
+	var large float64
+	for _, w := range r.Weeks {
+		large += w.LargeContext
+	}
+	if !near(large, r.Context.Cost) {
+		t.Errorf("weekly large-turn cost %v, P19 %v", large, r.Context.Cost)
+	}
+}
+
+// The headline's share of large turns counts the same turns as the bars,
+// priced or not.
+func TestLargeTurnShareCountsAllTurns(t *testing.T) {
+	small := event.Turn{Model: "claude-opus-5-5", Time: t0, Usage: event.Usage{CacheRead: 10_000}, Cost: event.Cost{CacheRead: 0.01}, Priced: true}
+	large := event.Turn{Model: "mystery", Time: t0, Usage: event.Usage{CacheRead: 300_000}}
+	s := []event.Session{{ID: "m", Kind: "main", Turns: []event.Turn{small, small, large, large}}}
+	v := newSummary(Analyse(s, Read{}, Local{}, DefaultSettings(), t0))
+	bars := 0.0
+	for _, b := range v.Bands[2:] {
+		bars += b.TurnShare
+	}
+	if !near(v.LargeTurnShare, 50) || !near(bars, 50) {
+		t.Errorf("headline %v%% of turns, bars %v%%; want 50%% both", v.LargeTurnShare, bars)
+	}
+}
+
 // The summary at the top shows spend against turns by conversation size, and
 // what filled the conversation.
 func TestHTMLSummary(t *testing.T) {
-	r := Analyse(sample(), Read{}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0)
 	v := newSummary(r)
-	if len(v.Bands) != 4 || v.Bands[0].Label != "Under 50k" || v.Bands[3].Label != "Over 500k" {
+	if len(v.Bands) != 4 || v.Bands[0].Label != "Up to 50k" || v.Bands[3].Label != "Over 500k" {
 		t.Fatalf("bands: got %+v", v.Bands)
 	}
 	// sample(): 300k ($40), 600k ($60), 10k ($10) turns; total $110.
@@ -311,7 +352,7 @@ func TestHTMLSummary(t *testing.T) {
 	if strings.Contains(buf.String(), "ZgotmplZ") {
 		t.Error("the template blanked a value it considered unsafe")
 	}
-	for _, want := range []string{"91% of your spend came from turns over 200k tokens", "paid to send the session to Claude",
+	for _, want := range []string{"91% of your spend went on sending turns over 200k tokens", "paid to send the session to Claude",
 		"Tool output", `class="size4"`, `class="kind2"`} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("page has no %q", want)
@@ -338,8 +379,27 @@ func TestReconcileSectionGivesReasons(t *testing.T) {
 	var b strings.Builder
 	reconcileSection(&b, detectors.Reconciliation{Unpriced: 1, Behind: 2}, 10)
 	out := b.String()
-	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") || !strings.Contains(out, "2 sessions went on") {
+	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") ||
+		!strings.Contains(out, "2 sessions have a record that does not cover all of them (they began") {
 		t.Errorf("got %q", out)
+	}
+	b.Reset()
+	reconcileSection(&b, detectors.Reconciliation{Behind: 1}, 10)
+	if out := b.String(); !strings.Contains(out, "1 session has a record that does not cover all of it (it began") {
+		t.Errorf("one session: got %q", out)
+	}
+	// The web page says the same, in the singular and the plural.
+	for n, want := range map[int]string{1: "1 session has a record that does not cover all of it (it began",
+		2: "2 sessions have a record that does not cover all of them (they began"} {
+		r := Analyse(sample(), Read{}, Local{}, DefaultSettings(), t0)
+		r.Reconciliation.Sessions, r.Reconciliation.Behind = 1, n
+		var page bytes.Buffer
+		if err := WriteHTML(&page, r); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(page.String(), want) {
+			t.Errorf("web page with %d left out has no %q", n, want)
+		}
 	}
 }
 
@@ -385,7 +445,7 @@ func TestCompactionLikelyRange(t *testing.T) {
 	}
 	sessions = append(sessions, event.Session{ID: "long", Kind: "main", Turns: long})
 
-	r := Analyse(sessions, Read{}, DefaultSettings(), t0)
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
 	f := r.CompactFix
 	if f == nil {
 		t.Fatal("no compaction card")
@@ -400,6 +460,56 @@ func TestCompactionLikelyRange(t *testing.T) {
 	// The smaller size pairs with the larger saving.
 	if want := "at 60k the likely saving is " + money(f.LikelyHigh); !strings.Contains(f.LikelyNote, want) {
 		t.Errorf("note %q has no %q", f.LikelyNote, want)
+	}
+	if !f.Estimated || f.LikelyHigh > f.Saving {
+		t.Errorf("got estimated=%v, high %v above up to %v", f.Estimated, f.LikelyHigh, f.Saving)
+	}
+}
+
+// The likely range never passes "up to", even when the replay at the low
+// quartile of the size after a compaction would.
+func TestCompactionLikelyRangeCapped(t *testing.T) {
+	turn := func(ctx int) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: true}
+	}
+	var sessions []event.Session
+	for i, after := range []int{20_000, 40_000, 60_000, 80_000} {
+		resumed := turn(after)
+		resumed.CompactedBefore = true
+		resumed.Compaction = event.Compaction{Before: 400_000, After: 10_000}
+		sessions = append(sessions, event.Session{ID: fmt.Sprint("c", i), Kind: "main",
+			Turns: []event.Turn{turn(390_000), resumed}})
+	}
+	long := []event.Turn{turn(199_000)}
+	for range 600 {
+		long = append(long, turn(201_000))
+	}
+	sessions = append(sessions, event.Session{ID: "long", Kind: "main", Turns: long})
+
+	f := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0).CompactFix
+	if f == nil {
+		t.Fatal("no compaction card")
+	}
+	if f.LikelyHigh > f.Saving || f.Likely > f.Saving {
+		t.Errorf("likely %v (%v–%v) passes up to %v", f.Likely, f.LikelyLow, f.LikelyHigh, f.Saving)
+	}
+}
+
+// With no compaction in the logs, the summary request is priced at the
+// measured typical summary, not at the whole size after a compaction.
+func TestCompactionSummaryWhenNoneMeasured(t *testing.T) {
+	var long []event.Turn
+	for ctx := 100_000; ctx <= 900_000; ctx += 50_000 {
+		long = append(long, event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: true})
+	}
+	sessions := []event.Session{{ID: "long", Kind: "main", Turns: long}}
+	whole := DefaultSettings()
+	whole.SummaryTo = whole.CompactTo // the old assumption: the summary is the whole 80k
+	a, b := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0).CompactFix, Analyse(sessions, Read{}, Local{}, whole, t0).CompactFix
+	if a == nil || b == nil || a.Likely <= b.Likely {
+		t.Errorf("likely with a typical summary %+v should exceed likely with an 80k summary %+v", a, b)
 	}
 }
 
@@ -422,7 +532,7 @@ func TestOlderReason(t *testing.T) {
 }
 
 func TestTextShowsGapSections(t *testing.T) {
-	r := Analyse(sample(), Read{Logs: 1}, DefaultSettings(), t0)
+	r := Analyse(sample(), Read{Logs: 1}, Local{}, DefaultSettings(), t0)
 	r.Retention = Retention{Days: 30}
 	r.Failures = detectors.Failures{Sleep: 4, Resent: 2}
 	var out bytes.Buffer
@@ -467,7 +577,7 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 	for _, titles := range []bool{true, false} {
 		s := DefaultSettings()
 		s.Titles = titles
-		r := Analyse(sample(), Read{Logs: 1}, s, t0)
+		r := Analyse(sample(), Read{Logs: 1}, Local{}, s, t0)
 		const id = "1a59c906-04da-521d-bda7-7f71b9f9e01c"
 		r.Attribution.ByMCPServer = []detectors.Spend{{Name: id, Cost: 3, Turns: 1}}
 		// Every other place a connector's name reaches the page or the text.
@@ -489,6 +599,15 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 			t.Fatalf("titles %v: %v", titles, err)
 		}
 		page := out.String()
+		// The footer says what the page shows.
+		for footer, want := range map[string]bool{
+			"It shows project names and session titles": titles,
+			"session titles and ids are left out":       !titles,
+		} {
+			if strings.Contains(page, footer) != want {
+				t.Errorf("titles %v: footer %q shown %v, want %v", titles, footer, !want, want)
+			}
+		}
 		hasID := strings.Contains(page, "1a59c906") || strings.Contains(page, `title="Session m1"`)
 		if hasID == !titles || !strings.Contains(page, "unnamed connector") || !strings.Contains(page, "</html>") {
 			t.Errorf("titles %v: ids shown %v; page ends %q", titles, hasID, page[len(page)-40:])
@@ -499,5 +618,97 @@ func TestHTMLHidesIDsUnderNoTitles(t *testing.T) {
 				t.Errorf("titles %v: the %s shows the connector's id", titles, name)
 			}
 		}
+	}
+}
+
+// The compaction card's two counts are of the same sessions: main sessions
+// with a priced turn, the ones its replay changes. A sub-agent or an
+// unpriced turn past 500k is left out of both, though the growth figures
+// count it.
+func TestCompactionCardCountsMainPricedSessions(t *testing.T) {
+	turn := func(ctx int, priced bool) event.Turn {
+		return event.Turn{Model: "claude-opus-5-5", Usage: event.Usage{CacheRead: ctx},
+			Cost: event.Cost{CacheRead: 5 * float64(ctx) / 1e6}, Priced: priced}
+	}
+	grow := func(top int, priced bool) []event.Turn {
+		var ts []event.Turn
+		for ctx := 100_000; ctx <= top; ctx += 50_000 {
+			ts = append(ts, turn(ctx, priced))
+		}
+		return ts
+	}
+	compacted := grow(600_000, true)
+	compacted[5] = turn(50_000, true) // the first request after a compaction
+	compacted[5].CompactedBefore = true
+	compacted[5].Compaction = event.Compaction{Before: 350_000, After: 20_000}
+	sessions := []event.Session{
+		{ID: "long", Kind: event.MainSession, Turns: grow(900_000, true)},           // over both
+		{ID: "mid", Kind: event.MainSession, Turns: grow(300_000, true)},            // over 200k only
+		{ID: "done", Kind: event.MainSession, Turns: compacted},                     // compacted
+		{ID: "long/agent", Kind: event.SubAgentSession, Turns: grow(900_000, true)}, // a sub-agent
+		{ID: "unpriced", Kind: event.MainSession, Turns: grow(900_000, false)},      // no price
+	}
+	r := Analyse(sessions, Read{}, Local{}, DefaultSettings(), t0)
+	if r.CompactFix == nil {
+		t.Fatal("no compaction card")
+	}
+	got := r.CompactFix.Finding
+	for _, want := range []string{"3 sessions passed 200,000 tokens", "1 session went past 500,000 tokens without compacting"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("finding %q has no %q", got, want)
+		}
+	}
+	if r.Growth.Uncompacted != 3 {
+		t.Errorf("growth: got %d never compacted, want 3 (every session)", r.Growth.Uncompacted)
+	}
+}
+
+// A conversation whose main log is gone is named after its first sub-agent
+// with a time; one with no time never counts as first.
+func TestLabelsFirstSubAgentHasATime(t *testing.T) {
+	timed := sample()[0]
+	timed.ID, timed.Kind, timed.ParentID, timed.Project = "gone/a", event.SubAgentSession, "gone", "api"
+	timed.Turns = append([]event.Turn(nil), timed.Turns...)
+	for i := range timed.Turns {
+		timed.Turns[i].Time = t0.Add(time.Duration(i) * time.Minute)
+	}
+	untimed := timed
+	untimed.ID, untimed.Project = "gone/b", "web"
+	untimed.Turns = append([]event.Turn(nil), timed.Turns...)
+	for i := range untimed.Turns {
+		untimed.Turns[i].Time = time.Time{}
+	}
+	for _, order := range [][]event.Session{{untimed, timed}, {timed, untimed}} {
+		r := Results{Growth: detectors.Growth{Top: []detectors.ConversationStat{{ID: "gone"}}}}
+		if l := labels(order, r, true)["gone"]; l.Project != "api" || l.Start.IsZero() {
+			t.Errorf("got %+v, want the timed sub-agent's project and start", l)
+		}
+	}
+}
+
+// Counts of one read as one in both formats: "1 time", "1 session", never
+// "1 times" or "1 was a breaks".
+func TestCountsOfOne(t *testing.T) {
+	r := Analyse(sample(), Read{Logs: 1}, Local{}, DefaultSettings(), t0)
+	r.Pause.Pauses, r.Pause.Sessions, r.Pause.Saving, r.Pause.Cost = 1, 1, 1, 1
+	r.Growth.Compactions, r.CacheLife.Waits, r.Switches.Switches = 1, 1, 1
+	r.Reconciliation.Sessions, r.SubAgents.Runs, r.Period.Days, r.Read.Unpriced = 1, 1, 1, 1
+	r.Reconciliation.Unrecorded, r.Reconciliation.Unpriced, r.Reconciliation.WebSearches = 1, 1, 1
+	r.Read.Failed, r.Read.BadLines, r.Tools.Calls, r.Tools.Persisted = 1, 1, 1, 1
+	bad := regexp.MustCompile(`\b1 (times|sessions|days|turns|runs|logs|lines|results|tool results|switches|web searches)\b|was a breaks|search[s]\b`) // the last: "search" with a plain s added
+	var text, page bytes.Buffer
+	if err := WriteText(&text, r); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteHTML(&page, r); err != nil {
+		t.Fatal(err)
+	}
+	for name, out := range map[string]string{"text": text.String(), "page": page.String()} {
+		if m := bad.FindAllString(out, -1); len(m) > 0 {
+			t.Errorf("%s says %q", name, m)
+		}
+	}
+	if !strings.Contains(text.String(), "1 time, work carried on") || !strings.Contains(page.String(), "1 time in 1 session, work carried on") {
+		t.Error("the long-break sentences do not say 1 time")
 	}
 }

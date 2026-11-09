@@ -49,5 +49,5 @@ bootstrap script that installed the newest Go, uv and Node.js on Linux.
 
 - v0.1.0 must not be published as it stands; it is rebuilt after going
   public.
-- Going public takes a few manual steps, listed above and in the README.
+- Going public takes a few manual steps, listed above and in docs/packaging.md (§10, "Cutting a release").
 - A Dependabot pull request needs a review like any other.
