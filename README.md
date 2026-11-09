@@ -148,9 +148,9 @@ trimloop --format json --out ~/trimloop.json   # every figure, for scripts
 It reads the logs in `~/.claude/projects` (or in `projects` under
 `CLAUDE_CONFIG_DIR`, if you set that) and sends nothing anywhere. The
 web page is saved as `trimloop-report.html` in the current folder;
-`--out` puts it elsewhere (`--out -` prints it instead). Writing replaces
-the file; a link at that path is replaced, not followed. `trimloop help`
-lists every option (`trimloop setup --help` lists setup's).
+`--out` puts it elsewhere (`--out -` prints it instead), replacing any
+file already there. `trimloop help` lists every option (`trimloop setup
+--help` lists setup's).
 
 ### Did a change work?
 
@@ -158,7 +158,7 @@ Add `--since` with the day you made the change:
 
 ```bash
 trimloop --since 2026-11-01       # sessions started on or after 1 November
-trimloop --since 7d               # sessions started in the last 7 days (2w: two weeks)
+trimloop --since 7d               # sessions started since midnight 7 days ago (2w: two weeks)
 ```
 
 The report then covers only sessions started from then on, with their
@@ -302,11 +302,11 @@ built.
 ## Development
 
 To run the prototype you need only Go. To run its checks you also need
-`golangci-lint` and `govulncheck`, plus `python3` for the end-to-end test's
-files and `claude` (Claude Code) to validate the plugin; the checks skip
-those two steps on your machine without them, but CI runs them.
-`scripts/bootstrap.sh` installs what is missing (macOS with Homebrew, or
-Debian/Ubuntu):
+`golangci-lint` and `govulncheck`. Two steps need more: the end-to-end
+test's files need `python3`, and validating the plugin needs `claude`
+(Claude Code). Without them the checks skip those steps on your machine,
+but CI always runs them. `scripts/bootstrap.sh` installs what is missing
+(macOS with Homebrew, or Debian/Ubuntu):
 
 ```bash
 scripts/bootstrap.sh --check                       # see what is missing; changes nothing
@@ -373,11 +373,17 @@ the steps for making the repository public, are in
 
 ## Licence and security
 
-Licence: [FSL-1.1-ALv2](LICENSE.md).
+Licence: [FSL-1.1-ALv2](LICENSE.md) (the Functional Source Licence). You
+may read, use and change the code for any purpose except offering it to
+others in a commercial product or service that competes with Trimloop, and
+each version becomes Apache-2.0 two years after its release.
 
 Outside contributions are not accepted yet: they will need a contributor
-licence agreement. Please report security problems
-to the maintainer privately rather than in an issue.
+licence agreement.
+
+Please report security problems privately, not in an issue: on the
+repository's **Security** tab, choose **Report a vulnerability**
+([GitHub's guide](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/report-privately)).
 
 Trimloop = **trim** + **loop**: it trims wasted tokens in a loop of detect,
 recommend, measure, repeat.

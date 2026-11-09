@@ -336,7 +336,9 @@ provenance (both need it public, or a paid plan) and stay drafts.
 [ADR 0052](adr/0052-third-review-corrections.md)):
 
 1. Decide whether to tidy the git history: it goes public too.
-2. Make this repository public.
+2. Make this repository public, and turn on private vulnerability
+   reporting (Settings → Code security), which the README's "Licence and
+   security" section points people to.
 3. Delete the v0.1.0 draft and its tag, then tag the current commit and
    push the tag (re-running the old workflow would rebuild the old commit).
 4. Check that the new draft is signed, and publish it.
