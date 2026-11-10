@@ -77,7 +77,7 @@ Read only the fields you need, not the whole file. With `jq` installed:
 
 ```bash
 jq '{total, period, plan, usage_limits: (.usage_limits | {hits, weekly}),
-  reconciliation: (.reconciliation | {sessions, harness, ours, gap}),
+  reconciliation: (.reconciliation | {sessions, harness, ours, gap, largest_gaps}),
   actions: [.actions[]? | {title, finding, saving, likely, likely_low,
   likely_high, estimated, nothing, weekly_limit_share, primary,
   alternatives, check}]}' /tmp/tmp.Ab12Cd/report.json
@@ -103,6 +103,13 @@ These are the fields:
 | `actions[].check` | how to tell afterwards whether it worked |
 | `plan`, `usage_limits` | their plan, and how often a usage limit stopped them |
 | `reconciliation` | how far Claude Code's own cost records exceed the logs |
+| `reconciliation.largest_gaps` | up to 3 sessions with the largest gaps: `id`, `harness`, `ours`, `gap`, `sub_agent_logs` |
+
+If `reconciliation.gap` is more than a few percent of `reconciliation.ours`,
+say so, and say that the findings are worked out from the logs, so they
+leave that spend out. When the sessions in `largest_gaps` hold at least half
+of the gap, say that most of it is in those few sessions rather than spread over
+every session as background requests (titles, summaries) would be.
 
 Explain the top three actions: what the habit is, what it cost, the fix in
 one or two steps, and the likely saving next to the "up to" figure. Then
