@@ -43,7 +43,7 @@ func TestReportRuns(t *testing.T) {
 	if err := WriteText(&buf, Analyse(nil, Read{Logs: 1}, Local{}, DefaultSettings(), t0)); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"COST BY TOKEN CLASS", "WHERE THE SPEND WENT", "P19 ", "P10)", "P09 ", "P04 ", "P13 "} {
+	for _, want := range []string{"COST BY TOKEN CLASS", "WHERE THE SPEND WENT", "LONG SESSIONS (P19)", "P10)", "LONG BREAKS (P09)", "TOOL OUTPUT (P04)", "SUB-AGENTS ON THE MAIN MODEL (P13)"} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("report has no %q", want)
 		}
@@ -255,7 +255,7 @@ func TestTextHasNewSections(t *testing.T) {
 	if err := WriteText(&buf, r); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"CHECKED AGAINST CLAUDE CODE'S OWN RECORDS", "WEEK BY WEEK", "P07 WHAT EVERY REQUEST CARRIES"} {
+	for _, want := range []string{"CHECKED AGAINST CLAUDE CODE'S OWN RECORDS", "WEEK BY WEEK", "WHAT EVERY REQUEST CARRIES (P07)"} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("text has no %q", want)
 		}
@@ -539,7 +539,7 @@ func TestTextShowsGapSections(t *testing.T) {
 	if err := WriteText(&out, r); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"gone unused for 30 days", "P12 REPLIES CUT OFF", "4 when the computer slept", "WHEN YOU WORK"} {
+	for _, want := range []string{"gone unused for 30 days", "REPLIES CUT OFF (P12)", "4 when the computer slept", "WHEN YOU WORK"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("text has no %q", want)
 		}

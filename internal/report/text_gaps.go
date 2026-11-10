@@ -36,7 +36,7 @@ func toolInputLine(w io.Writer, r Results) {
 func gapSections(w io.Writer, r Results) {
 	all := r.Total
 	if sw := r.Switches; sw.Switches > 0 {
-		fmt.Fprintln(w, "\nP01 MODEL SWITCHES MID-SESSION")
+		fmt.Fprintln(w, "\nMODEL SWITCHES MID-SESSION (P01)")
 		fmt.Fprintf(w, "  %d %s in %s: the first turn on the new model saved the whole conversation\n",
 			sw.Switches, agree(sw.Switches, "switch", "switches"), count(sw.Sessions, "session"))
 		fmt.Fprintf(w, "  to the cache again. Those turns cost %s; reading instead would have saved %s.\n",
@@ -47,7 +47,7 @@ func gapSections(w io.Writer, r Results) {
 		}
 	}
 	if f := r.Failures; f.Sleep+f.Network+f.Other > 0 {
-		fmt.Fprintln(w, "\nP12 REPLIES CUT OFF")
+		fmt.Fprintln(w, "\nREPLIES CUT OFF (P12)")
 		fmt.Fprintf(w, "  Requests that failed and were sent again: %d when the computer slept, %d network,\n", f.Sleep, f.Network)
 		fmt.Fprintf(w, "  %d other. Sending the conversation again cost at least %s; the cut-off output is not logged.\n",
 			f.Other, money(f.Resent))
@@ -57,7 +57,7 @@ func gapSections(w io.Writer, r Results) {
 		}
 	}
 	if r.AppServerFix != nil {
-		fmt.Fprintln(w, "\nP06 DESKTOP-APP TOOLS NEVER USED")
+		fmt.Fprintln(w, "\nDESKTOP-APP TOOLS NEVER USED (P06)")
 		fmt.Fprintf(w, "  %s: %s\n", r.AppServerFix.Title, savingText(*r.AppServerFix, all))
 		printFixes(w, *r.AppServerFix)
 	}

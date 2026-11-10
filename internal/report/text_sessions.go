@@ -110,7 +110,7 @@ func growthSection(w io.Writer, g detectors.Growth, rec *fixes.Recommendation, a
 
 // subAgentSection prints sub-agent spend and the cheaper-model saving.
 func subAgentSection(w io.Writer, f detectors.SubAgents, rec *fixes.Recommendation, all float64) {
-	fmt.Fprintln(w, "\nP13 SUB-AGENTS ON THE MAIN MODEL")
+	fmt.Fprintln(w, "\nSUB-AGENTS ON THE MAIN MODEL (P13)")
 	if f.Runs == 0 {
 		fmt.Fprintln(w, "  No sub-agent runs.")
 		return
