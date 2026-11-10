@@ -209,7 +209,7 @@ team/key alias, cwd/repo when known).
 
 ### 5.1 Standalone: `trimloop analyse`
 
-**Today:** `trimloop [analyse] [--format summary|text|html|json]
+**Today:** `trimloop [analyse] [--format summary|text|html|json|share]
 [--out FILE] [--open] [--since DATE|7d] [--no-titles] [--history FILE |
 --no-history]` and `trimloop --version`. `--since` keeps the main sessions
 that started on or after the date, with their sub-agents, and leaves the

@@ -115,7 +115,9 @@ Done:
   ([ADR 0053](docs/adr/0053-projects-by-conversation-and-ranking.md));
 - `trimloop demo`: the report on five weeks of made-up logs built into the
   binary, for someone with few logs of their own
-  ([ADR 0055](docs/adr/0055-demo-command.md)).
+  ([ADR 0055](docs/adr/0055-demo-command.md));
+- `--format share`: a few lines of figures with no names, safe to paste
+  elsewhere ([ADR 0056](docs/adr/0056-share-format.md)).
 
 To do:
 

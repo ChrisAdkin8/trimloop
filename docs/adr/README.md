@@ -20,7 +20,7 @@ Which record governs what in the M0 prototype:
 | What the prototype measures, and how | [0045](0045-m0-measurement-method.md), [0050](0050-second-gap-analysis-findings.md), [0052](0052-third-review-corrections.md), [0053](0053-projects-by-conversation-and-ranking.md) |
 | Which findings are in M0, and in what order | [0027](0027-measured-m0-findings.md), [0031](0031-m0-order-from-measured-spend.md), [0042](0042-p02-p14-and-main-session-models.md) |
 | How fixes are chosen and worded | [0030](0030-how-fixes-are-chosen.md) |
-| What reports show | [0032](0032-readable-reports.md), [0048](0048-usage-limits-for-subscribers.md) (subscribers), [0055](0055-demo-command.md) (the demo) |
+| What reports show | [0032](0032-readable-reports.md), [0048](0048-usage-limits-for-subscribers.md) (subscribers), [0055](0055-demo-command.md) (the demo), [0056](0056-share-format.md) (the share format) |
 | Reconciliation and weekly history | [0033](0033-reconciliation-history-standing-context.md), [0043](0043-weekly-trend-for-new-findings.md) |
 | Live nudges | [0034](0034-live-nudges.md) |
 | Licensing | [0054](0054-apache-2-licence.md) |
@@ -92,6 +92,7 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0053](0053-projects-by-conversation-and-ranking.md) | Projects by conversation, a card that saves nothing ranked last, and analysis version 8 | Measurements (M0) | Yes | Yes |
 | [0054](0054-apache-2-licence.md) | The repository is open source under Apache-2.0 | Licensing | Yes: LICENSE, NOTICE | Yes |
 | [0055](0055-demo-command.md) | A demo command on made-up logs | Reports (M0) | Yes | Yes |
+| [0056](0056-share-format.md) | A report format that is safe to share | Reports (M0) | Yes | Yes |
 
 Statuses: **Proposed** means decided for planning but not yet built;
 **Accepted** means the decision is in force, and says how much of it is

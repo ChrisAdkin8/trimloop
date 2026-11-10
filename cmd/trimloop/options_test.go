@@ -156,7 +156,7 @@ func TestCheckOptions(t *testing.T) {
 		{"to /dev/null", cliOptions{format: "html", out: "/dev/null"}, ""},
 		{"json out is a folder", cliOptions{format: "json", out: dir}, filepath.Join(dir, "trimloop-report.json")},
 		{"summary out is a folder", cliOptions{format: "summary", out: dir}, filepath.Join(dir, "trimloop-report.txt")},
-		{"unknown format", cliOptions{format: "txt"}, `unknown format "txt": use summary, text, html or json`},
+		{"unknown format", cliOptions{format: "txt"}, `unknown format "txt": use summary, text, html, json or share`},
 		{"open needs html", cliOptions{format: "json", open: true}, "--open opens the web page, so it needs --format html"},
 		{"missing folder", cliOptions{format: "html", out: "nodir/x.html"}, "the folder nodir does not exist"},
 		{"folder is a file", cliOptions{format: "html", out: file + "/x.html"}, "is a file, not a folder"},

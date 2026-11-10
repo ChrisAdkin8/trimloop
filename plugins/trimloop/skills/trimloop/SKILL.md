@@ -173,5 +173,6 @@ them, and leave that setting to them. Changes take effect in new Claude Code ses
 | `trimloop --open --out ~/trimloop-report.html` | the web page, saved in the home folder and opened |
 | `trimloop --since 7d` | only sessions started in the last 7 days |
 | `trimloop setup --check` | is the status line and nudge setup working? |
+| `trimloop --format share` | a few lines with figures only (no project names, titles, ids or dates), for the user to paste elsewhere |
 | `trimloop demo` | a report on made-up logs, to show what one looks like (not the user's figures) |
 | `trimloop --version` | which build is installed |

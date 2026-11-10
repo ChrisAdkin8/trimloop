@@ -220,6 +220,18 @@ what you asked, and your project names. Check a report before sharing it.
 ids, nor the ids of MCP connectors that have no name; project, skill and
 server names stay.
 
+To show someone your figures without any of that, use the share format:
+
+```bash
+trimloop --format share
+```
+
+It prints a few lines to paste into a chat or a post: the spend, the share
+of it that went on large sessions, and the three changes that would save
+the most. It holds figures and trimloop's own wording only: no project
+names, session titles or ids, folder paths, dates, plan name, or names of
+skills, plugins, MCP servers and agents.
+
 ### Try it without your own logs
 
 To see what a report looks like before you have many logs of your own:

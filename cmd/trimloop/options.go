@@ -190,7 +190,7 @@ type cliOptions struct {
 // that may be written to it.
 var formatFor = map[string][]string{
 	".json": {"json"},
-	".txt":  {"text", "summary"},
+	".txt":  {"text", "summary", "share"},
 	".html": {"html"},
 	".htm":  {"html"},
 }
@@ -219,7 +219,7 @@ func checkOptions(o cliOptions) error {
 		return fmt.Errorf("--%s does not go with demo, which never reads or writes the history file", o.historyFlag)
 	}
 	if !validFormat[o.format] {
-		return fmt.Errorf("unknown format %q: use summary, text, html or json", o.format)
+		return fmt.Errorf("unknown format %q: use summary, text, html, json or share", o.format)
 	}
 	if o.open && o.format != "html" {
 		return errors.New("--open opens the web page, so it needs --format html")

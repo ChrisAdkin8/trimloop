@@ -51,7 +51,7 @@ The code is laid out as:
 | `pkg/detectors` | The findings, attribution, reconciliation and weekly figures |
 | `pkg/cmdshape` | Shell commands reduced to their shape, without values |
 | `pkg/fixes` | Recommendations: for each finding, fixes ordered by kind, strongest first (the *fix ladder*, ADR 0030) |
-| `internal/report` | Results, rendered as summary, text, web page and JSON |
+| `internal/report` | Results, rendered as summary, text, web page, JSON and the share format |
 | `internal/history` | Weekly figures kept between runs |
 | `internal/live` | Status line, hooks and `setup` for Claude Code |
 | `internal/demo` | The made-up logs `trimloop demo` reports on (written by `scripts/gen-demo.py`) and its fixed clock |
