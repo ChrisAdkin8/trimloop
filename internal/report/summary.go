@@ -18,6 +18,10 @@ func WriteSummary(out io.Writer, r Results, path string, actions int) error {
 	if c := r.Reconciliation; c.Sessions > 0 && c.Gap > 0.005*c.Ours {
 		fmt.Fprintf(w, "Claude Code's own records show %s (%.0f%%) more than its logs: requests the logs do not record.\n",
 			money(c.Gap), pct(c.Gap, c.Ours))
+		if c.Concentrated() {
+			fmt.Fprintf(w, "%s of it is in %s. ", money(c.Held()), count(len(c.LargestGaps), "session"))
+		}
+		fmt.Fprintln(w, "The findings below come from the logs, so they leave it out.")
 	}
 	limitLines(w, r)
 	if len(r.Actions) > 0 {

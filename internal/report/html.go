@@ -250,6 +250,10 @@ func (v view) SessID(id string) string {
 	return id
 }
 
+// MissingCached names the models whose record counts clearly more cached
+// work than the logs hold; "" if none.
+func (v view) MissingCached() string { return missingCachedWork(v.Reconciliation) }
+
 // CtxName names a source of standing context for the page (contextName).
 func (v view) CtxName(n string) string { return contextName(n, v.HideIDs) }
 

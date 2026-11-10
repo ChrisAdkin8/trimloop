@@ -390,16 +390,35 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 {{with .Reconciliation}}{{if .Sessions}}
 <section class="area">
 <h2 id="checks">Checking the totals</h2>
-<p class="lead">{{if ge .Gap 0.0}}Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs: requests the logs don't record, such as session titles, summaries after a break, compactions and web searches.{{else}}The logs show {{dollars (neg .Gap)}} more than Claude Code's own records; its records may have been written before some sessions ended.{{end}}{{if .Unrecorded}} {{plural .Unrecorded "session"}} ({{pct .UnrecordedCost $.Total}} of spend) {{if eq .Unrecorded 1}}has{{else}}have{{end}} no record to check against.{{end}}</p>
+<p class="lead">{{if ge .Gap 0.0}}Claude Code's own records show {{dollars .Gap}} ({{pct .Gap .Ours}}) more than its logs: requests the logs don't record.{{if .Concentrated}} {{dollars .Held}} of it is in {{plural (len .LargestGaps) "session"}}.{{end}} The findings on this page come from the logs, so they leave it out.{{else}}The logs show {{dollars (neg .Gap)}} more than Claude Code's own records; its records may have been written before some sessions ended.{{end}}{{if .Unrecorded}} {{plural .Unrecorded "session"}} ({{pct .UnrecordedCost $.Total}} of spend) {{if eq .Unrecorded 1}}has{{else}}have{{end}} no record to check against.{{end}}</p>
 <details><summary>Show details</summary>
 <div class="panel">
   <p>For {{plural .Sessions "session"}} with a record, Claude Code recorded {{dollars .Harness}} and the logs show {{dollars .Ours}}.{{if .WebSearches}} {{if eq .WebSearches 1}}1 web search{{else}}{{thousands .WebSearches}} web searches{{end}} cost about {{dollars .WebSearchCost}} in search fees.{{end}}{{if .Behind}} {{plural .Behind "session"}} {{if eq .Behind 1}}has a record that does not cover all of it (it began before the record's first run, or went on after its last) and is left out{{else}}have a record that does not cover all of them (they began before the record's first run, or went on after its last) and are left out{{end}}.{{end}}{{if .Unpriced}} {{plural .Unpriced "session"}} used a model with no known price and are left out.{{end}}</p>
+  {{if gt .Gap 0.0}}<p>Part of the difference is background requests: session titles, summaries after a break, compactions and web searches.{{with $.MissingCached}} The record also counts more cached work (cache reads and writes) than the logs hold for {{.}}: some of the sessions' own requests are missing from the logs, and why is not known.{{end}}</p>{{end}}
   <div class="scroll"><table>
     <thead><tr><th>Model</th><th class="n">Claude Code's record</th><th class="n">In the logs</th><th class="n">Difference</th></tr></thead>
     <tbody>
     {{range .ByModel}}<tr><td>{{model .Model}}</td><td class="n">{{dollars .Harness}}</td><td class="n">{{dollars .Ours}}</td><td class="n">{{dollars .Gap}}</td></tr>{{end}}
     </tbody>
   </table></div>
+  <h3>Tokens by model</h3>
+  <p class="muted small">Each cell is Claude Code's record, then the logs.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Model</th><th class="n">Cache reads</th><th class="n">Cache writes</th><th class="n">Output</th><th class="n">Uncached input</th></tr></thead>
+    <tbody>
+    {{range .ByModel}}<tr><td>{{model .Model}}</td><td class="n">{{short .HarnessCacheRead}} / {{short .OursCacheRead}}</td><td class="n">{{short .HarnessCacheWrite}} / {{short .OursCacheWrite}}</td><td class="n">{{short .HarnessOutput}} / {{short .OursOutput}}</td><td class="n">{{short .HarnessUncached}} / {{short .OursUncached}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{if .LargestGaps}}
+  <h3>Sessions with the largest differences</h3>
+  <p class="muted small">Together {{dollars .Held}} of the {{dollars .Gap}}.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Session</th><th>Project</th><th class="n">Claude Code's record</th><th class="n">In the logs</th><th class="n">Difference</th><th class="n">Sub-agent logs</th></tr></thead>
+    <tbody>
+    {{range .LargestGaps}}{{$l := $.Name .ID}}<tr><td class="name session">{{template "session" (args $l ($.SessID .ID))}}</td><td class="name">{{$l.Project}}</td><td class="n">{{dollars .Harness}}</td><td class="n">{{dollars .Ours}}</td><td class="n">{{dollars .Gap}}</td><td class="n">{{.SubAgentLogs}}</td></tr>{{end}}
+    </tbody>
+  </table></div>
+  {{end}}
 </div>
 </details>
 </section>

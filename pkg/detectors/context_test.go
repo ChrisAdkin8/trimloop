@@ -88,8 +88,13 @@ func TestReconciliationLargestGaps(t *testing.T) {
 			t.Errorf("row %d: got %+v, want %+v", i, f.LargestGaps[i], want[i])
 		}
 	}
-	if held, ok := f.Concentrated(); held != 60 || !ok {
+	if held, ok := f.Held(), f.Concentrated(); held != 60 || !ok {
 		t.Errorf("concentrated: got %v %v, want 60 true", held, ok)
+	}
+	// Every compared session listed: nothing to say about concentration.
+	all := Reconciliation{Sessions: 1, Gap: 2, LargestGaps: []SessionGap{{ID: "a", Gap: 2}}}
+	if all.Concentrated() {
+		t.Error("one session of one: got concentrated")
 	}
 }
 

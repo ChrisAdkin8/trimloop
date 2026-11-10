@@ -50,15 +50,20 @@ type Reconciliation struct {
 	LargestGaps []SessionGap `json:"largest_gaps"`
 }
 
-// Concentrated returns what LargestGaps hold together, and whether that is
-// at least half of the gap: then a few sessions, not background requests
-// spread over all of them, make most of it.
-func (r Reconciliation) Concentrated() (float64, bool) {
+// Held is what LargestGaps hold together.
+func (r Reconciliation) Held() float64 {
 	held := 0.0
 	for _, s := range r.LargestGaps {
 		held += s.Gap
 	}
-	return held, r.Gap > 0 && held >= r.Gap/2
+	return held
+}
+
+// Concentrated reports whether LargestGaps hold at least half of the gap
+// and are not every compared session: then a few sessions, not background
+// requests spread over all of them, make most of it.
+func (r Reconciliation) Concentrated() bool {
+	return r.Gap > 0 && len(r.LargestGaps) < r.Sessions && r.Held() >= r.Gap/2
 }
 
 // SessionGap is the comparison for one main session and its sub-agents.
