@@ -1,5 +1,12 @@
 # Trimloop
 
+[![CI](https://github.com/ChrisAdkin8/trimloop/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ChrisAdkin8/trimloop/actions/workflows/ci.yml)
+[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
+[![Go 1.27.3 or later](https://img.shields.io/badge/go-1.27.3%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![Platforms: macOS and Linux](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey)](#install)
+[![Status: early prototype, M0](https://img.shields.io/badge/status-early%20prototype%20%28M0%29-orange)](ROADMAP.md)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](#ask-claude-about-it-claude-code-plugin)
+
 Trimloop reads the session logs Claude Code keeps on your machine, works out
 where your tokens went, and tells you which changes to how you work would save
 the most money.
@@ -262,7 +269,8 @@ Everything stays on your machine, readable by you only:
 
 ## The plan
 
-Everything in this section is design, not built yet.
+This section is design, not built yet, apart from the parts the
+picture below marks M0.
 
 Teams spend real money on coding agents (Claude Code, Codex, Cursor, Copilot)
 and on gateways that route their requests (LiteLLM, Portkey, Helicone,
@@ -294,7 +302,14 @@ Principles it is designed around:
 - **Neutral.** One event model for every coding agent, gateway and model
   provider; their differences live in profiles, not in the detectors.
 
-![Planned architecture: coding agents send traffic through Trimloop to model providers; analysis runs on the developer machine; an optional team collector receives hashes-only findings, including from a gateway sidecar beside LiteLLM](docs/images/architecture.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img src="docs/images/architecture.svg" width="840" alt="Architecture: on the developer machine, taps catch a coding agent's requests on their way to the model providers; a normaliser, a local store and the detectors turn them into findings (a report and nudges); actuators apply safe fixes. An optional team collector receives hashes, counts and cost, never source code, including from a gateway sidecar beside LiteLLM. Boxes marked M0 are in today's prototype in part.">
+</picture>
+
+Boxes marked **M0** exist today, in part: the prototype reads Claude Code's
+logs (not live traffic yet), runs 9 of the 19 waste patterns, and gives a
+report and nudges. Everything else in the picture is planned.
 
 The core will be one Go program; a thin Python plugin will connect LiteLLM to
 it; a web UI (TypeScript) will be embedded in the program. Detail:

@@ -343,6 +343,12 @@ provenance (both need it public, or a paid plan) and stay drafts.
    push the tag (re-running the old workflow would rebuild the old commit).
 4. Check that the new draft is signed, and publish it.
 5. Make the tap public.
+6. Add the README badges that need a public repository: the latest
+   release (`img.shields.io/github/v/release/ChrisAdkin8/trimloop`), Go
+   Reference (`pkg.go.dev/badge/github.com/ChrisAdkin8/trimloop.svg`) and
+   Go Report Card (`goreportcard.com/badge/github.com/ChrisAdkin8/trimloop`).
+   The Go badge can then read the version from `go.mod`
+   (`img.shields.io/github/go-mod/go-version/ChrisAdkin8/trimloop`).
 
 ### Pinned by hand
 
