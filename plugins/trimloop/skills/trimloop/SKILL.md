@@ -30,15 +30,14 @@ skill and tell them how to add the folder (README, "Install"). If neither
 works, stop and tell the user how to install it; do not install it
 yourself without their yes:
 
-- with Go 1.27.3 or later, from a clone of
-  https://github.com/ChrisAdkin8/trimloop:
-  `go build -o ~/.local/bin/trimloop ./cmd/trimloop`. Until a release is
-  published, this is the only way.
-- once a release is published, on macOS or Linux with Homebrew:
+- on macOS or Linux with Homebrew (the quickest):
   `brew install --cask chrisadkin8/tap/trimloop`;
 - or download the archive for their system from
   https://github.com/ChrisAdkin8/trimloop/releases and put `trimloop` on
-  their PATH.
+  their PATH;
+- or, with Go 1.27.3 or later, from a clone of
+  https://github.com/ChrisAdkin8/trimloop:
+  `go build -o ~/.local/bin/trimloop ./cmd/trimloop`.
 
 ## 2. Run the analysis
 

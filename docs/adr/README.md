@@ -83,7 +83,7 @@ M3 and M4 automatic fixes). "In force" says whether a record still governs:
 | [0044](0044-effort-thinking-and-cache-figures.md) | Effort by thinking tokens, and fairer cache figures | Measurements (M0) | Yes | Superseded by 0045 |
 | [0045](0045-m0-measurement-method.md) | The M0 measurement method | Measurements (M0) | Yes | Amended by 0048, 0050, 0053 |
 | [0046](0046-licensing.md) | Licensing — FSL core, Apache-2.0 connectors, commercial team features | Licensing | No longer | Superseded by 0054 |
-| [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: not yet published | Amended by 0049, 0051 |
+| [0047](0047-first-release-pure-go.md) | First releases built in one job while trimloop is pure Go | Packaging | Yes: published as v0.2.0 | Amended by 0049, 0051 |
 | [0048](0048-usage-limits-for-subscribers.md) | Usage limits for subscribers | Reports (M0) | Yes | Amended by 0052 |
 | [0049](0049-claude-code-plugin.md) | A Claude Code plugin with a trimloop skill | Packaging | Yes: not yet tried by users | Amended by 0054 |
 | [0050](0050-second-gap-analysis-findings.md) | Findings from the second gap analysis | Findings (M0) | Yes | Amended by 0052 |
