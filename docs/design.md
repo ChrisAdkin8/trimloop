@@ -9,8 +9,8 @@
 > **Today.** Only the M0 prototype is built. `trimloop analyse` reads Claude
 > Code's logs, finds waste and writes a summary, text, HTML or JSON report;
 > `trimloop setup`, `statusline` and `hook` give live nudges inside Claude
-> Code. The code is in `cmd/`, `internal/` and `pkg/` (see the
-> [README](../README.md#development)). How each figure is worked out:
+> Code. The code is in `cmd/`, `internal/` and `pkg/` (see
+> [development.md](development.md)). How each figure is worked out:
 > [measurements.md](measurements.md). The measured figures:
 > [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance). What
 > is next: [ROADMAP.md](../ROADMAP.md) and the Built column of the

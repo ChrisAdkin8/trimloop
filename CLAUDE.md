@@ -22,6 +22,7 @@ validation when `claude` is installed, govulncheck; `--offline` skips
 govulncheck) and keep it passing.
 
 - Entry points: `README.md` (what the prototype does today),
+  `docs/development.md` (the checks and the code layout),
   `docs/measurements.md` (how each reported figure is worked out), the build
   order in `ROADMAP.md`, and `docs/design.md` for the planned product;
   `docs/patterns.md` and `docs/data-model.md` hold the detail.

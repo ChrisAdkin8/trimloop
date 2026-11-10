@@ -9,15 +9,35 @@
 [![Status: early prototype, M0](https://img.shields.io/badge/status-early%20prototype%20%28M0%29-orange)](ROADMAP.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](#ask-claude-about-it-claude-code-plugin)
 
-Trimloop reads the session logs Claude Code keeps on your machine, works out
-where your tokens went, and tells you which changes to how you work would save
-the most money.
+Trimloop tells you what to change in how you use Claude Code, and what
+each change would save: money, if you pay per token; room under your usage
+limits, if you are on Pro or Max. It reads the session logs Claude Code
+keeps on your machine and sends nothing anywhere.
+
+A usage tracker (Claude Code's own `/cost`, or a tool that adds up your
+tokens) tells you how much you used. Trimloop tells you **why**, **what to
+do about it**, and afterwards **whether it worked**:
+
+| | |
+|---|---|
+| Why | Which habits cost the most: long sessions, breaks that let the cache expire, bulky tool output, a dearer model than the work needs ([all nine](#what-it-looks-for)) |
+| What to do | Changes ranked by what they would save, each with the steps to make it |
+| Did it work | Week-by-week figures, and `--since` the day you made a change |
+| If you pay per token | Savings in dollars at list prices |
+| If you are on Pro or Max | How often you hit a usage limit, and each saving as a share of your weekly limit |
+| While you work | A status line and nudges in Claude Code, before a costly message is sent |
+
+```bash
+brew install --cask chrisadkin8/tap/trimloop   # macOS or Linux; other ways are under Install
+trimloop                                       # what to do first
+trimloop --open                                # the full report, in your browser
+```
 
 **Status: early prototype** (milestone M0 in the [roadmap](ROADMAP.md)).
-Today it analyses Claude Code logs and gives live nudges inside Claude
-Code. It recommends; it does not change anything for you. The wider
-product (gateway plugin, team collector, automatic fixes) is design only:
-see [The plan](#the-plan).
+It analyses Claude Code logs and gives live nudges inside Claude Code. It
+recommends; it does not change anything for you. The wider product
+(gateway plugin, team collector, automatic fixes) is design only: see
+[The plan](#the-plan).
 
 ## What you get
 
@@ -297,109 +317,18 @@ Everything stays on your machine, readable by you only:
 
 ## The plan
 
-This section is design, not built yet, apart from the parts the
-picture below marks M0.
-
-Teams spend real money on coding agents (Claude Code, Codex, Cursor, Copilot)
-and on gateways that route their requests (LiteLLM, Portkey, Helicone,
-OpenRouter). The tools we have seen answer *where* the money went; few say
-*why it was wasted* or *what to change*. Trimloop is designed to join four
-steps:
-
-1. **Capture** requests from any coding agent or gateway.
-2. **Detect** waste patterns: the ones above, and more
-   ([docs/patterns.md](docs/patterns.md)).
-3. **Recommend** fixes ranked by money saved, across a whole team.
-4. **Apply** the safe ones automatically, with measurement and rollback.
-
-Principles it is designed around:
-
-- **Local-first.** Prompts contain source code and secrets. Raw content will
-  never leave the developer's machine unless explicitly enabled; teams will
-  share keyed hashes (fingerprints only the customer's key can make), sizes,
-  counts and cost, not code or names
-  ([ADR 0011](docs/adr/0011-keyed-fingerprints.md),
-  [ADR 0019](docs/adr/0019-fingerprint-key-management.md)).
-- **Observe before acting.** Recommendations first; changes Trimloop would
-  make to requests itself will ship report-only, then in shadow mode
-  (worked out and logged, not applied), then to a few, then to all, each
-  measured and reversible.
-- **Quality is a constraint.** A saving that makes the agent worse is not a
-  saving: Trimloop is to track outcome signals (tests, edits, errors) alongside
-  cost.
-- **Neutral.** One event model for every coding agent, gateway and model
-  provider; their differences live in profiles, not in the detectors.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
-  <img src="docs/images/architecture.svg" width="840" alt="Architecture: on the developer machine, taps catch a coding agent's requests on their way to the model providers; a normaliser, a local store and the detectors turn them into findings (a report and nudges); actuators apply safe fixes. An optional team collector receives hashes, counts and cost, never source code, including from a gateway sidecar beside LiteLLM. Boxes marked M0 are in today's prototype in part.">
-</picture>
-
-Boxes marked **M0** exist today, in part: the prototype reads Claude Code's
-logs (not live traffic yet), runs 9 of the 19 waste patterns, and gives a
-report and nudges. Everything else in the picture is planned.
-
-The core will be one Go program; a thin Python plugin will connect LiteLLM to
-it; a web UI (TypeScript) will be embedded in the program. Detail:
-[docs/design.md](docs/design.md), [docs/analyzer.md](docs/analyzer.md),
-[ROADMAP.md](ROADMAP.md) for the order, and
-[docs/adr/README.md](docs/adr/README.md) for every decision with whether it is
-built.
+Today's prototype is the first step (M0) of a larger design: capture
+requests from any coding agent or gateway, detect waste, recommend fixes
+across a whole team, and apply the safe ones automatically, with source
+code never leaving the developer's machine. None of that is built yet.
+[docs/plan.md](docs/plan.md) has the outline and the architecture picture;
+[ROADMAP.md](ROADMAP.md) has the order.
 
 ## Development
 
-To run the prototype you need only Go. To run its checks you also need
-`golangci-lint` and `govulncheck`. Two steps need more: the end-to-end
-test's files need `python3`, and validating the plugin needs `claude`
-(Claude Code). Without them the checks skip those steps on your machine,
-but CI always runs them. `scripts/bootstrap.sh` installs what is missing
-(macOS with Homebrew, or Debian/Ubuntu):
-
-```bash
-scripts/bootstrap.sh --check                       # see what is missing; changes nothing
-scripts/bootstrap.sh --skip-node --skip-python     # enough for the prototype and most checks
-scripts/bootstrap.sh                               # everything the planned stack needs
-```
-
-With Python and Node.js skipped, the golden-drift and plugin steps run only
-if `python3` and `claude` are already installed. The full install adds a C
-toolchain and the DuckDB CLI, `buf` and the protobuf plugins, `uv` with
-Python 3.12, and Node.js 22 or later;
-`--with-collector` also checks Docker. Re-running is safe.
-
-Before committing Go changes:
-
-```bash
-scripts/check.sh             # gofmt, go vet, golangci-lint, race tests, golden drift, plugin validation, govulncheck
-scripts/check.sh --offline   # the same without govulncheck, which needs the network
-```
-
-It runs every check, lists the failures and exits 1 if there are any.
-*Golden drift* checks that the end-to-end test's logs and expected figures
-(`testdata/golden`) are what their scripts make today. The linters are set
-in [.golangci.yml](.golangci.yml).
-
-The code is laid out as:
-
-| Package | What it does |
-|---|---|
-| `cmd/trimloop` | The command: options, then runs the report or a live command |
-| `internal/adapters/source` | Log readers: `claudecode` (Claude Code logs), `jsonl` (shared line reader) |
-| `internal/sessions` | Finds and reads every log and builds the sessions (`sessions.Load`) |
-| `internal/safefile` | Replaces a file whole or not at all (reports, history, nudge state, settings) |
-| `pkg/event`, `pkg/price`, `pkg/normalize` | The event model, the price list, usage normalisation |
-| `pkg/detectors` | The findings, attribution, reconciliation and weekly figures |
-| `pkg/cmdshape` | Shell commands reduced to their shape, without values |
-| `pkg/fixes` | Recommendations: for each finding, fixes ordered by kind, strongest first (the *fix ladder*, ADR 0030) |
-| `internal/report` | Results, rendered as summary, text, web page and JSON |
-| `internal/history` | Weekly figures kept between runs |
-| `internal/live` | Status line, hooks and `setup` for Claude Code |
-
-### Releases
-
-Pushing a version tag builds a draft GitHub release; how to cut one, and
-the steps for making the repository public, are in
-[docs/packaging.md](docs/packaging.md#cutting-a-release).
+To build it you need only Go (`go build ./cmd/trimloop`, `go test ./...`).
+The tools for the full checks, `scripts/check.sh`, the code layout and how
+releases are cut are in [docs/development.md](docs/development.md).
 
 ## Documents
 
@@ -411,6 +340,8 @@ the steps for making the repository public, are in
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/state-machines.md](docs/state-machines.md) | What the code remembers between steps, and the files it keeps |
 | [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain, and the measured figures (§8) |
+| [docs/plan.md](docs/plan.md) | The planned product in outline, with the architecture picture |
+| [docs/development.md](docs/development.md) | Building, the checks, the code layout, releases |
 | [docs/design.md](docs/design.md) | Planned architecture, components, deployment, security |
 | [docs/analyzer.md](docs/analyzer.md) | The analysis engine: command line, gateway sidecar, library; harness and provider profiles |
 | [docs/value.md](docs/value.md) | Value case: levers ranked by expected saving, validation plan |
