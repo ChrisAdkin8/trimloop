@@ -85,7 +85,10 @@ prompt on 7 Nov):
 - **Reconciliation** (`cost-state` lines): sessions whose records cover
   them (one with two runs, each with running totals), one whose record was
   written part way, one whose only run began after its first turn, one with
-  an unpriced turn, and conversations with no record.
+  an unpriced turn, and conversations with no record. Three compared
+  sessions have a record over their logged cost, so the largest gaps list
+  them (one with two sub-agent logs), and the records' tokens by model
+  differ from the logs' in every class.
 - **Weeks**: a session that crosses from Sunday to Monday in UTC, and
   sessions that fall in another week in Los Angeles, Kolkata or Auckland.
 - **Compactions by week** (`kappa-*`): a compaction counts in the week of

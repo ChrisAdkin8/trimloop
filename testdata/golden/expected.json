@@ -361,6 +361,81 @@
   "unrecorded": 7,
   "unrecorded_cost": 1.73235
  },
+ "reconciliation_by_model": {
+  "claude-haiku-4-5": {
+   "harness_cache_read": 30000,
+   "harness_cache_write": 25000,
+   "harness_output": 1260,
+   "harness_uncached": 1825,
+   "ours_cache_read": 30891,
+   "ours_cache_write": 25000,
+   "ours_output": 1000,
+   "ours_uncached": 17
+  },
+  "claude-haiku-5-5": {
+   "harness_cache_read": 1064000,
+   "harness_cache_write": 570000,
+   "harness_output": 4400,
+   "harness_uncached": 83,
+   "ours_cache_read": 586493,
+   "ours_cache_write": 483000,
+   "ours_output": 4650,
+   "ours_uncached": 54
+  },
+  "claude-opus-5-5": {
+   "harness_cache_read": 2000000,
+   "harness_cache_write": 360000,
+   "harness_output": 9000,
+   "harness_uncached": 120,
+   "ours_cache_read": 1195222,
+   "ours_cache_write": 452515,
+   "ours_output": 8355,
+   "ours_uncached": 90
+  },
+  "claude-sonnet-5": {
+   "harness_cache_read": 110000,
+   "harness_cache_write": 52000,
+   "harness_output": 1900,
+   "harness_uncached": 30,
+   "ours_cache_read": 121967,
+   "ours_cache_write": 52500,
+   "ours_output": 1716,
+   "ours_uncached": 26
+  },
+  "claude-sonnet-5-5": {
+   "harness_cache_read": 600000,
+   "harness_cache_write": 90000,
+   "harness_output": 3900,
+   "harness_uncached": 40,
+   "ours_cache_read": 181788,
+   "ours_cache_write": 101806,
+   "ours_output": 2654,
+   "ours_uncached": 48
+  }
+ },
+ "reconciliation_largest_gaps": [
+  {
+   "gap": 0.1725126,
+   "harness": 4.29,
+   "id": "alpha-1",
+   "ours": 4.1174874,
+   "sub_agent_logs": 1
+  },
+  {
+   "gap": 0.02211161,
+   "harness": 0.49,
+   "id": "beta-1",
+   "ours": 0.46788839,
+   "sub_agent_logs": 2
+  },
+  {
+   "gap": 0.0183946,
+   "harness": 0.27,
+   "id": "alpha-3",
+   "ours": 0.2516054,
+   "sub_agent_logs": 0
+  }
+ ],
  "sessions": {
   "alpha-1": {
    "cost": 3.9416982,

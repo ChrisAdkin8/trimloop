@@ -117,7 +117,15 @@ type golden struct {
 		UnrecordedCost float64 `json:"unrecorded_cost"`
 		Unpriced       int     `json:"unpriced"`
 	} `json:"reconciliation"`
-	Projects map[string]struct {
+	LargestGaps []struct {
+		ID           string  `json:"id"`
+		Harness      float64 `json:"harness"`
+		Ours         float64 `json:"ours"`
+		Gap          float64 `json:"gap"`
+		SubAgentLogs int     `json:"sub_agent_logs"`
+	} `json:"reconciliation_largest_gaps"`
+	GapByModel map[string]map[string]int `json:"reconciliation_by_model"` // token classes, as trimloop's JSON names them
+	Projects   map[string]struct {
 		Cost          float64 `json:"cost"`
 		Turns         int     `json:"turns"`
 		Conversations int     `json:"conversations"`
@@ -362,6 +370,29 @@ func compareReport(t *testing.T, want golden, zone zoneFigures, loc *time.Locati
 	f.count("reconciliation.unrecorded", rc.Unrecorded, wr.Unrecorded)
 	f.dollars("reconciliation.unrecorded_cost", rc.UnrecordedCost, wr.UnrecordedCost)
 	f.count("reconciliation.unpriced", rc.Unpriced, wr.Unpriced)
+	f.count("reconciliation.largest_gaps", len(rc.LargestGaps), len(want.LargestGaps))
+	for i, g := range rc.LargestGaps[:min(len(rc.LargestGaps), len(want.LargestGaps))] {
+		e, name := want.LargestGaps[i], fmt.Sprintf("reconciliation.largest_gaps.%d.", i)
+		f.text(name+"id", g.ID, e.ID)
+		f.dollars(name+"harness", g.Harness, e.Harness)
+		f.dollars(name+"ours", g.Ours, e.Ours)
+		f.dollars(name+"gap", g.Gap, e.Gap)
+		f.count(name+"sub_agent_logs", g.SubAgentLogs, e.SubAgentLogs)
+	}
+	gapModels := map[string]bool{}
+	for _, m := range rc.ByModel {
+		gapModels[m.Model] = true
+		e, name := want.GapByModel[m.Model], "reconciliation.by_model."+m.Model+"."
+		for k, got := range map[string]int{
+			"harness_uncached": m.HarnessUncached, "ours_uncached": m.OursUncached,
+			"harness_cache_read": m.HarnessCacheRead, "ours_cache_read": m.OursCacheRead,
+			"harness_cache_write": m.HarnessCacheWrite, "ours_cache_write": m.OursCacheWrite,
+			"harness_output": m.HarnessOutput, "ours_output": m.OursOutput,
+		} {
+			f.count(name+k, got, e[k])
+		}
+	}
+	f.keys("reconciliation.by_model", mapKeys(gapModels), mapKeys(want.GapByModel))
 
 	projects := map[string]bool{}
 	for _, p := range r.Attribution.ByProject {
