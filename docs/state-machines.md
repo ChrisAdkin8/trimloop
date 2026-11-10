@@ -186,7 +186,8 @@ A week worked out by an older analysis or another price list is marked
 with the reason (`olderReason`): "older method: analysis 4, now 7", "older
 prices: <catalogue>", or both. Figures first measured in a later version
 show a dash for older weeks (`Week.HasNewFindings`, `Week.HasLimitHits`).
-A `--since` run neither reads nor writes the file.
+A `--since` run neither reads nor writes the file, and nor does `trimloop
+demo` (ADR 0055).
 
 Known edges: deleting logs by hand makes a later week look complete, so a
 fuller stored copy is replaced; two runs at once can overwrite each other's

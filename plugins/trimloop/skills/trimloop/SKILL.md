@@ -59,7 +59,10 @@ change worked.
 
 If it prints "No Claude Code session logs found", say so, and mention that
 `CLAUDE_CONFIG_DIR` must point at the folder holding `projects` if their
-logs are elsewhere.
+logs are elsewhere. You may offer `trimloop demo` (same options, such as
+`--format text`) to show what a report looks like. Say plainly that its
+figures come from made-up logs of an invented developer, not theirs, and
+never explain them as the user's own.
 
 ## 3. Explain the result
 
@@ -177,4 +180,5 @@ them, and leave that setting to them. Changes take effect in new Claude Code ses
 | `trimloop --open --out ~/trimloop-report.html` | the web page, saved in the home folder and opened |
 | `trimloop --since 7d` | only sessions started in the last 7 days |
 | `trimloop setup --check` | is the status line and nudge setup working? |
+| `trimloop demo` | a report on made-up logs, to show what one looks like (not the user's figures) |
 | `trimloop --version` | which build is installed |

@@ -112,7 +112,10 @@ Done:
   ([ADR 0052](docs/adr/0052-third-review-corrections.md));
 - projects credited by conversation, a card that saves nothing ranked last,
   and re-reads counted by the part of a file viewed
-  ([ADR 0053](docs/adr/0053-projects-by-conversation-and-ranking.md)).
+  ([ADR 0053](docs/adr/0053-projects-by-conversation-and-ranking.md));
+- `trimloop demo`: the report on five weeks of made-up logs built into the
+  binary, for someone with few logs of their own
+  ([ADR 0055](docs/adr/0055-demo-command.md)).
 
 To do:
 

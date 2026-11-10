@@ -54,6 +54,7 @@ The code is laid out as:
 | `internal/report` | Results, rendered as summary, text, web page and JSON |
 | `internal/history` | Weekly figures kept between runs |
 | `internal/live` | Status line, hooks and `setup` for Claude Code |
+| `internal/demo` | The made-up logs `trimloop demo` reports on (written by `scripts/gen-demo.py`) and its fixed clock |
 
 ## Releases
 

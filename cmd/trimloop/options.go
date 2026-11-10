@@ -174,13 +174,16 @@ func openInBrowser(path string) error {
 	return cmd.Process.Release()
 }
 
-// cliOptions is what checkOptions looks at on the analyse command line.
+// cliOptions is what checkOptions looks at on the analyse or demo command
+// line.
 type cliOptions struct {
-	args   []string // words left after the options
-	first  bool     // args[0] was the command line's first word
-	format string   // after --open has made html the default
-	open   bool
-	out    string
+	args        []string // words left after the options
+	first       bool     // args[0] was the command line's first word
+	format      string   // after --open has made html the default
+	open        bool
+	out         string
+	demo        bool   // the demo's command line
+	historyFlag string // "history" or "no-history" when either was given
 }
 
 // formatFor is the format each --out extension promises, and the formats
@@ -197,11 +200,12 @@ var formatFor = map[string][]string{
 func checkOptions(o cliOptions) error {
 	if len(o.args) > 0 {
 		if o.first {
-			return fmt.Errorf(`unknown command %q: run "trimloop" to analyse your logs, or "trimloop setup" to add live nudges to Claude Code`, o.args[0])
+			return fmt.Errorf(`unknown command %q: run "trimloop" to analyse your logs, "trimloop demo" to see a report on made-up ones, `+
+				`or "trimloop setup" to add live nudges to Claude Code`, o.args[0])
 		}
 		switch w := o.args[0]; w {
-		case "setup":
-			return errors.New(`"setup" goes first, with its own options after it: "trimloop setup --help" lists them`)
+		case "setup", "demo":
+			return fmt.Errorf(`%q goes first, with its own options after it: "trimloop %s --help" lists them`, w, w)
 		case "statusline", "hook":
 			return fmt.Errorf("%q goes first, with nothing before it; Claude Code runs it for you once 'trimloop setup' has added it", w)
 		case "analyse", "analyze":
@@ -210,6 +214,9 @@ func checkOptions(o cliOptions) error {
 			return errors.New(`"help" goes on its own: run "trimloop help"`)
 		}
 		return fmt.Errorf("unexpected %q: options go before it, and trimloop takes no other words", o.args[0])
+	}
+	if o.demo && o.historyFlag != "" {
+		return fmt.Errorf("--%s does not go with demo, which never reads or writes the history file", o.historyFlag)
 	}
 	if !validFormat[o.format] {
 		return fmt.Errorf("unknown format %q: use summary, text, html or json", o.format)
@@ -283,5 +290,6 @@ func noLogsMessage(dir string) string {
 		"No Claude Code session logs found in " + dir + ".",
 		"Claude Code writes them there as you use it. If yours are elsewhere, set",
 		"CLAUDE_CONFIG_DIR to the folder that holds 'projects'.",
+		"To see what a report looks like, run 'trimloop demo'.",
 	}, "\n")
 }

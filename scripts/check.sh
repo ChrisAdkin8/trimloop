@@ -8,6 +8,8 @@
 #   go test -race  tests, with the data-race detector
 #   golden drift   testdata/golden is what its scripts make (skipped without
 #                  python3, except in CI, where it fails)
+#   demo drift     internal/demo/data is what scripts/gen-demo.py makes (the
+#                  same)
 #   claude plugin validate  the marketplace and the plugin (skipped without claude)
 #   govulncheck    known vulnerabilities in dependencies (needs network)
 #
@@ -20,7 +22,7 @@ OFFLINE=0
 for arg in "$@"; do
   case "$arg" in
     --offline) OFFLINE=1 ;;
-    -h|--help) sed -n '3,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -84,7 +86,7 @@ check "go test -race" go test -race ./...
 # It runs in a subshell, so its EXIT trap removes the scratch folder however
 # it ends.
 golden_fresh() (
-  local tmp status=0
+  local tmp
   local hint="  regenerate testdata/golden with its scripts (testdata/golden/README.md, \"Regenerating\")"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT
@@ -98,16 +100,39 @@ golden_fresh() (
     echo "$hint"
     return 1
   fi
-  local tracked made f differ=()
-  if ! tracked="$(git ls-files -- testdata/golden)"; then
-    echo "  git ls-files failed: the golden check needs a git checkout"
+  same_as_made testdata/golden "$tmp" "$hint"
+)
+
+# The demo's logs must be what scripts/gen-demo.py makes today, checked the
+# same way (internal/demo).
+demo_fresh() (
+  local tmp
+  local hint="  regenerate internal/demo/data: python3 -I scripts/gen-demo.py"
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  if ! python3 -I scripts/gen-demo.py --out "$tmp" >/dev/null; then
+    echo "  scripts/gen-demo.py failed"
+    echo "$hint"
     return 1
   fi
-  tracked="$(sed 's|^testdata/golden/||' <<<"$tracked" | not_readme | LC_ALL=C sort)"
+  same_as_made internal/demo/data "$tmp" "$hint"
+)
+
+# same_as_made DIR MADE HINT: fails, saying how, unless every file git
+# tracks under DIR and every file under MADE, but the READMEs, are the same
+# files with the same bytes.
+same_as_made() {
+  local dir=$1 tmp=$2 hint=$3 status=0
+  local tracked made f differ=()
+  if ! tracked="$(git ls-files -- "$dir")"; then
+    echo "  git ls-files failed: this check needs a git checkout"
+    return 1
+  fi
+  tracked="$(sed "s|^$dir/||" <<<"$tracked" | not_readme | LC_ALL=C sort)"
   made="$(cd "$tmp" && find . -type f | sed 's|^\./||' | not_readme | LC_ALL=C sort)"
   while IFS= read -r f; do
     if [[ -n $f ]]; then
-      differ+=("Only in testdata/golden (tracked, no longer made): $f")
+      differ+=("Only in $dir (tracked, no longer made): $f")
     fi
   done < <(LC_ALL=C comm -23 <(printf '%s\n' "$tracked") <(printf '%s\n' "$made"))
   while IFS= read -r f; do
@@ -116,33 +141,36 @@ golden_fresh() (
     fi
   done < <(LC_ALL=C comm -13 <(printf '%s\n' "$tracked") <(printf '%s\n' "$made"))
   while IFS= read -r f; do
-    if [[ -n $f ]] && ! cmp -s "testdata/golden/$f" "$tmp/$f"; then
-      differ+=("Files testdata/golden/$f and the made copy differ")
+    if [[ -n $f ]] && ! cmp -s "$dir/$f" "$tmp/$f"; then
+      differ+=("Files $dir/$f and the made copy differ")
     fi
   done < <(LC_ALL=C comm -12 <(printf '%s\n' "$tracked") <(printf '%s\n' "$made"))
   if ((${#differ[@]})); then
     printf '  %s\n' "${differ[@]}"
-    echo "  testdata/golden differs from what its scripts make"
+    echo "  $dir differs from what its scripts make"
     echo "$hint"
     status=1
   fi
   return "$status"
-)
+}
 
 # not_readme drops README.md files from a list of paths, one per line.
 not_readme() { grep -v -e '^README\.md$' -e '/README\.md$' || true; }
 
-if command -v python3 >/dev/null 2>&1; then
-  check "golden drift" golden_fresh
-elif [[ -n ${CI:-} ]]; then
-  # Without this, a runner image that dropped Python would drop the guard
-  # silently.
-  printf '%s==> golden drift%s\n' "$BOLD" "$RESET"
-  printf '  %s✗%s golden drift: python3 not found, and CI needs it for this step (install Python in the workflow)\n' "$RED" "$RESET"
-  failed+=("golden drift")
-else
-  printf '%s==> golden drift%s\n  skipped (python3 not installed; CI runs it)\n' "$BOLD" "$RESET"
-fi
+for step in "golden drift:golden_fresh" "demo drift:demo_fresh"; do
+  name=${step%%:*}
+  if command -v python3 >/dev/null 2>&1; then
+    check "$name" "${step#*:}"
+  elif [[ -n ${CI:-} ]]; then
+    # Without this, a runner image that dropped Python would drop the guard
+    # silently.
+    printf '%s==> %s%s\n' "$BOLD" "$name" "$RESET"
+    printf '  %s✗%s %s: python3 not found, and CI needs it for this step (install Python in the workflow)\n' "$RED" "$RESET" "$name"
+    failed+=("$name")
+  else
+    printf '%s==> %s%s\n  skipped (python3 not installed; CI runs it)\n' "$BOLD" "$name" "$RESET"
+  fi
+done
 # The Claude Code plugin and marketplace (ADR 0049); CI runs it too.
 if command -v claude >/dev/null 2>&1; then
   check "claude plugin validate (marketplace)" claude plugin validate . --strict
