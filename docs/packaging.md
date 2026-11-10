@@ -316,7 +316,7 @@ because those change findings.
 
 ### Cutting a release
 
-Pushing a version tag (`git tag v0.1.0 && git push origin v0.1.0`) runs
+Pushing a version tag (`git tag v0.2.0 && git push origin v0.2.0`) runs
 [.github/workflows/release.yml](../.github/workflows/release.yml), which
 builds a draft GitHub release with [GoReleaser](../.goreleaser.yaml):
 archives for macOS and Linux, each for amd64 (Intel and AMD) and arm64
@@ -339,16 +339,16 @@ provenance (both need it public, or a paid plan) and stay drafts.
 2. Make this repository public, and turn on private vulnerability
    reporting (Settings → Code security), which the README's "Licence and
    security" section points people to.
-3. Delete the v0.1.0 draft and its tag, then tag the current commit and
-   push the tag (re-running the old workflow would rebuild the old commit).
+3. Delete the v0.1.0 draft, then tag the current commit with a new
+   version and push the tag (re-running the old workflow would rebuild the
+   old commit). Done with v0.2.0: v0.1.0 cannot be reused, because Go's
+   module proxy and checksum database recorded it at the old commit once
+   the repository was public, so its tag stays.
 4. Check that the new draft is signed, and publish it.
 5. Make the tap public.
 6. Add the README badges that need a public repository: the latest
-   release (`img.shields.io/github/v/release/ChrisAdkin8/trimloop`), Go
-   Reference (`pkg.go.dev/badge/github.com/ChrisAdkin8/trimloop.svg`) and
-   Go Report Card (`goreportcard.com/badge/github.com/ChrisAdkin8/trimloop`).
-   The Go badge can then read the version from `go.mod`
-   (`img.shields.io/github/go-mod/go-version/ChrisAdkin8/trimloop`).
+   release, Go Reference, and the Go version read from `go.mod`. Done with
+   v0.2.0; Go Report Card has none, as that service is retired.
 
 ### Pinned by hand
 
