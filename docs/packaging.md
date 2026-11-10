@@ -384,9 +384,10 @@ The packaging parts of the layout — `cmd/trimloop-kong/`,
 
 ## 13. Open questions
 
-1. **Licence.** Settled by [ADR 0046](adr/0046-licensing.md): the
-   binary is FSL-1.1-ALv2, the Python plugin and other connectors
-   Apache-2.0, and team features commercial.
+1. **Licence.** Settled by [ADR 0054](adr/0054-apache-2-licence.md),
+   which replaces [ADR 0046](adr/0046-licensing.md): everything in the
+   repository is Apache-2.0. Whether team features are commercial is
+   decided when M2 starts.
 2. **Homebrew.** Own tap first; apply to homebrew-core once the project
    meets its popularity rules?
 3. **Windows.** Wait for demand, or ship `analyse` early because transcript

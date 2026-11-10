@@ -731,8 +731,8 @@ testdata/sessions/          synthetic fixture sessions + expected findings
 Adapters and database-backed stores live under `internal/`, which Go
 enforces as private, so the public core has no I/O dependencies.
 `internal/collector/` keeps team-only features in one place, so they can
-carry a commercial licence ([ADR 0046](adr/0046-licensing.md)) without a
-restructure.
+carry a different licence, if M2 decides they are commercial
+([ADR 0054](adr/0054-apache-2-licence.md)), without a restructure.
 
 ## 13. Performance targets
 

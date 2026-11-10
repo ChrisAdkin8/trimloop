@@ -1,6 +1,6 @@
 # ADR 0046: Licensing — FSL core, Apache-2.0 connectors, commercial team features
 
-- Status: Accepted — partly built: [LICENSE.md](../../LICENSE.md) puts the repository under FSL-1.1-ALv2; the Apache-2.0 connectors and the commercial team features do not exist yet
+- Status: Superseded by [ADR 0054](0054-apache-2-licence.md) (the repository is Apache-2.0); decisions 4 (no outside contributions without an agreement) and 5 (the name) carry over. Was: Accepted — partly built: LICENSE.md put the repository under FSL-1.1-ALv2
 - Date: 2026-11-08
 - Amends: [ADR 0008](0008-packaging-and-distribution.md) (settles the licensing decision it left open); closes ROADMAP open question 2 and packaging.md open question 1
 

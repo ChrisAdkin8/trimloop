@@ -377,10 +377,11 @@ the steps for making the repository public, are in
 
 ## Licence and security
 
-Licence: [FSL-1.1-ALv2](LICENSE.md) (the Functional Source Licence). You
-may read, use and change the code for any purpose except offering it to
-others in a commercial product or service that competes with Trimloop, and
-each version becomes Apache-2.0 two years after its release.
+Licence: [Apache-2.0](LICENSE). You may use, change and share the code
+for any purpose, including in commercial products, as long as you keep the
+licence and the [NOTICE](NOTICE) file with it. The licence does not cover
+the name "Trimloop"
+([ADR 0054](docs/adr/0054-apache-2-licence.md)).
 
 Outside contributions are not accepted yet: they will need a contributor
 licence agreement.
