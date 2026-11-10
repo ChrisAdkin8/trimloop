@@ -215,6 +215,16 @@ Or, from a terminal, in one step:
 `claude plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The
 plugin changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
 
+**Check it works.** The plugin works in Claude Code (the `claude` command,
+or the Code tab of the Claude desktop app), not in Claude's chat, which
+cannot see your computer. Skills load when a session starts, so start a new
+session after installing, then type `/trimloop:trimloop`: Claude should run
+trimloop. If Claude Code does not know that command, the plugin is not
+installed or not turned on: in a terminal, `claude plugin list` should show
+`trimloop@trimloop` as enabled. While this repository is private, Claude
+Code downloads it with Git over SSH, so the computer needs an SSH key added
+to your GitHub account: `ssh -T git@github.com` should greet you by name.
+
 ## Live nudges in Claude Code
 
 Trimloop can also nudge you while you work:
