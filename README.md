@@ -12,20 +12,20 @@ see [The plan](#the-plan).
 
 ## What you get
 
-A run on one developer's 45 days of logs, shortened (the full output also
+A run on one developer's 46 days of logs, shortened (the full output also
 covers their usage limits):
 
 ```text
-Read 574 logs: 573 sessions, 18,601 turns.
-Spent $2,330 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $362 a week.
-Claude Code's own records show $202 (11%) more than its logs: requests the logs do not record.
+Read 611 logs: 594 sessions, 20,256 turns.
+Spent $2,465 at list prices from 25 Sep to 10 Nov 2026 (46 days), about $375 a week.
+Claude Code's own records show $221 (11%) more than its logs: requests the logs do not record.
 
 What to do first (these savings overlap, so do not add them):
-  1. Compact long sessions earlier: likely about $581 ($557–$694), up to $896 (38%)
+  1. Compact long sessions earlier: likely about $618 ($585–$680), up to $947 (38%)
      Compact when a session passes about 200,000 tokens, or between tasks.
-  2. Run sub-agents on a cheaper model: up to $312 (13%)
+  2. Run sub-agents on a cheaper model: up to $337 (14%)
      Run sub-agents that search, read and summarise on Sonnet 5.5.
-  3. Start fresh after a long break: likely about $301, up to $312 (13%)
+  3. Start fresh after a long break: likely about $302, up to $312 (13%)
      After a break of over an hour, start a new session with a short note instead of carrying on.
 ```
 
