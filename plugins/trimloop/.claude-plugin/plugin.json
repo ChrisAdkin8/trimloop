@@ -1,6 +1,6 @@
 {
   "name": "trimloop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Find where your Claude Code tokens go, and which changes to how you work save the most. Needs the trimloop program; see the repository's Install section.",
   "author": {
     "name": "Chris Adkin"

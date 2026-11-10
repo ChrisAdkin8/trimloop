@@ -1,8 +1,10 @@
 # Trimloop
 
 [![CI](https://github.com/ChrisAdkin8/trimloop/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ChrisAdkin8/trimloop/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/ChrisAdkin8/trimloop)](https://github.com/ChrisAdkin8/trimloop/releases/latest)
 [![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
-[![Go 1.27.3 or later](https://img.shields.io/badge/go-1.27.3%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![Go version](https://img.shields.io/github/go-mod/go-version/ChrisAdkin8/trimloop?logo=go&logoColor=white)](go.mod)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ChrisAdkin8/trimloop.svg)](https://pkg.go.dev/github.com/ChrisAdkin8/trimloop)
 [![Platforms: macOS and Linux](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey)](#install)
 [![Status: early prototype, M0](https://img.shields.io/badge/status-early%20prototype%20%28M0%29-orange)](ROADMAP.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](#ask-claude-about-it-claude-code-plugin)
@@ -91,23 +93,25 @@ see whether a change worked. The codes (P19 and so on) refer to
 
 ## Install
 
-No release is published yet, so for now build it from source, with Go
-1.27.3 or later:
+With [Homebrew](https://brew.sh) (macOS or Linux):
+
+```bash
+brew install --cask chrisadkin8/tap/trimloop
+```
+
+Or **download** the archive for your system from the
+[releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
+it, and put `trimloop` somewhere on your PATH (for example
+`~/.local/bin`). [Checking a download](#checking-a-download) says how to
+verify it, and what to do if macOS refuses to open it.
+
+Or **build it from source**, with Go 1.27.3 or later:
 
 ```bash
 git clone https://github.com/ChrisAdkin8/trimloop.git
 cd trimloop
 go build -o ~/.local/bin/trimloop ./cmd/trimloop
 ```
-
-Once releases are public, either of these will work instead:
-
-- **Homebrew** (macOS or Linux): `brew install --cask chrisadkin8/tap/trimloop`
-- **Download** the archive for your system from the
-  [releases page](https://github.com/ChrisAdkin8/trimloop/releases), unpack
-  it, and put `trimloop` somewhere on your PATH (for example
-  `~/.local/bin`). [Checking a download](#checking-a-download) says how to
-  verify it, and what to do if macOS refuses to open it.
 
 Check it worked with `trimloop --version`. If the shell says "command not
 found", the folder is not on your PATH (the list of folders the shell
@@ -125,11 +129,11 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 
 Download `checksums.txt`, `checksums.txt.sigstore.json` and your archive
 into one folder. First check that the release workflow signed the
-checksums (put the release's tag in place of `v0.1.0`):
+checksums (put the release's tag in place of `v0.2.0`):
 
 ```bash
 cosign verify-blob \
-  --certificate-identity 'https://github.com/ChrisAdkin8/trimloop/.github/workflows/release.yml@refs/tags/v0.1.0' \
+  --certificate-identity 'https://github.com/ChrisAdkin8/trimloop/.github/workflows/release.yml@refs/tags/v0.2.0' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
   --bundle checksums.txt.sigstore.json checksums.txt
 ```
@@ -203,8 +207,13 @@ CLAUDE_CONFIG_DIR=/tmp/trimloop-demo trimloop --no-history --format text
 
 The trimloop plugin adds a skill to Claude Code. Ask "where did my tokens
 go?" or "why do I keep hitting my usage limit?", and Claude runs trimloop
-and explains the result in plain words. It needs trimloop
-[installed](#install). In Claude Code:
+and explains the result in plain words.
+
+**Install trimloop first.** The plugin runs the trimloop program but does
+not include it. Install it as in [Install](#install) (Homebrew is the
+quickest), and check that `trimloop --version` works in a terminal.
+
+Then, in Claude Code:
 
 ```text
 /plugin marketplace add ChrisAdkin8/trimloop
@@ -214,6 +223,15 @@ and explains the result in plain words. It needs trimloop
 Or, from a terminal, in one step:
 `claude plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The
 plugin changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
+
+**Check it works.** First, `trimloop --version` should work in a
+terminal. The plugin works in Claude Code (the `claude` command,
+or the Code tab of the Claude desktop app), not in Claude's chat, which
+cannot see your computer. Skills load when a session starts, so start a new
+session after installing, then type `/trimloop:trimloop`: Claude should run
+trimloop. If Claude Code does not know that command, the plugin is not
+installed or not turned on: in a terminal, `claude plugin list` should show
+`trimloop@trimloop` as enabled.
 
 ## Live nudges in Claude Code
 
