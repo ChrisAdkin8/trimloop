@@ -222,16 +222,17 @@ server names stay.
 
 ### Try it without your own logs
 
-The repository has a sample session. `CLAUDE_CONFIG_DIR` tells trimloop to
-read another folder laid out like `~/.claude`:
+To see what a report looks like before you have many logs of your own:
 
 ```bash
-mkdir -p /tmp/trimloop-demo/projects/demo
-cp testdata/sessions/tools.jsonl /tmp/trimloop-demo/projects/demo/
-CLAUDE_CONFIG_DIR=/tmp/trimloop-demo trimloop --no-history --format text
+trimloop demo           # the summary, on five weeks of made-up logs
+trimloop demo --open    # the web page
 ```
 
-`--no-history` keeps the demo out of your weekly figures.
+The demo's logs are an invented developer's, built into trimloop. It reads
+none of your files, writes none but the report when that goes to a file,
+and shows the same figures on every machine. It takes the same options as
+`trimloop` but `--history` and `--no-history`.
 
 ## Ask Claude about it (Claude Code plugin)
 
@@ -313,6 +314,7 @@ Everything stays on your machine, readable by you only:
 | `~/.trimloop/live/<session>.json` | Which nudges a session has been shown |
 | `~/.trimloop/nudges.jsonl` | Each nudge shown: time, kind, session size |
 | `~/.trimloop/limits.jsonl` (or `limits-<id>.jsonl`) | Pro and Max only: how much of your 5-hour and weekly limits was used, each time it changed |
+| A copy of the demo's made-up logs, in a new temporary folder | Nothing of yours; `trimloop demo` removes it when it ends |
 | `~/.trimloop/backups/settings.json-<id>.trimloop-backup-<time>` | A copy of your Claude Code settings from before each `setup --write` that changed them; it can hold API keys from those settings. Delete old ones when you no longer need them |
 
 ## The plan
