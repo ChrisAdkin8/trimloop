@@ -247,7 +247,7 @@ func parseArgs(forDemo bool, args []string, now time.Time, stdout, stderr io.Wri
 	fs := flag.NewFlagSet("trimloop", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // a mistake is explained below, in one line
 	fs.Usage = func() {}
-	fs.StringVar(&o.format, "format", "summary", "report format: summary (a few lines), text (the full report), html or json")
+	fs.StringVar(&o.format, "format", "summary", "report format: summary (a few lines), text (the full report), html, json, or share (a few lines with no names, safe to paste elsewhere)")
 	fs.StringVar(&o.out, "out", "", "write the report to this file (default: standard output, or "+defaultHTML+" for html; - for standard output)")
 	fs.BoolVar(&o.noTitles, "no-titles", false, "leave out session titles, which summarise what was asked")
 	fs.StringVar(&o.history, "history", "", "file that keeps weekly figures between runs (default ~/.trimloop/history.json; with CLAUDE_CONFIG_DIR, one file per folder)")
@@ -302,9 +302,9 @@ func parseArgs(forDemo bool, args []string, now time.Time, stdout, stderr io.Wri
 
 // usage prints how to run trimloop and every analyse option.
 func usage(w io.Writer, fs *flag.FlagSet) {
-	fmt.Fprint(w, "Usage: trimloop [analyse] [--format summary|text|html|json] [--out FILE] [--open] [--since DATE]\n"+
+	fmt.Fprint(w, "Usage: trimloop [analyse] [--format summary|text|html|json|share] [--out FILE] [--open] [--since DATE]\n"+
 		"                         [--no-titles] [--history FILE | --no-history]\n"+
-		"       trimloop demo [--format summary|text|html|json] [--out FILE] [--open] [--since DATE] [--no-titles]\n"+
+		"       trimloop demo [--format summary|text|html|json|share] [--out FILE] [--open] [--since DATE] [--no-titles]\n"+
 		"       trimloop --version\n"+
 		"       trimloop setup [--write SETTINGS_FILE] [--replace-statusline]\n"+
 		"       trimloop setup --check [--settings SETTINGS_FILE]\n"+
@@ -518,10 +518,13 @@ const discard = "/dev/null"
 // toStdout reports whether --out path means standard output.
 func toStdout(path string) bool { return path == "-" || path == "/dev/stdout" }
 
-var validFormat = map[string]bool{"summary": true, "text": true, "html": true, "json": true}
+var validFormat = map[string]bool{"summary": true, "text": true, "html": true, "json": true, "share": true}
 
 // summary prints the short summary, pointing to the full formats.
 func summary(out io.Writer, r report.Results) error { return report.WriteSummary(out, r, "", 3) }
+
+// share prints the few lines that are safe to paste where others read them.
+func share(out io.Writer, r report.Results) error { return report.WriteShare(out, r, 3) }
 
 // write renders r in format to path, or to standard output if path is empty,
 // "-" or /dev/stdout (HTML goes to a file when path is empty); /dev/null
@@ -537,6 +540,7 @@ func write(r report.Results, format, path string) (string, error) {
 		"text":    report.WriteText,
 		"json":    report.WriteJSON,
 		"html":    report.WriteHTML,
+		"share":   share,
 	}[format]
 	switch {
 	case path == "" || toStdout(path):
@@ -547,8 +551,8 @@ func write(r report.Results, format, path string) (string, error) {
 	if err := writeFile(path, func(w io.Writer) error { return render(w, r) }); err != nil {
 		return "", err
 	}
-	if format == "summary" {
-		return path, nil
+	if format == "summary" || format == "share" {
+		return path, nil // short already: no summary of it
 	}
 	return path, report.WriteSummary(os.Stdout, r, path, 3)
 }

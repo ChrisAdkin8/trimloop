@@ -3,7 +3,7 @@
 Trimloop is building M0 (`trimloop analyse`): the design documents are the
 spec, and a Go prototype lives in `cmd/`, `internal/` and `pkg/`. Run it with
 `go run ./cmd/trimloop/` (the package, not `main.go`; it prints a summary,
-and `--format text|html|json`, `--out FILE`, `--open`, `--since DATE|7d`
+and `--format text|html|json|share`, `--out FILE`, `--open`, `--since DATE|7d`
 and `--no-titles` change the output; `--since` leaves the history file
 alone) and test with `go test ./...`. To try it without real logs, copy a
 file from `testdata/sessions` into `<dir>/projects/demo/` and set

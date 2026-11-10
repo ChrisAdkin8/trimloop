@@ -115,3 +115,53 @@ func TestDemoRefusesHistoryOptions(t *testing.T) {
 		}
 	}
 }
+
+// The share format holds figures and trimloop's own words only: nothing
+// the report took as text from the logs (project names, session ids and
+// titles) may reach it.
+func TestDemoShare(t *testing.T) {
+	buildVersion = "v9.9.9"
+	defer func() { buildVersion = "" }()
+	const want = `Claude Code usage over 33 days: $149 at list prices, about $32 a week (38 sessions, 604 turns).
+39% of the spend went on sending turns over 200k tokens.
+
+What would save the most (the savings overlap, so they are not added up):
+  1. Compact long sessions earlier: likely about $9.16 ($7.39–$10.00), up to $39 (26%)
+  2. Start fresh after a long break: likely about $29, up to $31 (21%)
+  3. Run sub-agents on a cheaper model: up to $12 (8%)
+
+Worked out by trimloop v9.9.9 from local logs: https://github.com/ChrisAdkin8/trimloop
+`
+	code, shared, _ := demoRun(t, "--format", "share")
+	if code != 0 || shared != want {
+		t.Fatalf("exit code %d, share:\n%s\nwant:\n%s", code, shared, want)
+	}
+
+	_, full, _ := demoRun(t, "--format", "json", "--out", "-")
+	var r struct {
+		Attribution struct {
+			ByProject []struct {
+				Name string `json:"name"`
+			} `json:"by_project"`
+		} `json:"attribution"`
+		Labels map[string]struct {
+			Title string `json:"title"`
+		} `json:"labels"`
+	}
+	if err := json.Unmarshal([]byte(full), &r); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Attribution.ByProject) == 0 || len(r.Labels) == 0 {
+		t.Fatal("the demo report names no projects or sessions: nothing to check the share format against")
+	}
+	for _, p := range r.Attribution.ByProject {
+		if strings.Contains(shared, p.Name) {
+			t.Errorf("the share format names the project %q", p.Name)
+		}
+	}
+	for id, l := range r.Labels {
+		if strings.Contains(shared, id) || l.Title != "" && strings.Contains(shared, l.Title) {
+			t.Errorf("the share format names the session %s (%q)", id, l.Title)
+		}
+	}
+}
