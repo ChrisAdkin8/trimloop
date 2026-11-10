@@ -14,6 +14,7 @@ import (
 
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source"
 	"github.com/ChrisAdkin8/trimloop/internal/adapters/source/claudecode"
+	"github.com/ChrisAdkin8/trimloop/internal/demo"
 	"github.com/ChrisAdkin8/trimloop/internal/history"
 	"github.com/ChrisAdkin8/trimloop/internal/live"
 	"github.com/ChrisAdkin8/trimloop/internal/report"
@@ -23,18 +24,21 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
+	args := os.Args[1:]
+	if len(args) > 0 {
+		switch args[0] {
 		case "statusline", "hook", "setup":
-			os.Exit(runLive(os.Args[1], os.Args[2:]))
+			os.Exit(runLive(args[0], args[1:]))
 		case "help":
-			_, code, _ := parseArgs([]string{"--help"}, os.Stdout, os.Stderr)
+			_, code, _ := parseArgs(false, []string{"--help"}, time.Now(), os.Stdout, os.Stderr)
 			os.Exit(code)
+		case "demo":
+			os.Exit(runDemo(args[1:]))
 		case "analyse", "analyze":
-			os.Args = append(os.Args[:1], os.Args[2:]...)
+			args = args[1:]
 		}
 	}
-	analyse()
+	os.Exit(runAnalyse(args))
 }
 
 // runLive runs the commands Claude Code calls while a session is open, and
@@ -233,11 +237,12 @@ type analyseOptions struct {
 // helpHint ends the one line that explains a mistake on the command line.
 const helpHint = "Run 'trimloop --help' to see every option.\n"
 
-// parseArgs reads the analyse command line: args without the program name
-// or the word analyse. It returns false, with the exit code, when the run
+// parseArgs reads the analyse command line, or the demo's (forDemo): args
+// without the program name or the word analyse or demo. A --since span
+// counts back from now. It returns false, with the exit code, when the run
 // stops here: after --help or --version, printed to stdout (0), or after a
 // mistake, explained in one line on stderr (2).
-func parseArgs(args []string, stdout, stderr io.Writer) (analyseOptions, int, bool) {
+func parseArgs(forDemo bool, args []string, now time.Time, stdout, stderr io.Writer) (analyseOptions, int, bool) {
 	var o analyseOptions
 	fs := flag.NewFlagSet("trimloop", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // a mistake is explained below, in one line
@@ -262,23 +267,32 @@ func parseArgs(args []string, stdout, stderr io.Writer) (analyseOptions, int, bo
 		fmt.Fprintln(stdout, "trimloop", version())
 		return o, 0, false
 	}
-	formatSet := false
-	fs.Visit(func(f *flag.Flag) { formatSet = formatSet || f.Name == "format" })
+	formatSet, historyFlag := false, ""
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "format":
+			formatSet = true
+		case "history", "no-history":
+			historyFlag = f.Name
+		}
+	})
 	if o.open && !formatSet {
 		o.format = "html"
 	}
 	if err := checkOptions(cliOptions{
-		args:   fs.Args(),
-		first:  fs.NArg() == len(args), // nothing came before the first word
-		format: o.format,
-		open:   o.open,
-		out:    o.out,
+		args:        fs.Args(),
+		first:       !forDemo && fs.NArg() == len(args), // nothing came before the first word
+		format:      o.format,
+		open:        o.open,
+		out:         o.out,
+		demo:        forDemo,
+		historyFlag: historyFlag,
 	}); err != nil {
 		fmt.Fprintf(stderr, "%v.\n%s", err, helpHint)
 		return o, 2, false
 	}
 	if *sinceArg != "" {
-		if o.since, err = parseSince(*sinceArg, time.Now()); err != nil {
+		if o.since, err = parseSince(*sinceArg, now); err != nil {
 			fmt.Fprintln(stderr, err)
 			return o, 2, false
 		}
@@ -290,12 +304,14 @@ func parseArgs(args []string, stdout, stderr io.Writer) (analyseOptions, int, bo
 func usage(w io.Writer, fs *flag.FlagSet) {
 	fmt.Fprint(w, "Usage: trimloop [analyse] [--format summary|text|html|json] [--out FILE] [--open] [--since DATE]\n"+
 		"                         [--no-titles] [--history FILE | --no-history]\n"+
+		"       trimloop demo [--format summary|text|html|json] [--out FILE] [--open] [--since DATE] [--no-titles]\n"+
 		"       trimloop --version\n"+
 		"       trimloop setup [--write SETTINGS_FILE] [--replace-statusline]\n"+
 		"       trimloop setup --check [--settings SETTINGS_FILE]\n"+
 		"       trimloop statusline | trimloop hook stop|prompt   (run by Claude Code)\n\n"+
-		"Analyses Claude Code session logs on this machine for token waste. 'setup' adds live\n"+
-		"nudges to Claude Code: a status line and two hooks.\n\n")
+		"Analyses Claude Code session logs on this machine for token waste. 'demo' shows the\n"+
+		"report on made-up logs. 'setup' adds live nudges to Claude Code: a status line and\n"+
+		"two hooks.\n\n")
 	fs.SetOutput(w)
 	fs.PrintDefaults()
 	fs.SetOutput(io.Discard)
@@ -315,33 +331,114 @@ func optionError(err error) string {
 	return strings.Replace(msg, " for -", " for --", 1)
 }
 
-// analyse reads every session log and writes the report.
-func analyse() {
-	o, code, ok := parseArgs(os.Args[1:], os.Stdout, os.Stderr)
+// runAnalyse reads every session log on this machine and writes the
+// report. It returns the exit code.
+func runAnalyse(args []string) int {
+	now := time.Now()
+	o, code, ok := parseArgs(false, args, now, os.Stdout, os.Stderr)
 	if !ok {
-		os.Exit(code)
+		return code
 	}
-
 	home, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return 1
 	}
+	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
+	claude := claudecode.Reader{Home: home, ConfigDir: cfgDir}
 
+	// What the report needs from outside the logs: this build, the plan,
+	// the status line's usage-limit readings (ADR 0048) and how long Claude
+	// Code keeps logs (ADR 0050).
+	readings, err := history.LoadLimits(history.LimitsPath(home, cfgDir))
+	if err != nil {
+		log.Printf("usage-limit readings not used: %v", err)
+	}
+	plan := claude.Plan()
+	days, set := claude.Retention()
+	a := analysis{
+		claude: claude,
+		local: report.Local{
+			Version:   version(),
+			Plan:      report.Plan{Name: plan.Name, Subscription: plan.Subscription},
+			Readings:  readings,
+			Retention: report.Retention{Days: days, Set: set},
+		},
+		now: now,
+	}
+	if !o.noHistory {
+		a.history = o.history
+		if a.history == "" {
+			a.history = defaultHistory(home, cfgDir)
+		}
+	}
+	return analyse(o, a)
+}
+
+// demoBanner says, on standard error so that JSON on standard output stays
+// valid, whose logs a demo report is about.
+const demoBanner = "trimloop demo: these are made-up logs of an invented developer, not yours; run 'trimloop' to analyse your own."
+
+// runDemo writes the report on the made-up logs in internal/demo, so that
+// someone with few logs of their own can see one (ADR 0055). Nothing of the
+// user's is read or written: not their logs, plan, usage-limit readings or
+// log retention setting, nor the history file. It returns the exit code.
+func runDemo(args []string) int {
+	o, code, ok := parseArgs(true, args, demo.Now, os.Stdout, os.Stderr)
+	if !ok {
+		return code
+	}
+	// The log reader reads files, so the logs are copied out for the run.
+	dir, err := os.MkdirTemp("", "trimloop-demo-")
+	if err != nil {
+		log.Print(err)
+		return 1
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			log.Print(err)
+		}
+	}()
+	if err := os.CopyFS(dir, demo.Logs()); err != nil {
+		log.Print(err)
+		return 1
+	}
+	fmt.Fprintln(os.Stderr, demoBanner)
+	return analyse(o, analysis{
+		claude: claudecode.Reader{ConfigDir: dir},
+		local:  report.Local{Version: version()},
+		now:    demo.Now,
+	})
+}
+
+// analysis is what a report is made from besides the command line: the
+// logs, what is known from outside them, the clock, and the history file
+// to keep ("" for none).
+type analysis struct {
+	claude  claudecode.Reader
+	local   report.Local
+	now     time.Time
+	history string
+}
+
+// analyse reads the logs a names and writes the report o asks for. It
+// returns the exit code.
+func analyse(o analyseOptions, a analysis) int {
 	// The harnesses to read. Adding a harness is one line here.
-	claude := claudecode.Reader{Home: home, ConfigDir: os.Getenv("CLAUDE_CONFIG_DIR")}
-	readers := []source.Reader{claude}
+	readers := []source.Reader{a.claude}
 
 	// 1. Find and read every log, and build their sessions.
 	all, st, err := sessions.Load(readers)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return 1
 	}
 	for _, p := range st.Problems {
 		log.Print(p) // a log that failed partway: what was read is kept
 	}
 	if st.Logs == 0 {
-		fmt.Fprintln(os.Stderr, noLogsMessage(claude.Projects()))
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, noLogsMessage(a.claude.Projects()))
+		return 1
 	}
 	read := report.Read{Logs: st.Logs, Failed: len(st.Problems), BadLines: st.BadLines}
 	if !o.since.IsZero() {
@@ -349,49 +446,32 @@ func analyse() {
 		// weeks, so a --since run leaves the history file alone.
 		all = startedSince(all, o.since)
 		read.Since = o.since.Format("2006-01-02")
-		o.noHistory = true
+		a.history = ""
 		if len(all) == 0 {
 			fmt.Fprintf(os.Stderr, "No sessions started on or after %s.\n", o.since.Format("2 Jan 2006"))
-			os.Exit(1)
+			return 1
 		}
 	}
 
 	// 2. Run the findings and write the report.
-	// What the report needs from outside the logs: this build, the plan,
-	// the status line's usage-limit readings (ADR 0048) and how long Claude
-	// Code keeps logs (ADR 0050).
-	readings, err := history.LoadLimits(history.LimitsPath(home, os.Getenv("CLAUDE_CONFIG_DIR")))
-	if err != nil {
-		log.Printf("usage-limit readings not used: %v", err)
-	}
-	plan := claude.Plan()
-	days, set := claude.Retention()
-	local := report.Local{
-		Version:   version(),
-		Plan:      report.Plan{Name: plan.Name, Subscription: plan.Subscription},
-		Readings:  readings,
-		Retention: report.Retention{Days: days, Set: set},
-	}
 	settings := report.DefaultSettings()
 	settings.Titles = !o.noTitles
-	r := report.Analyse(all, read, local, settings, time.Now())
-	if !o.noHistory {
-		path := o.history
-		if path == "" {
-			path = defaultHistory(home, os.Getenv("CLAUDE_CONFIG_DIR"))
-		}
-		keepHistory(&r, path, st.Oldest)
+	settings.Location = a.now.Location() // weeks in the clock's zone: local time, or the demo's
+	r := report.Analyse(all, read, a.local, settings, a.now)
+	if a.history != "" {
+		keepHistory(&r, a.history, st.Oldest)
 	}
 	path, err := write(r, o.format, o.out)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not write the report: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	if o.open {
 		if err := openInBrowser(path); err != nil {
 			log.Print(err) // the report is written; say why it did not open
 		}
 	}
+	return 0
 }
 
 // defaultHistory is where weekly figures are kept: one file per set of

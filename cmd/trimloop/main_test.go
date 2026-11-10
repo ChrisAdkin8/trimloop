@@ -119,20 +119,24 @@ func TestWriteSpecialNames(t *testing.T) {
 }
 
 // captureStdout returns what f writes to standard output.
-func captureStdout(t *testing.T, f func()) string {
+func captureStdout(t *testing.T, f func()) string { return capture(t, &os.Stdout, f) }
+
+// capture returns what f writes to *file, standard output or standard
+// error.
+func capture(t *testing.T, file **os.File, f func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	old := os.Stdout
-	os.Stdout = w
+	old := *file
+	*file = w
 	done := make(chan string)
 	go func() {
 		b, _ := io.ReadAll(r)
 		done <- string(b)
 	}()
-	defer func() { os.Stdout = old }()
+	defer func() { *file = old }()
 	f()
 	_ = w.Close()
 	return <-done

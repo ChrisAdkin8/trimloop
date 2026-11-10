@@ -138,7 +138,12 @@ func TestCheckOptions(t *testing.T) {
 	}{
 		{"defaults", cliOptions{format: "summary"}, ""},
 		{"unknown command", cliOptions{args: []string{"report"}, first: true, format: "summary"},
-			`unknown command "report": run "trimloop" to analyse your logs, or "trimloop setup"`},
+			`unknown command "report": run "trimloop" to analyse your logs, "trimloop demo" to see a report on made-up ones, or "trimloop setup"`},
+		{"demo after options", cliOptions{args: []string{"demo"}, format: "summary"},
+			`"demo" goes first, with its own options after it: "trimloop demo --help" lists them`},
+		{"word after demo", cliOptions{args: []string{"report"}, format: "summary", demo: true}, `unexpected "report"`},
+		{"demo with --history", cliOptions{format: "summary", demo: true, historyFlag: "history"},
+			"--history does not go with demo, which never reads or writes the history file"},
 		{"word after options", cliOptions{args: []string{"extra"}, format: "text"}, `unexpected "extra"`},
 		{"setup after options", cliOptions{args: []string{"setup"}, format: "summary"},
 			`"setup" goes first, with its own options after it`},
@@ -192,25 +197,33 @@ func TestCheckOptions(t *testing.T) {
 func TestParseArgs(t *testing.T) {
 	for _, c := range []struct {
 		name    string
+		demo    bool
 		args    []string
 		code    int
 		goOn    bool
 		out     string // in standard output
 		errLine string // the first line of standard error, exactly
 	}{
-		{"defaults", nil, 0, true, "", ""},
-		{"unknown option", []string{"--foo"}, 2, false, "", "unknown option --foo."},
-		{"unknown short option", []string{"-foo=1"}, 2, false, "", "unknown option --foo."},
-		{"missing value", []string{"--out"}, 2, false, "", "--out needs a value."},
-		{"bad boolean", []string{"--open=maybe"}, 2, false, "", `invalid boolean value "maybe" for --open: parse error.`},
-		{"help", []string{"--help"}, 0, false, "Usage: trimloop", ""},
-		{"short help", []string{"-h"}, 0, false, "--no-history", ""},
-		{"version", []string{"--version"}, 0, false, "trimloop ", ""},
-		{"setup after an option", []string{"--no-history", "setup"}, 2, false, "", `"setup" goes first, with its own options after it: "trimloop setup --help" lists them.`},
-		{"bad since", []string{"--since", "soon"}, 2, false, "", `--since "soon": give a date such as 2026-11-01, or a number of days or weeks such as 7d or 2w`},
+		{"defaults", false, nil, 0, true, "", ""},
+		{"unknown option", false, []string{"--foo"}, 2, false, "", "unknown option --foo."},
+		{"unknown short option", false, []string{"-foo=1"}, 2, false, "", "unknown option --foo."},
+		{"missing value", false, []string{"--out"}, 2, false, "", "--out needs a value."},
+		{"bad boolean", false, []string{"--open=maybe"}, 2, false, "", `invalid boolean value "maybe" for --open: parse error.`},
+		{"help", false, []string{"--help"}, 0, false, "Usage: trimloop", ""},
+		{"short help", false, []string{"-h"}, 0, false, "--no-history", ""},
+		{"version", false, []string{"--version"}, 0, false, "trimloop ", ""},
+		{"setup after an option", false, []string{"--no-history", "setup"}, 2, false, "", `"setup" goes first, with its own options after it: "trimloop setup --help" lists them.`},
+		{"bad since", false, []string{"--since", "soon"}, 2, false, "", `--since "soon": give a date such as 2026-11-01, or a number of days or weeks such as 7d or 2w`},
+		{"demo", true, nil, 0, true, "", ""},
+		{"demo with --no-history", true, []string{"--no-history"}, 2, false, "",
+			"--no-history does not go with demo, which never reads or writes the history file."},
+		{"demo with --history", true, []string{"--history", "h.json"}, 2, false, "",
+			"--history does not go with demo, which never reads or writes the history file."},
+		{"demo with a word", true, []string{"report"}, 2, false, "",
+			`unexpected "report": options go before it, and trimloop takes no other words.`},
 	} {
 		var out, errOut strings.Builder
-		o, code, ok := parseArgs(c.args, &out, &errOut)
+		o, code, ok := parseArgs(c.demo, c.args, time.Now(), &out, &errOut)
 		if code != c.code || ok != c.goOn {
 			t.Errorf("%s: got code %d, go on %v; want %d, %v", c.name, code, ok, c.code, c.goOn)
 		}
@@ -228,7 +241,7 @@ func TestParseArgs(t *testing.T) {
 			t.Errorf("defaults: format %q", o.format)
 		}
 	}
-	if o, _, ok := parseArgs([]string{"--open"}, io.Discard, io.Discard); !ok || o.format != "html" {
+	if o, _, ok := parseArgs(false, []string{"--open"}, time.Now(), io.Discard, io.Discard); !ok || o.format != "html" {
 		t.Errorf("--open: got format %q, ok %v; want html", o.format, ok)
 	}
 }
