@@ -38,6 +38,6 @@ contributor licence agreement, which is not set up. Until it is, please
 open an issue that describes the change; a small patch pasted into the
 issue is fine to show what you mean, but it cannot be merged as it stands.
 
-To build and check the code yourself, see "Development" in the
-[README](README.md#development). Design decisions are recorded in
+To build and check the code yourself, see
+[docs/development.md](docs/development.md). Design decisions are recorded in
 [docs/adr/](docs/adr/README.md).

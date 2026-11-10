@@ -11,7 +11,7 @@
 > Code's logs, finds waste and writes a summary, text, HTML or JSON report,
 > and `trimloop setup`, `statusline` and `hook` give live nudges. It has no
 > store, no sidecar and no incremental detectors. The code is in `cmd/`,
-> `internal/` and `pkg/`; the [README](../README.md#development) lists the
+> `internal/` and `pkg/`; [development.md](development.md) lists the
 > packages. How each figure is worked out:
 > [measurements.md](measurements.md). The measured figures:
 > [log-signals.md §8](log-signals.md#8-measured-figures-at-a-glance). What
@@ -91,8 +91,8 @@ flowchart LR
 ## 4. Core packages
 
 The target packages and what each will do; §12 shows where they sit in the
-repository. Today's packages are listed in the README's
-[Development](../README.md#development) section: some share a name with a
+repository. Today's packages are listed in
+[development.md](development.md): some share a name with a
 row below (`pkg/event`, `pkg/price`, `pkg/normalize`, `pkg/detectors`) but
 hold less.
 
@@ -690,8 +690,8 @@ already use (Datadog, Grafana, etc.).
 The single target layout; packaging.md
 [§12](packaging.md#12-repository-layout) points here. §4 says what each
 `pkg/` package does. The M0 prototype's packages differ (for example
-`pkg/detectors`, `pkg/fixes`, `internal/report`, `internal/live`); the
-README's [Development](../README.md#development) section lists them.
+`pkg/detectors`, `pkg/fixes`, `internal/report`, `internal/live`); 
+[development.md](development.md) lists them.
 
 ```text
 cmd/trimloop/               the binary: analyse, serve, proxy, report, explain,
