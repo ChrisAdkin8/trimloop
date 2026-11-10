@@ -53,7 +53,7 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 
 // standingSection prints what every request carries (P07).
 func standingSection(w io.Writer, s detectors.StandingContext, all float64, hideIDs bool) {
-	fmt.Fprintln(w, "\nP07 WHAT EVERY REQUEST CARRIES")
+	fmt.Fprintln(w, "\nWHAT EVERY REQUEST CARRIES (P07)")
 	fmt.Fprintf(w, "  Sending the system prompt and tool definitions on every turn cost %s;\n", money(s.SystemPrompt+s.ToolDefinitions))
 	fmt.Fprintf(w, "  text Claude Code added to the conversation cost %s while it stayed there.\n", money(s.Injected))
 	fmt.Fprintf(w, "  Together %s (%.0f%% of spend).", money(s.Total()), pct(s.Total(), all))

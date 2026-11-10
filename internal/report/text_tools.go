@@ -15,7 +15,7 @@ import (
 // toolOutputSection prints what fills the context (P04) and the fixes for it.
 // all is the total spend, for percentages; hideIDs is --no-titles.
 func toolOutputSection(w io.Writer, f detectors.ToolOutput, recs []fixes.Recommendation, all float64, hideIDs bool) {
-	fmt.Fprintf(w, "\nP04 WHAT FILLS YOUR CONTEXT: TOOL OUTPUT\n")
+	fmt.Fprintf(w, "\nWHAT FILLS YOUR CONTEXT: TOOL OUTPUT (P04)\n")
 	fmt.Fprintf(w, "  %s added about %s tokens (at %d bytes per token).\n",
 		count(f.Calls, "tool result"), thousands(f.Tokens), event.BytesPerToken)
 	fmt.Fprintf(w, "  Each stays in the context and is sent again on every later turn. Carried\n")

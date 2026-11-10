@@ -32,6 +32,7 @@ func WriteText(out io.Writer, r Results) error {
 	fmt.Fprintln(w)
 	retentionLine(w, r)
 	limitLines(w, r)
+	fmt.Fprintln(w, "A code after a heading, such as (P19), names the pattern in trimloop's docs/patterns.md.")
 
 	fmt.Fprintln(w, "\nCOST BY TOKEN CLASS")
 	for _, row := range []struct {
@@ -66,7 +67,7 @@ func WriteText(out io.Writer, r Results) error {
 	weeksSection(w, r.Weeks, r.Prices)
 	attributionSection(w, r.Attribution, r.HideIDs)
 
-	fmt.Fprintf(w, "\nP19 LARGE WORKING CONTEXT\n")
+	fmt.Fprintf(w, "\nLONG SESSIONS (P19)\n")
 	fmt.Fprintf(w, "  %s in %s sent more than %s tokens of context.\n",
 		count(ctx.Turns, "turn"), count(ctx.Sessions, "session"), thousands(ctx.Threshold))
 	fmt.Fprintf(w, "  Their input cost %s (%.0f%% of all spend).\n", dollars(ctx.Cost), pct(ctx.Cost, all))
@@ -76,7 +77,7 @@ func WriteText(out io.Writer, r Results) error {
 	sessionTable(w, ctx.Top, "turns over", "peak context")
 	growthSection(w, r.Growth, r.CompactFix, all)
 
-	fmt.Fprintf(w, "\nP09 LONG PAUSES (RESUME BLOAT)\n")
+	fmt.Fprintf(w, "\nLONG BREAKS (P09)\n")
 	fmt.Fprintf(w, "  %s, work carried on after a pause of over %s. The cache had expired, so\n",
 		count(pause.Pauses, "time"), duration(pause.MinGap))
 	fmt.Fprintf(w, "  the whole context was written again: %s (%.0f%% of all spend).\n", dollars(pause.Cost), pct(pause.Cost, all))
