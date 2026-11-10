@@ -198,12 +198,18 @@ func agree(n int, one, many string) string {
 	return many
 }
 
-// count writes n with its noun: "1 log", "2,000 logs".
+// count writes n with its noun: "1 log", "2,000 logs", "3 web searches".
 func count(n int, noun string) string {
 	if n == 1 {
 		return "1 " + noun
 	}
-	return thousands(n) + " " + noun + "s"
+	plural := noun + "s"
+	for _, end := range []string{"s", "x", "z", "ch", "sh"} {
+		if strings.HasSuffix(noun, end) {
+			plural = noun + "es"
+		}
+	}
+	return thousands(n) + " " + plural
 }
 
 // readLine prints what was read: "Read 3 logs: 2 sessions, 10 turns."

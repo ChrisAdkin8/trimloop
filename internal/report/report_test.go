@@ -711,4 +711,25 @@ func TestCountsOfOne(t *testing.T) {
 	if !strings.Contains(text.String(), "1 time, work carried on") || !strings.Contains(page.String(), "1 time in 1 session, work carried on") {
 		t.Error("the long-break sentences do not say 1 time")
 	}
+	if !strings.Contains(page.String(), "1 turn used a model with no known price and is left out.") {
+		t.Error(`the page does not say "1 turn ... is left out"`)
+	}
+}
+
+// Nouns that end in a hissing sound take "es", not a plain "s".
+func TestCountPlurals(t *testing.T) {
+	for _, c := range []struct {
+		n          int
+		noun, want string
+	}{
+		{1, "web search", "1 web search"},
+		{133, "web search", "133 web searches"},
+		{2, "switch", "2 switches"},
+		{2000, "log", "2,000 logs"},
+		{0, "session", "0 sessions"},
+	} {
+		if got := count(c.n, c.noun); got != c.want {
+			t.Errorf("count(%d, %q) = %q, want %q", c.n, c.noun, got, c.want)
+		}
+	}
 }

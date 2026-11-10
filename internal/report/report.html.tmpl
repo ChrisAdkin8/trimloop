@@ -108,7 +108,7 @@ footer { margin-top: 40px; color: var(--muted); font-size: 14px; }
 {{if .Read.Since}}<br><span class="note">Only sessions started on or after {{sinceDay .Read.Since}}, with their sub-agents.</span>{{end}}
 {{if .Read.Failed}}<br><span class="note">{{.Read.Failed}} log files could not be read to the end.</span>{{end}}
 {{if .Read.BadLines}}<br><span class="note">{{plural .Read.BadLines "line"}} could not be read; Claude Code's log format may have changed.</span>{{end}}
-{{if .Read.Unpriced}}<br><span class="muted small">{{plural .Read.Unpriced "turn"}} used a model with no known price and are left out.</span>{{end}}
+{{if .Read.Unpriced}}<br><span class="muted small">{{plural .Read.Unpriced "turn"}} used a model with no known price and {{if eq .Read.Unpriced 1}}is{{else}}are{{end}} left out.</span>{{end}}
 </p>
 {{if .Subscriber}}<p class="note">You are on {{.PlanName}}, a flat fee: these figures are list prices, a measure of how much of your usage limits work takes, not money you would get back. {{.LimitHitsText}} {{.LimitRateText}}</p>{{end}}
 
