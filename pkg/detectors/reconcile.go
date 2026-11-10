@@ -11,7 +11,10 @@ import (
 // Reconciliation compares the costs worked out from the logs with the
 // harness's own records (ADR 0028). The harness also pays for requests that
 // never appear in its logs, such as session titles, summaries after a break
-// and web searches; the gap between the two is that unobserved spend.
+// and web searches; the gap between the two is that unobserved spend. In
+// some sessions the record also counts requests of the conversation itself
+// that the logs lack; LargestGaps and the token classes in ByModel show
+// when that is so.
 type Reconciliation struct {
 	Sessions int     `json:"sessions"` // main sessions with a complete harness record
 	Harness  float64 `json:"harness"`  // what the harness recorded for them
@@ -39,7 +42,41 @@ type Reconciliation struct {
 	WebSearches   int        `json:"web_searches"`    // in the compared sessions
 	WebSearchCost float64    `json:"web_search_cost"` // at the catalogue's per-request price
 	ByModel       []ModelGap `json:"by_model"`        // largest gap first
+
+	// LargestGaps are the compared sessions with the largest positive gaps,
+	// at most maxLargestGaps, largest first. They show whether the gap is
+	// spread thinly over every session (background requests) or held by a
+	// few whose logs are incomplete.
+	LargestGaps []SessionGap `json:"largest_gaps"`
 }
+
+// Concentrated returns what LargestGaps hold together, and whether that is
+// at least half of the gap: then a few sessions, not background requests
+// spread over all of them, make most of it.
+func (r Reconciliation) Concentrated() (float64, bool) {
+	held := 0.0
+	for _, s := range r.LargestGaps {
+		held += s.Gap
+	}
+	return held, r.Gap > 0 && held >= r.Gap/2
+}
+
+// SessionGap is the comparison for one main session and its sub-agents.
+type SessionGap struct {
+	ID           string  `json:"id"`
+	Harness      float64 `json:"harness"`
+	Ours         float64 `json:"ours"`
+	Gap          float64 `json:"gap"`
+	SubAgentLogs int     `json:"sub_agent_logs"` // sub-agent logs read for it
+}
+
+// maxLargestGaps is how many sessions LargestGaps lists, and minListedGap
+// the smallest gap it lists: a cent, so a session whose two sides differ
+// only by rounding is not listed as a gap.
+const (
+	maxLargestGaps = 3
+	minListedGap   = 0.01
+)
 
 // ModelGap is the comparison for one model.
 type ModelGap struct {
@@ -52,6 +89,33 @@ type ModelGap struct {
 	// they are not cached.
 	HarnessUncached int `json:"harness_uncached"`
 	OursUncached    int `json:"ours_uncached"`
+
+	// The other token classes. A record well ahead of the logs on cached
+	// work means whole requests of the conversation are missing from the
+	// logs, not only background ones.
+	HarnessCacheRead  int `json:"harness_cache_read"`
+	OursCacheRead     int `json:"ours_cache_read"`
+	HarnessCacheWrite int `json:"harness_cache_write"` // both cache lifetimes
+	OursCacheWrite    int `json:"ours_cache_write"`
+	HarnessOutput     int `json:"harness_output"`
+	OursOutput        int `json:"ours_output"`
+}
+
+// cachedMargin is how far the record's cached tokens (read and write) may
+// pass the logs' before the report says requests are missing from the logs.
+// Background requests add some cached work too: a summary after a break
+// re-reads the conversation. Across 412 sessions the whole gap, background
+// requests and all, was about 4 % of spend (docs/log-signals.md §8), so 10 %
+// leaves room for them; the incomplete logs seen so far were 30 % and more
+// short.
+const cachedMargin = 0.10
+
+// MissingCachedWork reports whether the record counts clearly more cached
+// work on this model than the logs hold. A model the logs hold no cached
+// work for is left out: that is background work only, such as titles.
+func (g ModelGap) MissingCachedWork() bool {
+	ours := g.OursCacheRead + g.OursCacheWrite
+	return ours > 0 && float64(g.HarnessCacheRead+g.HarnessCacheWrite) > (1+cachedMargin)*float64(ours)
 }
 
 // staleAfter is how long a session may go on after its record was last
@@ -66,6 +130,7 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 	last := map[string]time.Time{}  // latest turn of each conversation
 	first := map[string]time.Time{} // earliest turn of each conversation
 	unpriced := map[string]bool{}   // conversations with a turn that has no price
+	subLogs := map[string]int{}     // sub-agent logs of each conversation
 	oursModel := map[string]map[string]*ModelGap{}
 	for _, s := range sessions {
 		id := s.Conversation()
@@ -91,6 +156,12 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 			}
 			g.Ours += t.Cost.Total()
 			g.OursUncached += t.Usage.InputUncached
+			g.OursCacheRead += t.Usage.CacheRead
+			g.OursCacheWrite += t.Usage.CacheWrite5m + t.Usage.CacheWrite1h
+			g.OursOutput += t.Usage.Output
+		}
+		if s.Kind == event.SubAgentSession {
+			subLogs[id]++
 		}
 	}
 
@@ -119,18 +190,30 @@ func FindReconciliation(sessions []event.Session) Reconciliation {
 		f.Sessions++
 		f.Harness += s.Harness.Cost
 		f.Ours += mine
+		if gap := s.Harness.Cost - mine; gap >= minListedGap {
+			f.LargestGaps = append(f.LargestGaps, SessionGap{ID: s.ID, Harness: s.Harness.Cost, Ours: mine,
+				Gap: gap, SubAgentLogs: subLogs[s.ID]})
+		}
 		for model, r := range s.Harness.ByModel {
 			g := gapFor(byModel, model)
 			g.Harness += r.Cost
 			g.HarnessUncached += r.InputUncached
+			g.HarnessCacheRead += r.CacheRead
+			g.HarnessCacheWrite += r.CacheWrite
+			g.HarnessOutput += r.Output
 			f.WebSearches += r.WebSearches
 		}
 		for model, o := range oursModel[s.ID] {
 			g := gapFor(byModel, model)
 			g.Ours += o.Ours
 			g.OursUncached += o.OursUncached
+			g.OursCacheRead += o.OursCacheRead
+			g.OursCacheWrite += o.OursCacheWrite
+			g.OursOutput += o.OursOutput
 		}
 	}
+	sortBy(f.LargestGaps, func(g SessionGap) (float64, string) { return g.Gap, g.ID })
+	f.LargestGaps = f.LargestGaps[:min(maxLargestGaps, len(f.LargestGaps))]
 	// Sub-agents whose main session's log is gone have no record either.
 	for _, s := range sessions {
 		if s.Kind == event.MainSession {
