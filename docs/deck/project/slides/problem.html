@@ -1,0 +1,27 @@
+<section id="problem" data-transition="fade" style="background:#F7F5EF;color:#172033;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:#C2561A">Why it gets expensive</p>
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">Every turn re-sends the whole conversation</h2>
+</div>
+<div style="flex:1;display:flex;gap:96px;align-items:center">
+<div style="display:flex;gap:28px;align-items:end">
+<div style="display:flex;flex-direction:column;gap:12px;align-items:center"><div style="width:110px;height:40px;background:#E8742A;border-radius:6px 6px 0 0"></div><div style="width:110px;height:60px;background:#B9C2CF"></div><p style="font-size:24px;color:#4A5568">Turn 1</p></div>
+<div style="display:flex;flex-direction:column;gap:0px;align-items:center"><div style="width:110px;height:40px;background:#E8742A;border-radius:6px 6px 0 0"></div><div style="width:110px;height:60px;background:#2F6FA8"></div><div style="width:110px;height:60px;background:#B9C2CF"></div><p style="font-size:24px;color:#4A5568;padding:12px 0 0 0">Turn 2</p></div>
+<div style="display:flex;flex-direction:column;gap:0px;align-items:center"><div style="width:110px;height:40px;background:#E8742A;border-radius:6px 6px 0 0"></div><div style="width:110px;height:120px;background:#2F6FA8"></div><div style="width:110px;height:60px;background:#B9C2CF"></div><p style="font-size:24px;color:#4A5568;padding:12px 0 0 0">Turn 3</p></div>
+<div style="display:flex;flex-direction:column;gap:0px;align-items:center"><div style="width:110px;height:40px;background:#E8742A;border-radius:6px 6px 0 0"></div><div style="width:110px;height:180px;background:#2F6FA8"></div><div style="width:110px;height:60px;background:#B9C2CF"></div><p style="font-size:24px;color:#4A5568;padding:12px 0 0 0">Turn 4</p></div>
+<div style="display:flex;flex-direction:column;gap:0px;align-items:center"><div style="width:110px;height:40px;background:#E8742A;border-radius:6px 6px 0 0"></div><div style="width:110px;height:240px;background:#2F6FA8"></div><div style="width:110px;height:60px;background:#B9C2CF"></div><p style="font-size:24px;color:#4A5568;padding:12px 0 0 0">Turn 5</p></div>
+<div style="display:flex;flex-direction:column;gap:0px;align-items:center"><div style="width:110px;height:40px;background:#E8742A;border-radius:6px 6px 0 0"></div><div style="width:110px;height:300px;background:#2F6FA8"></div><div style="width:110px;height:60px;background:#B9C2CF"></div><p style="font-size:24px;color:#4A5568;padding:12px 0 0 0">Turn 6</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:40px">
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:44px;font-weight:600;line-height:1.2">Turn 6 pays to send turns 1–5 again.</p>
+<p style="font-size:32px;line-height:1.4;color:#4A5568">So a long conversation gets dearer with every message, even a short one.</p>
+<p style="font-size:26px;line-height:1.4;color:#4A5568"><b>Turn:</b> one message and its reply. <b>Session:</b> one conversation. <b>Tokens:</b> the small pieces of text a model reads and writes; you pay per token.</p>
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;gap:16px;align-items:center"><div style="width:32px;height:32px;background:#E8742A;border-radius:6px"></div><p style="font-size:26px">Your new message</p></div>
+<div style="display:flex;gap:16px;align-items:center"><div style="width:32px;height:32px;background:#2F6FA8;border-radius:6px"></div><p style="font-size:26px">The history so far</p></div>
+<div style="display:flex;gap:16px;align-items:center"><div style="width:32px;height:32px;background:#B9C2CF;border-radius:6px"></div><p style="font-size:26px">Standing instructions, sent every time</p></div>
+</div>
+</div>
+</div>
+<aside>This is the one fact most of trimloop rests on. A model has no memory between turns, so Claude Code sends everything again each time: the system prompt and tool definitions, the whole history, then the new message. The bars are a sketch, not measured sizes.</aside>
+</section>

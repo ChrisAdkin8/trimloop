@@ -379,6 +379,7 @@ the steps for making the repository public, are in
 |---|---|
 | [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today |
 | [docs/examples/example-report.html](docs/examples/example-report.html) | A full web-page report from real logs (download and open in a browser) |
+| [docs/deck/](docs/deck/README.md) | A 16-slide introduction to the ideas here: the source files of a slide deck |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/state-machines.md](docs/state-machines.md) | What the code remembers between steps, and the files it keeps |
 | [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain, and the measured figures (§8) |

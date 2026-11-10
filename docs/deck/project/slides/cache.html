@@ -1,0 +1,30 @@
+<section id="cache" data-transition="fade" style="background:#F7F5EF;color:#172033;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:64px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">Cached history is cheap, until it expires</h2>
+<div style="flex:1;display:flex;gap:8px;align-items:center">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF8;padding:36px;border:3px solid #E8742A;border-radius:20px">
+<x-icon name="Database" style="color:#C2561A;width:56px;height:56px"></x-icon>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:40px;font-weight:600">Write</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">The first turn stores the conversation. This costs more than sending it normally.</p>
+</div>
+<x-connector head="end" style="width:56px;color:#4A5568;border-width:4px"></x-connector>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF8;padding:36px;border:3px solid #2F6FA8;border-radius:20px">
+<x-icon name="Lightning" style="color:#2F6FA8;width:56px;height:56px"></x-icon>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:40px;font-weight:600">Read</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Later turns reuse it, at a tenth of the normal price or less.</p>
+</div>
+<x-connector head="end" style="width:56px;color:#4A5568;border-width:4px"></x-connector>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFDF8;padding:36px;border:3px solid #9AA5B4;border-radius:20px">
+<x-icon name="Clock" style="color:#4A5568;width:56px;height:56px"></x-icon>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:40px;font-weight:600">Break</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">You step away for longer than 5 minutes or an hour.</p>
+</div>
+<x-connector head="end" style="width:56px;color:#4A5568;border-width:4px"></x-connector>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FBE9DC;padding:36px;border:3px solid #E8742A;border-radius:20px">
+<x-icon name="Warning" style="color:#C2561A;width:56px;height:56px"></x-icon>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:40px;font-weight:600">Expired</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">The next turn writes the whole conversation again, at the dear rate.</p>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#172033">Claude Code picks how long the cache lasts: usually an hour when you chat, 5 minutes for <b>sub-agents</b> (helpers Claude starts for side tasks) and for runs started from a program. So <b>long breaks</b> and <b>short waits</b> both cost money.</p>
+<aside>The cache is Anthropic keeping the start of a recent request so the next one can reuse it. A cache read is cheap; a cache write is dearer than plain input. After it expires, the next request pays the write price on everything again. In a session of 500,000 tokens that is a big bill for one message.</aside>
+</section>

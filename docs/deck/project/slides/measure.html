@@ -1,0 +1,34 @@
+<section id="measure" data-transition="fade" style="background:#EFEBE1;color:#172033;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">Change a habit, then measure again</h2>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;gap:16px;align-items:center"><div style="width:8px;height:40px;background:#C2561A;border-radius:4px"></div><p style="font-size:26px;font-weight:600;color:#C2561A">The day you change a habit</p></div>
+<div style="display:flex;gap:12px;align-items:end">
+<div style="flex:1;height:140px;background:#9AA5B4;border-radius:10px"></div>
+<div style="flex:1;height:140px;background:#9AA5B4;border-radius:10px"></div>
+<div style="flex:1;height:140px;background:#9AA5B4;border-radius:10px"></div>
+<div style="flex:1;height:140px;background:#9AA5B4;border-radius:10px"></div>
+<div style="width:8px;height:200px;background:#C2561A;border-radius:4px"></div>
+<div style="flex:1;height:140px;background:#2F6FA8;border-radius:10px"></div>
+<div style="flex:1;height:140px;background:#2F6FA8;border-radius:10px"></div>
+<div style="flex:1;height:140px;background:#2F6FA8;border-radius:10px"></div>
+</div>
+<div style="display:flex;gap:12px">
+<p style="flex:4;font-size:26px;color:#4A5568">Weeks before the change</p>
+<p style="flex:3;font-size:26px;font-weight:600;color:#2F6FA8">Weeks after it</p>
+</div>
+</div>
+<div style="display:flex;gap:24px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FBFAF6;padding:36px;border-radius:18px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;font-weight:600;color:#C2561A">trimloop --since 2026-11-01</p>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">The report covers only sessions started from that day on. <b>--since 7d</b> means the last 7 days.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FBFAF6;padding:36px;border-radius:18px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;font-weight:600;color:#2F6FA8">~/.trimloop/history.json</p>
+<p style="font-size:26px;line-height:1.4;color:#4A5568">Weekly figures, numbers only, kept after Claude Code deletes old logs. Shown in the full report’s “Week by week”.</p>
+</div>
+</div>
+<p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600;line-height:1.3">That closes the loop: <span style="color:#C2561A">detect, recommend, measure</span>, then go round again.</p>
+</div>
+<aside>The blocks are weeks, not real figures. Each normal run updates the weekly history; a --since run leaves it alone, so a partial view never replaces full weeks. Each Claude Code folder (CLAUDE_CONFIG_DIR) gets its own history file.</aside>
+</section>
