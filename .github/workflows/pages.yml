@@ -1,0 +1,50 @@
+# Publishes the example report (docs/examples/example-report.html) as the
+# project's web page, https://chrisadkin8.github.io/trimloop/, so people can
+# see a report without downloading it. Runs when the example or this file
+# changes on main, or by hand. Actions are pinned to commits; the comment
+# gives the release each commit is.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/examples/example-report.html
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer one waits for a running one to finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write # publish the page
+      id-token: write # prove to GitHub Pages that this workflow built it
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The page is the example report alone, as the site's front page.
+      - name: Build the site
+        run: |
+          mkdir site
+          cp docs/examples/example-report.html site/index.html
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

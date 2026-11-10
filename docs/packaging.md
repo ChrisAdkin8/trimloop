@@ -353,6 +353,15 @@ v0.2.0 (2026-11-10), in this order
    release, Go Reference, and the Go version read from `go.mod`. Done with
    v0.2.0; Go Report Card has none, as that service is retired.
 
+### The example report's web page
+
+[pages.yml](../.github/workflows/pages.yml) publishes
+`docs/examples/example-report.html` at
+<https://chrisadkin8.github.io/trimloop/> whenever that file changes on
+`main`. The README's picture of it, `docs/images/example-report.png`, is
+made by hand: after refreshing the example, take it again (the top of the
+page in a browser window 1100 wide) so the two show the same figures.
+
 ### Pinned by hand
 
 Dependabot updates the GitHub Actions and Go modules. It cannot see the
