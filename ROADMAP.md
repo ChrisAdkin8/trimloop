@@ -240,9 +240,10 @@ the sidecar causes zero failed model calls.
    owned by another company and an npm package `trimtab` already targets
    AI-agent behaviour. `.dev` availability was not confirmed.)
 2. **Licence and business model.** Settled by
-   [ADR 0046](docs/adr/0046-licensing.md): the repository is source-available
-   (FSL-1.1-ALv2), connectors will be Apache-2.0, and team features are
-   expected to be commercial.
+   [ADR 0054](docs/adr/0054-apache-2-licence.md), which replaces
+   [ADR 0046](docs/adr/0046-licensing.md): the repository is open source
+   under Apache-2.0. Whether team features (M2 onwards) are commercial is
+   decided when M2 starts.
 3. **Provider terms.** Confirm that structural request changes (reordering,
    cache markers, TTL choice) are allowed under each provider's terms, and
    that forward-proxying a vendor's harness is acceptable to that vendor.

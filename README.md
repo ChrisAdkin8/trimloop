@@ -1,5 +1,12 @@
 # Trimloop
 
+[![CI](https://github.com/ChrisAdkin8/trimloop/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ChrisAdkin8/trimloop/actions/workflows/ci.yml)
+[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
+[![Go 1.27.3 or later](https://img.shields.io/badge/go-1.27.3%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![Platforms: macOS and Linux](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux-lightgrey)](#install)
+[![Status: early prototype, M0](https://img.shields.io/badge/status-early%20prototype%20%28M0%29-orange)](ROADMAP.md)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](#ask-claude-about-it-claude-code-plugin)
+
 Trimloop reads the session logs Claude Code keeps on your machine, works out
 where your tokens went, and tells you which changes to how you work would save
 the most money.
@@ -12,20 +19,20 @@ see [The plan](#the-plan).
 
 ## What you get
 
-A run on one developer's 45 days of logs, shortened (the full output also
+A run on one developer's 46 days of logs, shortened (the full output also
 covers their usage limits):
 
 ```text
-Read 574 logs: 573 sessions, 18,601 turns.
-Spent $2,330 at list prices from 25 Sep to 9 Nov 2026 (45 days), about $362 a week.
-Claude Code's own records show $202 (11%) more than its logs: requests the logs do not record.
+Read 611 logs: 594 sessions, 20,256 turns.
+Spent $2,465 at list prices from 25 Sep to 10 Nov 2026 (46 days), about $375 a week.
+Claude Code's own records show $221 (11%) more than its logs: requests the logs do not record.
 
 What to do first (these savings overlap, so do not add them):
-  1. Compact long sessions earlier: likely about $581 ($557–$694), up to $896 (38%)
+  1. Compact long sessions earlier: likely about $618 ($585–$680), up to $947 (38%)
      Compact when a session passes about 200,000 tokens, or between tasks.
-  2. Run sub-agents on a cheaper model: up to $312 (13%)
+  2. Run sub-agents on a cheaper model: up to $337 (14%)
      Run sub-agents that search, read and summarise on Sonnet 5.5.
-  3. Start fresh after a long break: likely about $301, up to $312 (13%)
+  3. Start fresh after a long break: likely about $302, up to $312 (13%)
      After a break of over an hour, start a new session with a short note instead of carrying on.
 ```
 
@@ -262,7 +269,8 @@ Everything stays on your machine, readable by you only:
 
 ## The plan
 
-Everything in this section is design, not built yet.
+This section is design, not built yet, apart from the parts the
+picture below marks M0.
 
 Teams spend real money on coding agents (Claude Code, Codex, Cursor, Copilot)
 and on gateways that route their requests (LiteLLM, Portkey, Helicone,
@@ -294,7 +302,14 @@ Principles it is designed around:
 - **Neutral.** One event model for every coding agent, gateway and model
   provider; their differences live in profiles, not in the detectors.
 
-![Planned architecture: coding agents send traffic through Trimloop to model providers; analysis runs on the developer machine; an optional team collector receives hashes-only findings, including from a gateway sidecar beside LiteLLM](docs/images/architecture.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/architecture-dark.svg">
+  <img src="docs/images/architecture.svg" width="840" alt="Architecture: on the developer machine, taps catch a coding agent's requests on their way to the model providers; a normaliser, a local store and the detectors turn them into findings (a report and nudges); actuators apply safe fixes. An optional team collector receives hashes, counts and cost, never source code, including from a gateway sidecar beside LiteLLM. Boxes marked M0 are in today's prototype in part.">
+</picture>
+
+Boxes marked **M0** exist today, in part: the prototype reads Claude Code's
+logs (not live traffic yet), runs 9 of the 19 waste patterns, and gives a
+report and nudges. Everything else in the picture is planned.
 
 The core will be one Go program; a thin Python plugin will connect LiteLLM to
 it; a web UI (TypeScript) will be embedded in the program. Detail:
@@ -364,6 +379,7 @@ the steps for making the repository public, are in
 |---|---|
 | [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today |
 | [docs/examples/example-report.html](docs/examples/example-report.html) | A full web-page report from real logs (download and open in a browser) |
+| [docs/deck/](docs/deck/README.md) | A 16-slide introduction to the ideas here: the source files of a slide deck |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/state-machines.md](docs/state-machines.md) | What the code remembers between steps, and the files it keeps |
 | [docs/log-signals.md](docs/log-signals.md) | What Claude Code logs contain, and the measured figures (§8) |
@@ -377,10 +393,11 @@ the steps for making the repository public, are in
 
 ## Licence and security
 
-Licence: [FSL-1.1-ALv2](LICENSE.md) (the Functional Source Licence). You
-may read, use and change the code for any purpose except offering it to
-others in a commercial product or service that competes with Trimloop, and
-each version becomes Apache-2.0 two years after its release.
+Licence: [Apache-2.0](LICENSE). You may use, change and share the code
+for any purpose, including in commercial products, as long as you keep the
+licence and the [NOTICE](NOTICE) file with it. The licence does not cover
+the name "Trimloop"
+([ADR 0054](docs/adr/0054-apache-2-licence.md)).
 
 Outside contributions are not accepted yet: they will need a contributor
 licence agreement.

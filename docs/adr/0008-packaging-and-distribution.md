@@ -1,6 +1,6 @@
 # ADR 0008: One binary, one image, one Python package
 
-- Status: Proposed — build approach amended by [ADR 0014](0014-release-builds-per-os.md) (per-OS builds with open-source GoReleaser); licensing settled by [ADR 0046](0046-licensing.md); a Claude Code plugin artefact: [ADR 0049](0049-claude-code-plugin.md)
+- Status: Proposed — build approach amended by [ADR 0014](0014-release-builds-per-os.md) (per-OS builds with open-source GoReleaser); licensing settled by [ADR 0046](0046-licensing.md), then [ADR 0054](0054-apache-2-licence.md); a Claude Code plugin artefact: [ADR 0049](0049-claude-code-plugin.md)
 - Date: 2026-11-05
 - Amends: [ADR 0002](0002-go-for-agent-and-proxy.md) (build and platform claims)
 

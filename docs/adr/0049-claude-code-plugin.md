@@ -1,6 +1,6 @@
 # ADR 0049: A Claude Code plugin with a trimloop skill
 
-- Status: Accepted — built: `.claude-plugin/marketplace.json` and `plugins/trimloop/`; passes `claude plugin validate --strict`; not yet tried by users
+- Status: Accepted — built: `.claude-plugin/marketplace.json` and `plugins/trimloop/`; passes `claude plugin validate --strict`; not yet tried by users; the licence in decision 5 is now Apache-2.0 ([ADR 0054](0054-apache-2-licence.md))
 - Date: 2026-11-09
 - Amends: [ADR 0008](0008-packaging-and-distribution.md) (a new artefact), [ADR 0047](0047-first-release-pure-go.md) (releases bump the plugin's version)
 

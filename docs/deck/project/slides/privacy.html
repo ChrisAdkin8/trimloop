@@ -1,0 +1,22 @@
+<section id="privacy" data-transition="fade" style="background:#172033;color:#F2EEE6;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">Everything stays on your machine</h2>
+<div style="flex:1;display:flex;gap:80px;align-items:center">
+<div style="width:560px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;gap:20px;align-items:center"><x-icon name="Lock" style="color:#F08A3E;width:64px;height:64px"></x-icon><p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:44px;font-weight:600;line-height:1.2">Reads local logs. Sends nothing.</p></div>
+<p style="font-size:28px;line-height:1.45;color:#C9D3E3">Files it keeps hold numbers only. Reports show session titles (Claude Code’s names for your chats) and project names, so check one before you share it: <span style="color:#F08A3E">--no-titles</span> hides the titles.</p>
+<p style="font-size:28px;line-height:1.45;color:#C9D3E3">For teams, the plan is to share <b>keyed hashes</b>: fingerprints only the customer’s own key can make. Never code or names.</p>
+</div>
+<div style="flex:1">
+<table style="font-size:26px;color:#F2EEE6">
+<tr style="background:#2C3A55"><th style="width:52%;text-align:left">File</th><th style="width:48%;text-align:left">What it holds</th></tr>
+<tr><td>The report you ask for</td><td>Figures, project names, session titles</td></tr>
+<tr><td>history.json</td><td>Weekly figures only</td></tr>
+<tr><td>live/SESSION.json</td><td>Which nudges a session has seen</td></tr>
+<tr><td>nudges.jsonl</td><td>Each nudge: time, kind, size</td></tr>
+<tr><td>limits.jsonl</td><td>Pro and Max: limit use over time</td></tr>
+<tr><td>backups/…</td><td>Your settings before setup changed them</td></tr>
+</table>
+</div>
+</div>
+<aside>Everything lives under ~/.trimloop and is readable by you only. The backups can hold API keys from your Claude Code settings, so delete old ones when you no longer need them. The keyed-hash design for teams is in ADRs 0004, 0011 and 0019.</aside>
+</section>

@@ -1,0 +1,17 @@
+<section id="close" data-transition="fade" style="background:#C2561A;color:#FBF6EE;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:space-between;gap:40px">
+<div style="display:flex;flex-direction:column;gap:24px">
+<p style="font-size:24px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:#FBF6EE">Trim the waste, in a loop</p>
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:700;line-height:1.1">Detect. Recommend. Measure. Repeat.</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#172033;padding:40px 48px;border-radius:20px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#9AA5B4"># build it once, in the repository folder (needs Go)</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#F2EEE6">go build -o ~/.local/bin/trimloop ./cmd/trimloop</p>
+<hr style="border-top:2px solid #2C3A55">
+<div style="display:flex;gap:32px;align-items:center"><p style="width:360px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F08A3E">trimloop</p><p style="flex:1;font-size:26px;color:#F2EEE6">Detect and recommend: the short summary of what to fix first</p></div>
+<div style="display:flex;gap:32px;align-items:center"><p style="width:360px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F08A3E">trimloop --open</p><p style="flex:1;font-size:26px;color:#F2EEE6">The full report, as a web page</p></div>
+<div style="display:flex;gap:32px;align-items:center"><p style="width:360px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F08A3E">trimloop setup</p><p style="flex:1;font-size:26px;color:#F2EEE6">Turn on the nudges inside Claude Code</p></div>
+<div style="display:flex;gap:32px;align-items:center"><p style="width:360px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F08A3E">trimloop --since 7d</p><p style="flex:1;font-size:26px;color:#F2EEE6">Measure: did last week’s change work? Then repeat</p></div>
+</div>
+<p style="font-size:28px;line-height:1.45">Or add trimloop’s plugin (an add-on) to Claude Code and just ask “where did my tokens go?”. Read README.md first, then docs/measurements.md for the method and ROADMAP.md for what comes next.</p>
+<aside>The four commands retrace the deck. Start with the short summary, pick the top recommendation, change that one habit, then run trimloop --since with the day you changed it to see whether it worked. The plugin needs trimloop installed; it adds a skill so Claude runs trimloop and explains the result.</aside>
+</section>

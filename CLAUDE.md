@@ -61,9 +61,9 @@ govulncheck) and keep it passing.
   are read (ADR 0048).
 - Dev environment: `scripts/bootstrap.sh` installs the SDKs; run it with
   `--check` first. Keep its tool list in step with the planned stack.
-- Licence: FSL-1.1-ALv2 in `LICENSE.md` (ADR 0046); connector code meant
-  for other tools (gateway plugins) gets its own Apache-2.0 licence file.
-  Do not merge outside contributions: they need a contributor agreement.
+- Licence: Apache-2.0 in `LICENSE`, with the copyright line in `NOTICE`
+  (ADR 0054, which replaces the FSL of ADR 0046). Do not merge outside
+  contributions: they need a contributor agreement.
 - Packaging and releases: `docs/packaging.md` (ADR 0008). Releases are
   built by `.goreleaser.yaml` in `.github/workflows/release.yml` on a `v*`
   tag (ADR 0047); `ci.yml` runs `scripts/check.sh` and a snapshot release.

@@ -1,0 +1,21 @@
+<section id="checks" data-transition="fade" style="background:#EFEBE1;color:#172033;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">Two programs must agree on the figures</h2>
+<div style="flex:1;display:flex;gap:72px;align-items:center">
+<div style="width:1000px;display:flex;flex-direction:column;gap:12px;align-items:center">
+<div style="width:620px;display:flex;flex-direction:column;gap:8px;background:#172033;padding:24px 32px;border-radius:18px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600;color:#F08A3E">docs/measurements.md</p><p style="font-size:24px;color:#F2EEE6">One page says how every figure is worked out</p></div>
+<div style="width:620px;display:flex;justify-content:space-between"><x-shape kind="arrow-down" style="background:#9AA5B4;width:36px;height:56px"></x-shape><x-shape kind="arrow-down" style="background:#9AA5B4;width:36px;height:56px"></x-shape></div>
+<div style="display:flex;gap:40px">
+<div style="width:440px;display:flex;flex-direction:column;gap:8px;background:#FBFAF6;padding:24px 32px;border:3px solid #2F6FA8;border-radius:18px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600">trimloop, in Go</h3><p style="font-size:24px;color:#4A5568">The product</p></div>
+<div style="width:440px;display:flex;flex-direction:column;gap:8px;background:#FBFAF6;padding:24px 32px;border:3px solid #E8742A;border-radius:18px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600">recount.py, in Python</h3><p style="font-size:24px;color:#4A5568">Written separately, from the page</p></div>
+</div>
+<div style="width:620px;display:flex;justify-content:space-between"><x-shape kind="arrow-down" style="background:#9AA5B4;width:36px;height:56px"></x-shape><x-shape kind="arrow-down" style="background:#9AA5B4;width:36px;height:56px"></x-shape></div>
+<div style="width:620px;display:flex;flex-direction:column;gap:8px;background:#FBFAF6;padding:24px 32px;border:3px solid #172033;border-radius:18px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600">A test: both must agree</h3><p style="font-size:24px;color:#4A5568">On made-up logs with known answers</p></div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:36px;justify-content:center">
+<div style="display:flex;flex-direction:column;gap:8px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600">Against Claude Code</h3><p style="font-size:24px;line-height:1.4;color:#4A5568">Totals are checked against its own cost records.</p></div>
+<div style="display:flex;flex-direction:column;gap:8px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600">Before every commit</h3><p style="font-size:24px;line-height:1.4;color:#4A5568">A script checks code style, common mistakes, the tests, and known security flaws in code it uses.</p></div>
+<div style="display:flex;flex-direction:column;gap:8px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:32px;font-weight:600">Decisions written down</h3><p style="font-size:24px;line-height:1.4;color:#4A5568">53 decision records (ADRs) say what was decided and why.</p></div>
+</div>
+</div>
+<aside>Two programs, written separately from the same page, must get the same answers; if the page changes, the Python recount changes with it, and the expected answers are made from the recount, never from trimloop. ADR means architecture decision record. Golden drift checks the test files are what their scripts make today.</aside>
+</section>

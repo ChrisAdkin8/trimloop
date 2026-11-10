@@ -29,7 +29,10 @@ archives:
     # File times come from the commit, so the same commit builds the same
     # archives (reproducible builds, ADR 0047).
     files:
-      - src: LICENSE.md
+      - src: LICENSE
+        info:
+          mtime: "{{ .CommitDate }}"
+      - src: NOTICE
         info:
           mtime: "{{ .CommitDate }}"
       - src: README.md
@@ -62,13 +65,17 @@ nfpms:
     maintainer: Chris Adkin
     homepage: https://github.com/ChrisAdkin8/trimloop
     description: Finds where Claude Code's tokens go and which changes to how you work save the most.
-    license: FSL-1.1-ALv2
+    license: Apache-2.0
     formats: [deb, rpm]
     bindir: /usr/bin
     mtime: "{{ .CommitDate }}"
     contents:
-      - src: LICENSE.md
-        dst: /usr/share/doc/trimloop/LICENSE.md
+      - src: LICENSE
+        dst: /usr/share/doc/trimloop/LICENSE
+        file_info:
+          mtime: "{{ .CommitDate }}"
+      - src: NOTICE
+        dst: /usr/share/doc/trimloop/NOTICE
         file_info:
           mtime: "{{ .CommitDate }}"
       - src: README.md
@@ -84,7 +91,7 @@ homebrew_casks:
     binaries: [trimloop]
     homepage: https://github.com/ChrisAdkin8/trimloop
     description: Finds where Claude Code's tokens go and which changes save the most
-    license: FSL-1.1-ALv2
+    license: Apache-2.0
     repository:
       owner: ChrisAdkin8
       name: homebrew-tap
@@ -117,7 +124,7 @@ release:
   replace_existing_artifacts: true
   footer: |
     Verify a download: see "Checking a download" in the README.
-    Licence: FSL-1.1-ALv2 (each version becomes Apache-2.0 two years after release).
+    Licence: Apache-2.0.
 
 changelog:
   sort: asc

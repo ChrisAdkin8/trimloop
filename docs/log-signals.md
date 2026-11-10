@@ -294,12 +294,15 @@ of what a sub-agent returns could not be measured from it.
 
 ## 8. Measured figures at a glance
 
-**Latest run (2026-11-09, after ADR 0053):** 574 logs (573 sessions,
-18,601 turns) from 25 Sep to 9 Nov 2026 (45 days); $2,330 at list prices,
-matched to the cent by an independent recount of the logs. The README's
-example and `docs/examples/example-report.html` come from this run (the
-example with session titles hidden and project folders renamed). Rows dated 11-08
-or earlier keep that day's values where only the logs have grown since.
+**Latest run (2026-11-10, analysis version 9):** 611 logs (594 sessions,
+20,256 turns) from 25 Sep to 10 Nov 2026 (46 days); $2,465 at list prices,
+matched to the cent by an independent recount of the logs (in the logs'
+local time zone). Its top actions: compact earlier, likely $618 ($585–$680;
+up to $947); sub-agents on a cheaper model, up to $337 (14 %); start fresh
+after a break, likely $302 (up to $312). The README's example and
+`docs/examples/example-report.html` come from this run (the example with
+session titles hidden and project folders renamed). Rows below keep the
+values of the day they were measured where only the logs have grown since.
 
 The same developer's logs were measured several times as the code grew.
 Each value chain below shows changes of method; the logs also grew between

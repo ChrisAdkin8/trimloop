@@ -1,0 +1,24 @@
+<section id="live" data-transition="fade" style="background:#F7F5EF;color:#172033;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">Nudges warn you while you work</h2>
+<div style="flex:1;display:flex;gap:72px;align-items:center">
+<div style="flex:1;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;gap:24px"><p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:44px;font-weight:700;color:#C2561A">1</p><div style="display:flex;flex-direction:column;gap:8px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:36px;font-weight:600">A status line</h3><p style="font-size:26px;line-height:1.4;color:#4A5568">Below your prompt: the session’s size and cost. Near the cache’s end, a countdown; after it, what the next message will cost.</p></div></div>
+<div style="display:flex;gap:24px"><p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:44px;font-weight:700;color:#C2561A">2</p><div style="display:flex;flex-direction:column;gap:8px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:36px;font-weight:600">Size messages</h3><p style="font-size:26px;line-height:1.4;color:#4A5568">Once when a session passes 200,000 tokens, and again at 500,000.</p></div></div>
+<div style="display:flex;gap:24px"><p style="font-family:'Space Grotesk', Arial, sans-serif;font-size:44px;font-weight:700;color:#C2561A">3</p><div style="display:flex;flex-direction:column;gap:8px"><h3 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:36px;font-weight:600">A pause before sending</h3><p style="font-size:26px;line-height:1.4;color:#4A5568">In a big session whose cache has expired, it stops your first message once and shows what sending it will cost.</p></div></div>
+</div>
+<div style="width:700px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;flex-direction:column;gap:20px;background:#172033;padding:36px;border-radius:20px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F2EEE6">trimloop setup</p>
+<p style="font-size:24px;color:#9AA5B4">Prints the settings to add</p>
+<hr style="border-top:2px solid #2C3A55">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F2EEE6">trimloop setup --write FILE</p>
+<p style="font-size:24px;color:#9AA5B4">Adds them, after saving a backup</p>
+<hr style="border-top:2px solid #2C3A55">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;font-weight:600;color:#F2EEE6">trimloop setup --check</p>
+<p style="font-size:24px;color:#9AA5B4">Checks it is all working</p>
+</div>
+<p style="font-size:24px;line-height:1.4;color:#4A5568"><b>Hooks</b> are commands Claude Code runs after each reply and before each message. Trimloop uses them for the size messages and the pause.</p>
+</div>
+</div>
+<aside>The report looks back; the nudges act at the moment the money is about to be spent. The pause applies to sessions over 500,000 tokens after a break long enough for the cache to expire. The message is not sent; send it again to go ahead, or /clear first to start fresh. If you already have your own status line, setup --write changes nothing unless you add --replace-statusline.</aside>
+</section>

@@ -6,7 +6,7 @@ when_to_use: >-
   I keep hitting my usage limit; how do I spend less; did compacting earlier
   help; set up trimloop; check my trimloop setup.
 argument-hint: "[since DATE or 7d]"
-license: FSL-1.1-ALv2
+license: Apache-2.0
 ---
 
 # trimloop

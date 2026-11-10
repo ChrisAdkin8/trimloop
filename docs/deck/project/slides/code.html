@@ -1,0 +1,24 @@
+<section id="code" data-transition="fade" style="background:#F7F5EF;color:#172033;font-family:Inter, Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:#C2561A">Under the hood</p>
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif;font-size:72px;font-weight:600;line-height:1.1">One program, one path through it</h2>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:72px">
+<div style="display:flex;gap:8px;align-items:center">
+<div style="width:360px;display:flex;flex-direction:column;gap:12px;background:#FFFDF8;padding:28px;border:3px solid #9AA5B4;border-radius:18px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">source/claudecode</p><p style="font-size:24px;line-height:1.4;color:#4A5568">Reads each log line by line</p></div>
+<x-connector head="end" style="width:48px;color:#4A5568;border-width:4px"></x-connector>
+<div style="width:360px;display:flex;flex-direction:column;gap:12px;background:#FFFDF8;padding:28px;border:3px solid #2F6FA8;border-radius:18px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">sessions.Load</p><p style="font-size:24px;line-height:1.4;color:#4A5568">Builds sessions and their turns</p></div>
+<x-connector head="end" style="width:48px;color:#4A5568;border-width:4px"></x-connector>
+<div style="width:360px;display:flex;flex-direction:column;gap:12px;background:#FBE9DC;padding:28px;border:3px solid #E8742A;border-radius:18px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">report.Analyse</p><p style="font-size:24px;line-height:1.4;color:#4A5568">Prices, detects, picks fixes</p></div>
+<x-connector head="end" style="width:48px;color:#4A5568;border-width:4px"></x-connector>
+<div style="width:360px;display:flex;flex-direction:column;gap:12px;background:#FFFDF8;padding:28px;border:3px solid #9AA5B4;border-radius:18px"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">report.Results</p><p style="font-size:24px;line-height:1.4;color:#4A5568">One result, shown four ways</p></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px">
+<div style="display:flex;flex-direction:column;gap:10px;border-top:4px solid #E8742A;padding:20px 0 0 0"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">pkg/price · detectors · fixes</p><p style="font-size:24px;line-height:1.4;color:#4A5568">Price list, the nine findings, and fixes strongest first</p></div>
+<div style="display:flex;flex-direction:column;gap:10px;border-top:4px solid #2F6FA8;padding:20px 0 0 0"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">internal/history · live</p><p style="font-size:24px;line-height:1.4;color:#4A5568">Weekly figures between runs; status line, hooks, setup</p></div>
+<div style="display:flex;flex-direction:column;gap:10px;border-top:4px solid #9AA5B4;padding:20px 0 0 0"><p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600">internal/safefile</p><p style="font-size:24px;line-height:1.4;color:#4A5568">Replaces a file whole or not at all</p></div>
+</div>
+<p style="font-size:24px;color:#4A5568">Written in Go, a programming language. Names in code type are folders and functions in the repository.</p>
+</div>
+<aside>The command in cmd/trimloop wires these together. Each module has a narrow front door: Load gives sessions, Analyse gives one Results value, and the summary, text, web page and JSON all render that same value. docs/state-machines.md lists everything the code remembers between steps.</aside>
+</section>

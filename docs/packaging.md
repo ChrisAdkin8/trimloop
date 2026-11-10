@@ -343,6 +343,12 @@ provenance (both need it public, or a paid plan) and stay drafts.
    push the tag (re-running the old workflow would rebuild the old commit).
 4. Check that the new draft is signed, and publish it.
 5. Make the tap public.
+6. Add the README badges that need a public repository: the latest
+   release (`img.shields.io/github/v/release/ChrisAdkin8/trimloop`), Go
+   Reference (`pkg.go.dev/badge/github.com/ChrisAdkin8/trimloop.svg`) and
+   Go Report Card (`goreportcard.com/badge/github.com/ChrisAdkin8/trimloop`).
+   The Go badge can then read the version from `go.mod`
+   (`img.shields.io/github/go-mod/go-version/ChrisAdkin8/trimloop`).
 
 ### Pinned by hand
 
@@ -384,9 +390,10 @@ The packaging parts of the layout — `cmd/trimloop-kong/`,
 
 ## 13. Open questions
 
-1. **Licence.** Settled by [ADR 0046](adr/0046-licensing.md): the
-   binary is FSL-1.1-ALv2, the Python plugin and other connectors
-   Apache-2.0, and team features commercial.
+1. **Licence.** Settled by [ADR 0054](adr/0054-apache-2-licence.md),
+   which replaces [ADR 0046](adr/0046-licensing.md): everything in the
+   repository is Apache-2.0. Whether team features are commercial is
+   decided when M2 starts.
 2. **Homebrew.** Own tap first; apply to homebrew-core once the project
    meets its popularity rules?
 3. **Windows.** Wait for demand, or ship `analyse` early because transcript
