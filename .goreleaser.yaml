@@ -126,8 +126,25 @@ release:
     Verify a download: see "Checking a download" in the README.
     Licence: Apache-2.0.
 
+# The list of commits under the release notes, grouped by how the commit's
+# subject starts and without commit hashes. It is the detail, not the
+# notes: before publishing the draft, write a short "What's new" above it
+# (docs/packaging.md, "Cutting a release").
 changelog:
   sort: asc
+  abbrev: -1
   filters:
     exclude:
       - "^Merge "
+  groups:
+    - title: Added
+      regexp: '^Add\b'
+      order: 0
+    - title: Fixed
+      regexp: '^(Fix|Harden|Correct)\b'
+      order: 1
+    - title: Documentation
+      regexp: '^(README|Docs?)\b'
+      order: 2
+    - title: Other changes
+      order: 999

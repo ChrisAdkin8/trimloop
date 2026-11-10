@@ -1,0 +1,29 @@
+name: An idea for a finding
+description: A way Claude Code wastes tokens that trimloop does not report, or advice that would help
+labels: [idea]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The waste patterns trimloop knows are in
+        [docs/patterns.md](https://github.com/ChrisAdkin8/trimloop/blob/main/docs/patterns.md)
+        (P01 to P19); nine are built so far. Ideas for new ones, and for
+        better advice on the ones it has, are welcome here.
+  - type: textarea
+    id: waste
+    attributes:
+      label: What gets wasted, and when
+      description: What you were doing, and where the tokens went
+    validations:
+      required: true
+  - type: textarea
+    id: seen
+    attributes:
+      label: How you noticed
+      description: >-
+        For example a slow session, a usage limit, `/cost`, `/context`, or
+        a trimloop report that missed it
+  - type: textarea
+    id: fix
+    attributes:
+      label: What you changed, if anything, and whether it helped

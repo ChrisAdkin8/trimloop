@@ -323,7 +323,9 @@ builds a draft GitHub release with [GoReleaser](../.goreleaser.yaml):
 archives for macOS and Linux, each for amd64 (Intel and AMD) and arm64
 (Apple silicon and other ARM), `.deb` and `.rpm` packages, signed
 checksums, a software bill of materials and build provenance. Check the
-draft, then publish it. With a `HOMEBREW_TAP_TOKEN` secret the release also
+draft, write a short "What's new" above its list of commits (what a user
+can now do, in a few lines; the list is grouped by how each commit's
+subject starts: Add, Fix, README or Docs), then publish it. With a `HOMEBREW_TAP_TOKEN` secret the release also
 updates the `ChrisAdkin8/homebrew-tap` cask, for
 `brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
 release dry run ([ci.yml](../.github/workflows/ci.yml)) on every push to

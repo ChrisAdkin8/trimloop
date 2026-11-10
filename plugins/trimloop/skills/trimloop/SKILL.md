@@ -27,8 +27,9 @@ Run `trimloop --version`. If the command is not found, try
 `~/.local/bin/trimloop --version`: if that works, trimloop is installed but
 that folder is not on their PATH; use the full path for the rest of this
 skill and tell them how to add the folder (README, "Install"). If neither
-works, stop and tell the user how to install it; do not install it
-yourself without their yes:
+works, stop and tell the user how to install it. If `brew --version`
+works, offer to run the Homebrew command for them; do not install anything
+without their yes:
 
 - on macOS or Linux with Homebrew (the quickest):
   `brew install --cask chrisadkin8/tap/trimloop`;
