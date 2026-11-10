@@ -10,24 +10,24 @@ import (
 	"github.com/ChrisAdkin8/trimloop/pkg/event"
 )
 
-// recordedSession is a main session on Opus 5.5 whose record says recorded
-// and cachedRecorded tokens read from cache, while its one logged turn cost
-// logged and read cachedLogged.
-func recordedSession(id, title string, recorded, logged float64, cachedRecorded, cachedLogged int) event.Session {
+// recordedSession is a main session on Opus 5.5 whose record says recorded,
+// with cachedRecorded tokens read from cache and outRecorded written, while
+// its one logged turn cost logged, read cachedLogged and wrote outLogged.
+func recordedSession(id, title string, recorded, logged float64, cachedRecorded, cachedLogged, outRecorded, outLogged int) event.Session {
 	return event.Session{ID: id, Kind: event.MainSession, Project: "api", Title: title,
 		Harness: &event.HarnessRecord{Cost: recorded, At: t0.Add(time.Hour), ByModel: map[string]event.ModelRecord{
-			"claude-opus-5-5": {Cost: recorded, CacheRead: cachedRecorded}}},
+			"claude-opus-5-5": {Cost: recorded, CacheRead: cachedRecorded, Output: outRecorded}}},
 		Turns: []event.Turn{{Model: "claude-opus-5-5", Time: t0, Priced: true,
-			Usage: event.Usage{CacheRead: cachedLogged}, Cost: event.Cost{CacheRead: logged}}}}
+			Usage: event.Usage{CacheRead: cachedLogged, Output: outLogged}, Cost: event.Cost{CacheRead: logged}}}}
 }
 
-// spreadSessions are ten sessions with a gap of 10 cents each, and a record
-// of cached work 10 % over the logs': background requests, within the
-// margin.
+// spreadSessions are ten sessions with a gap of 10 cents each: a record 20 %
+// over the logs on cached work and level on output, as summaries after a
+// break leave it.
 func spreadSessions() []event.Session {
 	var out []event.Session
 	for i := range 10 {
-		out = append(out, recordedSession(fmt.Sprintf("s%d", i), "", 1.10, 1, 1_100_000, 1_000_000))
+		out = append(out, recordedSession(fmt.Sprintf("s%d", i), "", 1.10, 1, 1_200_000, 1_000_000, 1_000, 1_000))
 	}
 	return out
 }
@@ -36,16 +36,16 @@ func spreadSessions() []event.Session {
 // ones, two of them equal, and two left out of the comparison that would
 // otherwise top the list.
 func concentratedSessions() []event.Session {
-	late := recordedSession("late", "Left running", 500, 1, 0, 0)
+	late := recordedSession("late", "Left running", 500, 1, 0, 0, 0, 0)
 	late.Harness.At = t0.Add(-time.Hour) // work went on after the record
-	unpriced := recordedSession("unpriced", "Unpriced", 400, 1, 0, 0)
+	unpriced := recordedSession("unpriced", "Unpriced", 400, 1, 0, 0, 0, 0)
 	unpriced.Turns[0].Priced = false
 	return append(spreadSessions(),
-		recordedSession("big", "Fix the parser", 90, 30, 125_000_000, 88_000_000),
+		recordedSession("big", "Fix the parser", 90, 30, 125_000_000, 88_000_000, 716_000, 140_000),
 		event.Session{ID: "big/a", Kind: event.SubAgentSession, ParentID: "big", Project: "api",
 			Turns: []event.Turn{{Model: "claude-opus-5-5", Time: t0, Priced: true}}},
-		recordedSession("tie-b", "Second tie", 20, 10, 0, 0),
-		recordedSession("tie-a", "First tie", 20, 10, 0, 0),
+		recordedSession("tie-b", "Second tie", 20, 10, 0, 0, 0, 0),
+		recordedSession("tie-a", "First tie", 20, 10, 0, 0, 0, 0),
 		late, unpriced,
 	)
 }
@@ -89,7 +89,7 @@ func TestReconciliationSpreadGap(t *testing.T) {
 			"  background requests: session titles, summaries after a break, compactions and\n" +
 			"  web searches.\n" +
 			"  The findings in this report are worked out from the logs, so they leave this spend out.\n",
-		"    11.0M / 10.0M     0 / 0             0 / 0           0 / 0           Opus 5.5\n",
+		"    12.0M / 10.0M     0 / 0             10k / 10k       0 / 0           Opus 5.5\n",
 		"  Sessions with the largest gaps ($0.30 of the $1.00):\n",
 		"    $1.10      $1.00      $0.10                   0  api                  s0\n" +
 			"    $1.10      $1.00      $0.10                   0  api                  s1\n" +
@@ -100,7 +100,7 @@ func TestReconciliationSpreadGap(t *testing.T) {
 		}
 	}
 	if strings.Contains(text, "cached work") || strings.Contains(page, "cached work") {
-		t.Error("a record 10 % over the logs' cached work says requests are missing")
+		t.Error("a record over the logs on cached work alone says requests are missing")
 	}
 	if want := "requests the logs don't record. The findings on this page come from the logs, so they leave it out.</p>"; !strings.Contains(page, want) {
 		t.Errorf("page: want %q in\n%s", want, page)
@@ -109,7 +109,7 @@ func TestReconciliationSpreadGap(t *testing.T) {
 
 // Most of the gap in a few sessions: the summary says how much, the rows
 // list them largest first with ties by id, sessions left out of the
-// comparison are not listed, and the record's extra cached work is named.
+// comparison are not listed, and the record's extra cached work and output are named.
 func TestReconciliationConcentratedGap(t *testing.T) {
 	summary, text, page := reconcileOutputs(t, concentratedSessions(), true)
 	want := "Claude Code's own records show $81 (135%) more than its logs: requests the logs do not record.\n" +
@@ -118,10 +118,10 @@ func TestReconciliationConcentratedGap(t *testing.T) {
 		t.Errorf("summary: want %q in\n%s", want, summary)
 	}
 	for _, want := range []string{
-		"  The record also counts more cached work (cache reads and writes) than the logs\n" +
-			"  hold for Opus 5.5:\n" +
+		"  The record also counts clearly more cached work and output than the logs hold\n" +
+			"  for Opus 5.5:\n" +
 			"  some of the sessions' own requests are missing from the logs, and why is not known.\n",
-		"    136.0M / 98.0M    0 / 0             0 / 0           0 / 0           Opus 5.5\n",
+		"    137.0M / 98.0M    0 / 0             726k / 150k     0 / 0           Opus 5.5\n",
 		"  Sessions with the largest gaps ($80 of the $81):\n" +
 			"    recorded   in logs    gap        sub-agent logs  project              session\n" +
 			"    $90        $30        $60                     1  api                  big  Fix the parser\n" +
@@ -140,7 +140,7 @@ func TestReconciliationConcentratedGap(t *testing.T) {
 	for _, want := range []string{
 		"requests the logs don't record. $80 of it is in 3 sessions. The findings on this page come from the logs",
 		"than the logs hold for Opus 5.5: some of the sessions' own requests are missing from the logs, and why is not known.",
-		"<td class=\"n\">136.0M / 98.0M</td>",
+		"<td class=\"n\">137.0M / 98.0M</td><td class=\"n\">0 / 0</td><td class=\"n\">726k / 150k</td>",
 		"Together $80 of the $81.",
 		`Fix the parser<span class="id" title="Session big">`,
 		"<td class=\"name\">api</td><td class=\"n\">$90</td><td class=\"n\">$30</td><td class=\"n\">$60</td><td class=\"n\">1</td>",

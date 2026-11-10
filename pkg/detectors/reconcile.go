@@ -96,8 +96,8 @@ type ModelGap struct {
 	OursUncached    int `json:"ours_uncached"`
 
 	// The other token classes. A record well ahead of the logs on cached
-	// work means whole requests of the conversation are missing from the
-	// logs, not only background ones.
+	// work and on output means whole requests of the conversation are
+	// missing from the logs, not only background ones.
 	HarnessCacheRead  int `json:"harness_cache_read"`
 	OursCacheRead     int `json:"ours_cache_read"`
 	HarnessCacheWrite int `json:"harness_cache_write"` // both cache lifetimes
@@ -106,21 +106,37 @@ type ModelGap struct {
 	OursOutput        int `json:"ours_output"`
 }
 
-// cachedMargin is how far the record's cached tokens (read and write) may
-// pass the logs' before the report says requests are missing from the logs.
-// Background requests add some cached work too: a summary after a break
-// re-reads the conversation. Across 412 sessions the whole gap, background
-// requests and all, was about 4 % of spend (docs/log-signals.md §8), so 10 %
-// leaves room for them; the incomplete logs seen so far were 30 % and more
-// short.
-const cachedMargin = 0.10
+// missingMargin is how far the record's cached tokens (read and write) and
+// its output may both pass the logs' on a model before the report says the
+// conversation's own requests are missing from the logs. Background
+// requests add cached work (a summary after a break re-reads the
+// conversation) but little output. On one machine's logs, with two
+// sessions whose logs were incomplete set aside, each model's record was 9
+// to 17 % over the logs on cached work and under 1 % over on output; those
+// two sessions were 30 % and 54 % over on cached work and two and five
+// times over on output. So output carries the margin, with room on both
+// sides; cached work must pass it too, as the report's sentence names it.
+const missingMargin = 0.10
 
-// MissingCachedWork reports whether the record counts clearly more cached
-// work on this model than the logs hold. A model the logs hold no cached
-// work for is left out: that is background work only, such as titles.
-func (g ModelGap) MissingCachedWork() bool {
-	ours := g.OursCacheRead + g.OursCacheWrite
-	return ours > 0 && float64(g.HarnessCacheRead+g.HarnessCacheWrite) > (1+cachedMargin)*float64(ours)
+// backgroundModel is the share of a model's recorded cost the logs must
+// hold before its figures are compared: below it, the model ran almost only
+// background requests the logs never hold, such as titles (Haiku: $0.01 in
+// the logs against $2.28 recorded on that machine).
+const backgroundModel = 0.10
+
+// MissingRequests reports whether the record counts clearly more cached
+// work and output on this model than the logs hold.
+func (g ModelGap) MissingRequests() bool {
+	if g.Ours < backgroundModel*g.Harness {
+		return false
+	}
+	return over(g.HarnessCacheRead+g.HarnessCacheWrite, g.OursCacheRead+g.OursCacheWrite) &&
+		over(g.HarnessOutput, g.OursOutput)
+}
+
+// over reports whether recorded passes logged by more than missingMargin.
+func over(recorded, logged int) bool {
+	return logged > 0 && float64(recorded) > (1+missingMargin)*float64(logged)
 }
 
 // staleAfter is how long a session may go on after its record was last

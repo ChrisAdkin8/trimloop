@@ -23,9 +23,9 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64, labe
 		fmt.Fprintf(w, "  %s (%.1f%%) was spent on requests the logs do not record. Part of it is\n", money(c.Gap), pct(c.Gap, c.Ours))
 		fmt.Fprintln(w, "  background requests: session titles, summaries after a break, compactions and")
 		fmt.Fprintln(w, "  web searches.")
-		if models := missingCachedWork(c); models != "" {
-			fmt.Fprintln(w, "  The record also counts more cached work (cache reads and writes) than the logs")
-			fmt.Fprintf(w, "  hold for %s:\n", printable(models))
+		if models := missingRequests(c); models != "" {
+			fmt.Fprintln(w, "  The record also counts clearly more cached work and output than the logs hold")
+			fmt.Fprintf(w, "  for %s:\n", printable(models))
 			fmt.Fprintln(w, "  some of the sessions' own requests are missing from the logs, and why is not known.")
 		}
 		fmt.Fprintln(w, "  The findings in this report are worked out from the logs, so they leave this spend out.")
@@ -80,13 +80,13 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64, labe
 	}
 }
 
-// missingCachedWork names the models whose record counts clearly more
-// cached work than the logs hold (ModelGap.MissingCachedWork), as "Opus 5.5
-// and Haiku 5.5"; "" if none.
-func missingCachedWork(c detectors.Reconciliation) string {
+// missingRequests names the models whose record counts clearly more cached
+// work and output than the logs hold (ModelGap.MissingRequests), as "Opus
+// 5.5 and Fable 5.1"; "" if none.
+func missingRequests(c detectors.Reconciliation) string {
 	var names []string
 	for _, m := range c.ByModel {
-		if m.MissingCachedWork() {
+		if m.MissingRequests() {
 			names = append(names, modelName(m.Model))
 		}
 	}

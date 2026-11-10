@@ -98,22 +98,29 @@ func TestReconciliationLargestGaps(t *testing.T) {
 	}
 }
 
-// The record's cached tokens against the logs': only a clear margin over
-// the logs says requests are missing from them.
-func TestMissingCachedWork(t *testing.T) {
+// The record's cached tokens and output against the logs': only a clear
+// margin over the logs on both says requests are missing from them.
+func TestMissingRequests(t *testing.T) {
 	for _, c := range []struct {
+		name                                           string
 		harnessRead, harnessWrite, oursRead, oursWrite int
+		harnessOut, oursOut                            int
+		harnessCost, oursCost                          float64
 		want                                           bool
 	}{
-		{110, 0, 100, 0, false}, // 10 % more: within the margin
-		{100, 11, 100, 0, true}, // 11 % more, counting writes
-		{147, 0, 88, 7, true},
-		{5000, 0, 0, 0, false}, // the logs hold no cached work: background only
-		{90, 0, 100, 0, false},
+		{"10 % more of both: within the margin", 110, 0, 100, 0, 110, 100, 10, 9, false},
+		{"11 % more, counting writes", 100, 11, 100, 0, 111, 100, 10, 9, true},
+		{"incomplete logs", 125_000_000, 22_000_000, 88_000_000, 7_400_000, 716_000, 140_000, 154, 60, true},
+		{"cached work only: summaries after breaks", 177, 0, 151, 0, 713, 711, 104, 98, false},
+		{"output only", 100, 0, 100, 0, 200, 100, 10, 9, false},
+		{"no cached work in the logs", 5000, 0, 0, 0, 200, 100, 10, 9, false},
+		{"logs hold 9 % of the cost: a background model", 400, 0, 300, 0, 300_000, 42, 1, 0.09, false},
+		{"logs hold 10 % of the cost", 400, 0, 300, 0, 300_000, 42, 1, 0.1, true},
 	} {
-		g := ModelGap{HarnessCacheRead: c.harnessRead, HarnessCacheWrite: c.harnessWrite, OursCacheRead: c.oursRead, OursCacheWrite: c.oursWrite}
-		if got := g.MissingCachedWork(); got != c.want {
-			t.Errorf("%+v: got %v, want %v", c, got, c.want)
+		g := ModelGap{HarnessCacheRead: c.harnessRead, HarnessCacheWrite: c.harnessWrite, OursCacheRead: c.oursRead,
+			OursCacheWrite: c.oursWrite, HarnessOutput: c.harnessOut, OursOutput: c.oursOut, Harness: c.harnessCost, Ours: c.oursCost}
+		if got := g.MissingRequests(); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
 		}
 	}
 }
