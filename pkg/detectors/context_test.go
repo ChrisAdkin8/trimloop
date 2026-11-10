@@ -48,6 +48,81 @@ func TestFindReconciliation(t *testing.T) {
 	if len(f.ByModel) != 2 || f.ByModel[0].Model != "haiku" || f.ByModel[0].Gap != 1 || f.ByModel[0].HarnessUncached != 500 {
 		t.Errorf("by model: got %+v", f.ByModel)
 	}
+	if want := (SessionGap{ID: "a", Harness: 12, Ours: 10, Gap: 2, SubAgentLogs: 1}); len(f.LargestGaps) != 1 || f.LargestGaps[0] != want {
+		t.Errorf("largest gaps: got %+v, want %+v", f.LargestGaps, want)
+	}
+}
+
+// The sessions with the largest gaps: compared sessions only, largest
+// first, ties by id, at most three, with their sub-agent logs counted.
+func TestReconciliationLargestGaps(t *testing.T) {
+	at := time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)
+	main := func(id string, recorded, logged float64) event.Session {
+		return event.Session{ID: id, Kind: event.MainSession, Harness: &event.HarnessRecord{Cost: recorded, At: at},
+			Turns: []event.Turn{{Model: "opus", Cost: event.Cost{Output: logged}, Priced: true, Time: at}}}
+	}
+	sub := func(id, parent string) event.Session {
+		return event.Session{ID: id, Kind: event.SubAgentSession, ParentID: parent,
+			Turns: []event.Turn{{Model: "opus", Priced: true, Time: at}}}
+	}
+	behind := main("behind", 100, 1)
+	behind.Turns[0].Time = at.Add(time.Hour)
+	unpriced := main("unpriced", 100, 1)
+	unpriced.Turns[0].Priced = false
+	f := FindReconciliation([]event.Session{
+		main("small", 3, 2), main("tie-b", 12, 2), main("tie-a", 12, 2), main("big", 50, 10),
+		sub("big/1", "big"), sub("big/2", "big"), sub("tie-a/1", "tie-a"),
+		main("even", 5, 5), main("over", 1, 4), main("rounding", 2.004, 2), behind, unpriced,
+		{ID: "unrecorded", Kind: event.MainSession, Turns: []event.Turn{{Cost: event.Cost{Output: 1}, Priced: true, Time: at}}},
+	})
+	want := []SessionGap{
+		{ID: "big", Harness: 50, Ours: 10, Gap: 40, SubAgentLogs: 2},
+		{ID: "tie-a", Harness: 12, Ours: 2, Gap: 10, SubAgentLogs: 1},
+		{ID: "tie-b", Harness: 12, Ours: 2, Gap: 10},
+	}
+	if len(f.LargestGaps) != len(want) {
+		t.Fatalf("got %+v, want %+v", f.LargestGaps, want)
+	}
+	for i := range want {
+		if f.LargestGaps[i] != want[i] {
+			t.Errorf("row %d: got %+v, want %+v", i, f.LargestGaps[i], want[i])
+		}
+	}
+	if held, ok := f.Held(), f.Concentrated(); held != 60 || !ok {
+		t.Errorf("concentrated: got %v %v, want 60 true", held, ok)
+	}
+	// Every compared session listed: nothing to say about concentration.
+	all := Reconciliation{Sessions: 1, Gap: 2, LargestGaps: []SessionGap{{ID: "a", Gap: 2}}}
+	if all.Concentrated() {
+		t.Error("one session of one: got concentrated")
+	}
+}
+
+// The record's cached tokens and output against the logs': only a clear
+// margin over the logs on both says requests are missing from them.
+func TestMissingRequests(t *testing.T) {
+	for _, c := range []struct {
+		name                                           string
+		harnessRead, harnessWrite, oursRead, oursWrite int
+		harnessOut, oursOut                            int
+		harnessCost, oursCost                          float64
+		want                                           bool
+	}{
+		{"10 % more of both: within the margin", 110, 0, 100, 0, 110, 100, 10, 9, false},
+		{"11 % more, counting writes", 100, 11, 100, 0, 111, 100, 10, 9, true},
+		{"incomplete logs", 125_000_000, 22_000_000, 88_000_000, 7_400_000, 716_000, 140_000, 154, 60, true},
+		{"cached work only: summaries after breaks", 177, 0, 151, 0, 713, 711, 104, 98, false},
+		{"output only", 100, 0, 100, 0, 200, 100, 10, 9, false},
+		{"no cached work in the logs", 5000, 0, 0, 0, 200, 100, 10, 9, false},
+		{"logs hold 9 % of the cost: a background model", 400, 0, 300, 0, 300_000, 42, 1, 0.09, false},
+		{"logs hold 10 % of the cost", 400, 0, 300, 0, 300_000, 42, 1, 0.1, true},
+	} {
+		g := ModelGap{HarnessCacheRead: c.harnessRead, HarnessCacheWrite: c.harnessWrite, OursCacheRead: c.oursRead,
+			OursCacheWrite: c.oursWrite, HarnessOutput: c.harnessOut, OursOutput: c.oursOut, Harness: c.harnessCost, Ours: c.oursCost}
+		if got := g.MissingRequests(); got != c.want {
+			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
+		}
+	}
 }
 
 func TestWeekOf(t *testing.T) {

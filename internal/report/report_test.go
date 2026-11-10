@@ -377,14 +377,14 @@ func TestDollarsNegative(t *testing.T) {
 // When no session can be compared, the text says why.
 func TestReconcileSectionGivesReasons(t *testing.T) {
 	var b strings.Builder
-	reconcileSection(&b, detectors.Reconciliation{Unpriced: 1, Behind: 2}, 10)
+	reconcileSection(&b, detectors.Reconciliation{Unpriced: 1, Behind: 2}, 10, nil)
 	out := b.String()
 	if strings.Contains(out, "No session has a cost record") || !strings.Contains(out, "no known price") ||
 		!strings.Contains(out, "2 sessions have a record that does not cover all of them (they began") {
 		t.Errorf("got %q", out)
 	}
 	b.Reset()
-	reconcileSection(&b, detectors.Reconciliation{Behind: 1}, 10)
+	reconcileSection(&b, detectors.Reconciliation{Behind: 1}, 10, nil)
 	if out := b.String(); !strings.Contains(out, "1 session has a record that does not cover all of it (it began") {
 		t.Errorf("one session: got %q", out)
 	}

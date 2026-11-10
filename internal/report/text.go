@@ -63,7 +63,7 @@ func WriteText(out io.Writer, r Results) error {
 		fmt.Fprintln(w, "  Each is explained, with how to do it, in its section below.")
 	}
 
-	reconcileSection(w, r.Reconciliation, all)
+	reconcileSection(w, r.Reconciliation, all, r.Labels)
 	weeksSection(w, r.Weeks, r.Prices)
 	attributionSection(w, r.Attribution, r.HideIDs)
 

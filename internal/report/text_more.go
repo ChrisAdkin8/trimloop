@@ -7,8 +7,9 @@ import (
 	"github.com/ChrisAdkin8/trimloop/pkg/detectors"
 )
 
-// reconcileSection compares the totals with Claude Code's own records.
-func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
+// reconcileSection compares the totals with Claude Code's own records;
+// labels name the sessions with the largest gaps.
+func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64, labels map[string]Label) {
 	fmt.Fprintln(w, "\nCHECKED AGAINST CLAUDE CODE'S OWN RECORDS")
 	compared := fmt.Sprintf("  For %s with a record, Claude Code recorded %s and the logs show %s:\n",
 		count(c.Sessions, "session"), money(c.Harness), money(c.Ours))
@@ -19,8 +20,15 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 		fmt.Fprintln(w, "  No session could be checked; the reasons follow.")
 	case c.Gap >= 0:
 		fmt.Fprint(w, compared)
-		fmt.Fprintf(w, "  %s (%.1f%%) was spent on requests the logs do not record, such as\n", money(c.Gap), pct(c.Gap, c.Ours))
-		fmt.Fprintln(w, "  session titles, summaries after a break, compactions and web searches.")
+		fmt.Fprintf(w, "  %s (%.1f%%) was spent on requests the logs do not record. Part of it is\n", money(c.Gap), pct(c.Gap, c.Ours))
+		fmt.Fprintln(w, "  background requests: session titles, summaries after a break, compactions and")
+		fmt.Fprintln(w, "  web searches.")
+		if models := missingRequests(c); models != "" {
+			fmt.Fprintln(w, "  The record also counts clearly more cached work and output than the logs hold")
+			fmt.Fprintf(w, "  for %s:\n", printable(models))
+			fmt.Fprintln(w, "  some of the sessions' own requests are missing from the logs, and why is not known.")
+		}
+		fmt.Fprintln(w, "  The findings in this report are worked out from the logs, so they leave this spend out.")
 	default:
 		fmt.Fprint(w, compared)
 		fmt.Fprintf(w, "  the logs show %s more than the records; some records may predate the session's end.\n", money(-c.Gap))
@@ -49,7 +57,44 @@ func reconcileSection(w io.Writer, c detectors.Reconciliation, all float64) {
 	for _, m := range c.ByModel {
 		fmt.Fprintf(w, "    %-10s %-10s %-10s %s\n", money(m.Harness), money(m.Ours), money(m.Gap), printable(modelName(m.Model)))
 	}
+	fmt.Fprintln(w, "\n  Tokens by model, recorded / in logs:")
+	fmt.Fprintf(w, "    %-17s %-17s %-15s %-15s %s\n", "cache reads", "cache writes", "output", "uncached input", "model")
+	for _, m := range c.ByModel {
+		fmt.Fprintf(w, "    %-17s %-17s %-15s %-15s %s\n", tokenPair(m.HarnessCacheRead, m.OursCacheRead),
+			tokenPair(m.HarnessCacheWrite, m.OursCacheWrite), tokenPair(m.HarnessOutput, m.OursOutput),
+			tokenPair(m.HarnessUncached, m.OursUncached), printable(modelName(m.Model)))
+	}
+	if len(c.LargestGaps) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "\n  Sessions with the largest gaps (%s of the %s):\n", money(c.Held()), money(c.Gap))
+	fmt.Fprintf(w, "    %-10s %-10s %-10s %14s  %-20s %s\n", "recorded", "in logs", "gap", "sub-agent logs", "project", "session")
+	for _, s := range c.LargestGaps {
+		l := labels[s.ID]
+		name := s.ID
+		if l.Title != "" {
+			name += "  " + l.Title
+		}
+		fmt.Fprintf(w, "    %-10s %-10s %-10s %14d  %-20s %s\n", money(s.Harness), money(s.Ours), money(s.Gap),
+			s.SubAgentLogs, printable(l.Project), printable(name))
+	}
 }
+
+// missingRequests names the models whose record counts clearly more cached
+// work and output than the logs hold (ModelGap.MissingRequests), as "Opus
+// 5.5 and Fable 5.1"; "" if none.
+func missingRequests(c detectors.Reconciliation) string {
+	var names []string
+	for _, m := range c.ByModel {
+		if m.MissingRequests() {
+			names = append(names, modelName(m.Model))
+		}
+	}
+	return joinAnd(names)
+}
+
+// tokenPair writes a recorded and a logged token count: "125.0M / 88.0M".
+func tokenPair(recorded, logged int) string { return approx(recorded) + " / " + approx(logged) }
 
 // standingSection prints what every request carries (P07).
 func standingSection(w io.Writer, s detectors.StandingContext, all float64, hideIDs bool) {

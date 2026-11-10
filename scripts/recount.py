@@ -76,6 +76,9 @@ NO_US_SURCHARGE = {
 US_SURCHARGE = 1.1
 
 CLASSES = ("input_uncached", "cache_read", "cache_write_5m", "cache_write_1h", "output")
+# The reconciliation's token classes, named as trimloop's by_model fields
+# end (harness_uncached, ours_cache_write, ...).
+TOKEN_CLASSES = ("uncached", "cache_read", "cache_write", "output")
 THRESHOLD = 200_000  # P19: a turn counts when its context is over this
 ZONES = ("UTC", "America/Los_Angeles", "Asia/Kolkata", "Pacific/Auckland")
 STALE = timedelta(minutes=10)  # reconciliation: ADR 0033, 0035
@@ -240,7 +243,9 @@ class Log:
         self.id = f"{rel[1]}/{stem}" if self.sub else stem
         self.replies = {}  # message id -> reply, in first-seen order
         self.compactions = []  # dicts: line id, trigger, time, reply time
-        self.records = []  # (startTime, totalCostUSD, unknown, date of the last reply before it)
+        # (startTime, totalCostUSD, unknown, date of the last reply before
+        # it, modelUsage)
+        self.records = []
         self.first_cwd = None
         self.agent_type = None  # the harness's attributionAgent, else meta.json
         self.times = []
@@ -299,6 +304,7 @@ class Log:
                         float(o["totalCostUSD"]),
                         bool(o.get("hasUnknownModelCost")),
                         last_reply,
+                        o.get("modelUsage") or {},
                     )
                 )
             elif kind == "assistant":
@@ -600,8 +606,21 @@ def recount(cfg, tz):
     # logged before it. Compared only when covered: no turn more than 10
     # minutes after the latest record, none more than 10 minutes before the
     # earliest run began.
+    #
+    # Tokens by model (grouped as P13 groups them) in four classes on both
+    # sides: uncached input, cache reads, cache writes of both lifetimes,
+    # output. The record's cacheCreationInputTokens has no split by lifetime.
+    def tokens():
+        return defaultdict(lambda: dict.fromkeys(TOKEN_CLASSES, 0))
+
     conv = defaultdict(
-        lambda: {"cost": 0.0, "first": None, "last": None, "unpriced": False}
+        lambda: {
+            "cost": 0.0,
+            "first": None,
+            "last": None,
+            "unpriced": False,
+            "models": tokens(),
+        }
     )
     for r in turns:
         c = conv[r["log"].conv]
@@ -610,8 +629,18 @@ def recount(cfg, tz):
         if r["time"]:
             c["first"] = min(c["first"] or r["time"], r["time"])
             c["last"] = max(c["last"] or r["time"], r["time"])
+        unc, rd, w5, w1, out = r["tok"]
+        m = c["models"][group(r["model"])]
+        for k, v in zip(TOKEN_CLASSES, (unc, rd, w5 + w1, out)):
+            m[k] += v
+    sub_logs = defaultdict(int)  # sub-agent logs with turns, per conversation
+    for log in with_turns.values():
+        if log.sub:
+            sub_logs[log.conv] += 1
     rec = {k: 0 for k in ("sessions", "behind", "unrecorded", "unpriced")}
     rec.update({k: 0.0 for k in ("harness", "ours", "behind_cost", "unrecorded_cost")})
+    gaps = []  # compared sessions whose record is at least a cent over the logs
+    harness_models, ours_models = tokens(), tokens()
     main_ids = set()
     for log in logs:
         if log.sub or log.id not in with_turns:
@@ -623,12 +652,12 @@ def recount(cfg, tz):
             rec["unrecorded_cost"] += c["cost"]
             continue
         runs = {}
-        for start, total, unknown, dated in log.records:
-            runs[start] = (total, unknown, dated)  # the latest record of each run
-        if c["unpriced"] or any(u for _, u, _ in runs.values()):
+        for start, total, unknown, dated, usage in log.records:
+            runs[start] = (total, unknown, dated, usage)  # the latest record of each run
+        if c["unpriced"] or any(u for _, u, _, _ in runs.values()):
             rec["unpriced"] += 1
             continue
-        dated = max((d for _, _, d in runs.values() if d), default=None)
+        dated = max((d for _, _, d, _ in runs.values() if d), default=None)
         starts = [
             datetime.fromtimestamp(s / 1000, timezone.utc)
             for s in runs
@@ -641,15 +670,45 @@ def recount(cfg, tz):
             rec["behind"] += 1
             rec["behind_cost"] += c["cost"]
             continue
+        recorded = sum(total for total, _, _, _ in runs.values())
         rec["sessions"] += 1
-        rec["harness"] += sum(total for total, _, _ in runs.values())
+        rec["harness"] += recorded
         rec["ours"] += c["cost"]
+        if recorded - c["cost"] >= 0.01:
+            gaps.append(
+                {
+                    "id": log.conv,
+                    "harness": recorded,
+                    "ours": c["cost"],
+                    "gap": recorded - c["cost"],
+                    "sub_agent_logs": sub_logs[log.conv],
+                }
+            )
+        for _, _, _, usage in runs.values():
+            for model, u in usage.items():
+                m = harness_models[group(model)]
+                m["uncached"] += u.get("inputTokens") or 0
+                m["cache_read"] += u.get("cacheReadInputTokens") or 0
+                m["cache_write"] += u.get("cacheCreationInputTokens") or 0
+                m["output"] += u.get("outputTokens") or 0
+        for model, t in c["models"].items():
+            for k, v in t.items():
+                ours_models[model][k] += v
     for cid, c in sorted(conv.items()):
         if cid not in main_ids:  # sub-agents whose main session's log is gone
             rec["unrecorded"] += 1
             rec["unrecorded_cost"] += c["cost"]
     rec["gap"] = rec["harness"] - rec["ours"]
     R["reconciliation"] = rec
+    gaps.sort(key=lambda g: (-g["gap"], g["id"]))
+    R["reconciliation_largest_gaps"] = gaps[:3]
+    R["reconciliation_by_model"] = {
+        m: {
+            **{f"harness_{k}": harness_models[m][k] for k in TOKEN_CLASSES},
+            **{f"ours_{k}": ours_models[m][k] for k in TOKEN_CLASSES},
+        }
+        for m in sorted(set(harness_models) | set(ours_models))
+    }
 
     R["weeks"] = dict(sorted(weeks.items()))
     return R
@@ -703,6 +762,13 @@ def theirs(T):
         "unpriced",
     ):
         out[f"reconciliation.{k}"] = rc.get(k)
+    for i, g in enumerate(rc.get("largest_gaps") or []):
+        for k in ("id", "harness", "ours", "gap", "sub_agent_logs"):
+            out[f"reconciliation.largest_gaps.{i}.{k}"] = g.get(k)
+    for m in rc.get("by_model") or []:
+        for side in ("harness", "ours"):
+            for k in TOKEN_CLASSES:
+                out[f"reconciliation.by_model.{m['model']}.{side}_{k}"] = m.get(f"{side}_{k}")
     for s in T.get("attribution", {}).get("by_project") or []:
         for k in ("cost", "turns", "conversations", "sub_agent_cost"):
             out[f"projects.{s['name']}.{k}"] = s.get(k)
@@ -736,6 +802,12 @@ def ours(R):
         out[f"p19.{k}"] = v
     for k, v in R["reconciliation"].items():
         out[f"reconciliation.{k}"] = v
+    for i, g in enumerate(R["reconciliation_largest_gaps"]):
+        for k, v in g.items():
+            out[f"reconciliation.largest_gaps.{i}.{k}"] = v
+    for m, t in R["reconciliation_by_model"].items():
+        for k, v in t.items():
+            out[f"reconciliation.by_model.{m}.{k}"] = v
     for name, v in R["projects"].items():
         for k in ("cost", "turns", "conversations", "sub_agent_cost"):
             out[f"projects.{name}.{k}"] = v[k]
@@ -775,6 +847,8 @@ def rounded(v):
         return round(v, 9)
     if isinstance(v, dict):
         return {k: rounded(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [rounded(x) for x in v]
     return v
 
 

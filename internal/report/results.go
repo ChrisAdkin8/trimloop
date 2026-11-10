@@ -307,6 +307,9 @@ func labels(sessions []event.Session, r Results, titles bool) map[string]Label {
 	for _, c := range r.Growth.Top {
 		want[c.ID] = true
 	}
+	for _, s := range r.Reconciliation.LargestGaps {
+		want[s.ID] = true
+	}
 	byID := map[string]event.Session{}
 	child := map[string]event.Session{} // a conversation's first sub-agent, for one whose main log is gone
 	for _, s := range sessions {
