@@ -44,11 +44,14 @@ the conversation so far with a short summary. *Sub-agents* are helpers
 Claude starts for side tasks, such as searching the code.
 
 The full report explains each finding, shows the sessions behind it, and
-gives the fix step by step. **See one:**
-[docs/examples/example-report.html](docs/examples/example-report.html) is the
-web page from the same run, with session titles left out and project
-folders renamed to neutral words (oak, larch, ...). GitHub shows it as
-code: download it ("Download raw file") and open it in a browser.
+gives the fix step by step. **[See one in your browser](https://chrisadkin8.github.io/trimloop/)**:
+the web page from the same run, with session titles left out and project
+folders renamed to neutral words (oak, larch, ...). This is its top:
+
+<a href="https://chrisadkin8.github.io/trimloop/"><img src="docs/images/example-report.png" width="760" alt="The top of a trimloop report: 58% of spend went on sending turns over 200,000 tokens, shown as bars of spend and turns by session size; $2,006 was paid to send the session to Claude, split into messages and replies, tool output, commands and files, the system prompt, and text Claude Code added; then the first action, compact long sessions earlier, likely to save about $618."></a>
+
+(The page's file is
+[docs/examples/example-report.html](docs/examples/example-report.html).)
 
 **How far to trust the figures.** They are estimates:
 
@@ -403,7 +406,7 @@ the steps for making the repository public, are in
 | Doc | What's in it |
 |---|---|
 | [docs/measurements.md](docs/measurements.md) | How each figure the prototype reports is worked out today |
-| [docs/examples/example-report.html](docs/examples/example-report.html) | A full web-page report from real logs (download and open in a browser) |
+| [docs/examples/example-report.html](docs/examples/example-report.html) | A full web-page report from real logs; [see it in a browser](https://chrisadkin8.github.io/trimloop/) |
 | [docs/deck/](docs/deck/README.md) | A 16-slide introduction to the ideas here: the source files of a slide deck |
 | [docs/patterns.md](docs/patterns.md) | Catalogue of waste patterns: signals, detection, fix |
 | [docs/state-machines.md](docs/state-machines.md) | What the code remembers between steps, and the files it keeps |
