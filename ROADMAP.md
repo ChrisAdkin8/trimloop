@@ -61,11 +61,10 @@ Each item is tagged **Done**, **Partly** or **Not built** for the prototype.
 - **Not built.** Aggregate runner for the cross-session detectors (P06). P07
   is built as a per-session Go detector
   ([ADR 0033](docs/adr/0033-reconciliation-history-standing-context.md)).
-- **Partly.** Release: the installable release is built — one GoReleaser
-  job, checksums (signed once the repository is public), `.deb` / `.rpm`, a
-  Homebrew cask
-  ([ADR 0047](docs/adr/0047-first-release-pure-go.md)); nothing is
-  published yet. Still to do with cgo:
+- **Partly.** Release: the installable release is built and published
+  (v0.2.0, the first public release, 2026-11-10) — one GoReleaser job,
+  signed checksums, `.deb` / `.rpm`, a Homebrew cask
+  ([ADR 0047](docs/adr/0047-first-release-pure-go.md)). Still to do with cgo:
   the per-OS signed pipeline — signed binary on GitHub Releases, `.deb` / `.rpm`
   packages and a Homebrew tap ([packaging.md](docs/packaging.md)), proved
   by a dry-run of the per-OS build
@@ -123,10 +122,9 @@ To do:
 3. P03, P06 (with the DuckDB store, numbers only until item 5), P01's other
    causes (beyond model switches); then P05, and P12 from harness retry
    records (its full fidelity, and P10's, stays in M3).
-4. Distribution: publish the first release after going public
-   from a fresh tag
-   ([ADR 0052](docs/adr/0052-third-review-corrections.md)), minimal
-   conformance runner, profiles.
+4. Distribution: minimal conformance runner, profiles (the first public
+   release, v0.2.0, is published:
+   [ADR 0052](docs/adr/0052-third-review-corrections.md)).
 5. Keyed fingerprints, key commands, segmentation, redaction, exact hashes.
 
 **Done when:** on a sample of real sessions, findings are reproducible and a

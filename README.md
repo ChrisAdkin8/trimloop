@@ -105,7 +105,14 @@ it, and put `trimloop` somewhere on your PATH (for example
 `~/.local/bin`). [Checking a download](#checking-a-download) says how to
 verify it, and what to do if macOS refuses to open it.
 
-Or **build it from source**, with Go 1.27.3 or later:
+Or, with Go 1.27.3 or later, **install it with Go** (into `~/go/bin`
+unless you have set `GOBIN` or `GOPATH`):
+
+```bash
+go install github.com/ChrisAdkin8/trimloop/cmd/trimloop@latest
+```
+
+Or **build it from source**:
 
 ```bash
 git clone https://github.com/ChrisAdkin8/trimloop.git
@@ -417,12 +424,14 @@ licence and the [NOTICE](NOTICE) file with it. The licence does not cover
 the name "Trimloop"
 ([ADR 0054](docs/adr/0054-apache-2-licence.md)).
 
-Outside contributions are not accepted yet: they will need a contributor
+Feedback is welcome: whether the advice was right, a figure that looks
+wrong, an idea for a finding ([CONTRIBUTING.md](CONTRIBUTING.md)). Pull
+requests from outside are not merged yet: they will need a contributor
 licence agreement.
 
 Please report security problems privately, not in an issue: on the
 repository's **Security** tab, choose **Report a vulnerability**
-([GitHub's guide](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/report-privately)).
+([SECURITY.md](SECURITY.md)).
 
 Trimloop = **trim** + **loop**: it trims wasted tokens in a loop of detect,
 recommend, measure, repeat.

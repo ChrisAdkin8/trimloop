@@ -289,8 +289,9 @@ which sidecar API versions.
 **Today:** one GoReleaser job (`.goreleaser.yaml`,
 `.github/workflows/release.yml`) builds a draft release with checksums,
 SBOMs, packages and a Homebrew cask, after the tests pass in a read-only
-job. Checksums are signed and provenance attached only once the repository
-is public; until then releases stay drafts ([ADR 0051](adr/0051-private-releases-and-going-public.md)). macOS
+job. The repository is public (since v0.2.0), so the checksums are signed
+and provenance is attached; a private copy would skip both
+([ADR 0051](adr/0051-private-releases-and-going-public.md)). macOS
 binaries are not yet notarised ([ADR 0047](adr/0047-first-release-pure-go.md)).
 The pipeline below is the target once cgo arrives.
 
@@ -322,16 +323,18 @@ builds a draft GitHub release with [GoReleaser](../.goreleaser.yaml):
 archives for macOS and Linux, each for amd64 (Intel and AMD) and arm64
 (Apple silicon and other ARM), `.deb` and `.rpm` packages, signed
 checksums, a software bill of materials and build provenance. Check the
-draft, then publish it. With a `HOMEBREW_TAP_TOKEN` secret the release also
+draft, write a short "What's new" above its list of commits (what a user
+can now do, in a few lines; the list is grouped by how each commit's
+subject starts: Add, Fix, README or Docs), then publish it. With a `HOMEBREW_TAP_TOKEN` secret the release also
 updates the `ChrisAdkin8/homebrew-tap` cask, for
 `brew install --cask chrisadkin8/tap/trimloop`. CI runs the checks and a
 release dry run ([ci.yml](../.github/workflows/ci.yml)) on every push to
 `main` and every pull request. [ADR 0047](adr/0047-first-release-pure-go.md)
 has the detail.
 
-While the repository is private, releases skip the signature and
-provenance (both need it public, or a paid plan) and stay drafts.
-**Going public**, in this order
+In a private repository, releases skip the signature and provenance
+(both need it public, or a paid plan). **Going public** was done with
+v0.2.0 (2026-11-10), in this order
 ([ADR 0051](adr/0051-private-releases-and-going-public.md),
 [ADR 0052](adr/0052-third-review-corrections.md)):
 

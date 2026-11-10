@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/ChrisAdkin8/trimloop/security/advisories/new
+    about: Privately, not in an issue. See SECURITY.md.
+  - name: Ask a question, or say what your report showed
+    url: https://github.com/ChrisAdkin8/trimloop/discussions
+    about: Questions, and whether the advice was worth following, go in Discussions.

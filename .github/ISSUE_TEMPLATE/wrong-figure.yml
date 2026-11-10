@@ -1,0 +1,54 @@
+name: A figure looks wrong
+description: A cost, saving or count in a report that does not match what you expect
+labels: [figure]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Figures are the point of trimloop, so a wrong one matters.
+
+        **Before you paste anything:** reports show your project names and the
+        titles Claude Code gives your sessions. Run with `--no-titles`, and
+        paste only the lines in question, not a whole report or a log file.
+  - type: input
+    id: version
+    attributes:
+      label: trimloop version
+      description: The output of `trimloop --version`
+      placeholder: trimloop v0.2.0
+    validations:
+      required: true
+  - type: textarea
+    id: figure
+    attributes:
+      label: Which figure, and what it shows
+      description: The section of the report and the line or lines, pasted as text
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and why
+      description: For example Claude Code's `/cost`, your bill, or your own count
+    validations:
+      required: true
+  - type: dropdown
+    id: plan
+    attributes:
+      label: How you pay for Claude Code
+      options:
+        - Per token (API key)
+        - Pro or Max
+        - Team or Enterprise
+        - Bedrock, Vertex or another provider
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: >-
+        Your system (macOS or Linux), the command you ran, and whether
+        `CLAUDE_CONFIG_DIR` is set
