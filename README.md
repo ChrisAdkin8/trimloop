@@ -203,8 +203,14 @@ CLAUDE_CONFIG_DIR=/tmp/trimloop-demo trimloop --no-history --format text
 
 The trimloop plugin adds a skill to Claude Code. Ask "where did my tokens
 go?" or "why do I keep hitting my usage limit?", and Claude runs trimloop
-and explains the result in plain words. It needs trimloop
-[installed](#install). In Claude Code:
+and explains the result in plain words.
+
+**Install trimloop first.** The plugin runs the trimloop program but does
+not include it. Install it as in [Install](#install) (for now, build it
+from source: Homebrew and downloads work once releases are public), and
+check that `trimloop --version` works in a terminal.
+
+Then, in Claude Code:
 
 ```text
 /plugin marketplace add ChrisAdkin8/trimloop
@@ -215,7 +221,8 @@ Or, from a terminal, in one step:
 `claude plugin install trimloop --marketplace ChrisAdkin8/trimloop`. The
 plugin changes no settings ([ADR 0049](docs/adr/0049-claude-code-plugin.md)).
 
-**Check it works.** The plugin works in Claude Code (the `claude` command,
+**Check it works.** First, `trimloop --version` should work in a
+terminal. The plugin works in Claude Code (the `claude` command,
 or the Code tab of the Claude desktop app), not in Claude's chat, which
 cannot see your computer. Skills load when a session starts, so start a new
 session after installing, then type `/trimloop:trimloop`: Claude should run
